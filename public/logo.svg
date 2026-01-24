@@ -1,0 +1,51 @@
+<svg width="100" height="100" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Gold Gradient for the Main Body -->
+    <linearGradient id="gold-3d" x1="20" y1="20" x2="80" y2="80" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#FDE68A" />
+      <stop offset="50%" stop-color="#F59E0B" />
+      <stop offset="100%" stop-color="#B45309" />
+    </linearGradient>
+    
+    <!-- Emerald Glow for the Saving Arrow -->
+    <linearGradient id="emerald-glow" x1="50" y1="30" x2="50" y2="70" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#34D399" />
+      <stop offset="100%" stop-color="#059669" />
+    </linearGradient>
+
+    <!-- Shadow for Depth -->
+    <filter id="deep-shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#B45309" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+
+  <!-- Background Dark Circle to pop the gold -->
+  <circle cx="50" cy="50" r="48" fill="#0F172A" />
+
+  <!-- Outer Golden Hexagon (The Vault/Wealth) -->
+  <path d="M50 15L80.3109 32.5V67.5L50 85L19.6891 67.5V32.5L50 15Z" 
+        fill="url(#gold-3d)" 
+        filter="url(#deep-shadow)" />
+
+  <!-- Inner Dark Core for Contrast -->
+  <path d="M50 22L74.2487 36V64L50 78L25.7513 64V36L50 22Z" fill="#1E293B" />
+
+  <!-- Abstract "ث" & Growth Arrow (Saving & AI) -->
+  <!-- The base of "ث" as a golden bowl -->
+  <path d="M35 55C35 62 42 66 50 66C58 66 65 62 65 55" stroke="url(#gold-3d)" stroke-width="4" stroke-linecap="round" />
+  
+  <!-- The 3 dots as glowing emerald nodes (Smart/AI) -->
+  <circle cx="42" cy="45" r="3" fill="#34D399" />
+  <circle cx="58" cy="45" r="3" fill="#34D399" />
+  <circle cx="50" cy="38" r="4" fill="#10B981" />
+
+  <!-- Rising Growth Arrow (The Core of Saving) -->
+  <path d="M50 70V30M50 30L42 38M50 30L58 38" 
+        stroke="url(#emerald-glow)" 
+        stroke-width="5" 
+        stroke-linecap="round" 
+        stroke-linejoin="round" />
+
+  <!-- Highlight Shine -->
+  <path d="M25 35L50 20L75 35" stroke="white" stroke-opacity="0.2" stroke-width="2" stroke-linecap="round" />
+</svg>
