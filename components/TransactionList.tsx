@@ -1,12 +1,13 @@
 
 import React, { useState, useMemo } from 'react';
-import { Trash2, Wallet, Filter, Check } from 'lucide-react';
-import { Transaction, Category, TransactionType } from '../types';
+import { Trash2, Wallet as WalletIcon, ArrowDownLeft, ArrowUpRight, ArrowRightLeft } from 'lucide-react';
+import { Transaction, Category, TransactionType, Wallet } from '../types';
 import { getIcon } from '../constants';
 
 interface TransactionListProps {
   transactions: Transaction[];
   categories: Category[];
+  wallets: Wallet[];
   onDelete: (id: string) => void;
   currencySymbol: string;
   showFilters?: boolean;
@@ -15,20 +16,16 @@ interface TransactionListProps {
 const TransactionList: React.FC<TransactionListProps> = ({ 
   transactions, 
   categories, 
+  wallets,
   onDelete, 
   currencySymbol,
   showFilters = false
 }) => {
   const [typeFilter, setTypeFilter] = useState<'all' | TransactionType>('all');
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string>('all');
 
   const filteredTransactions = useMemo(() => {
-    return transactions.filter(tx => {
-      const matchesType = typeFilter === 'all' || tx.type === typeFilter;
-      const matchesCategory = selectedCategoryId === 'all' || tx.categoryId === selectedCategoryId;
-      return matchesType && matchesCategory;
-    });
-  }, [transactions, typeFilter, selectedCategoryId]);
+    return transactions.filter(tx => typeFilter === 'all' || tx.type === typeFilter);
+  }, [transactions, typeFilter]);
 
   const sortedTransactions = useMemo(() => {
     return [...filteredTransactions].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
@@ -36,128 +33,78 @@ const TransactionList: React.FC<TransactionListProps> = ({
 
   if (transactions.length === 0) {
     return (
-      <div className="text-center py-12 animate-entry">
-        <div className="bg-slate-100 dark:bg-slate-800 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4">
-          <Wallet className="text-slate-400" size={32} />
+      <div className="text-center py-20 animate-fade">
+        <div className="bg-slate-50 dark:bg-slate-900 w-24 h-24 rounded-[3rem] flex items-center justify-center mx-auto mb-6 shadow-inner border border-slate-100 dark:border-slate-800">
+          <WalletIcon className="text-slate-200 dark:text-slate-700" size={40} />
         </div>
-        <p className="text-slate-500 dark:text-slate-400">لا توجد عمليات مسجلة حتى الآن</p>
+        <p className="text-slate-400 dark:text-slate-500 text-sm font-black uppercase tracking-widest">السجل المالي فارغ تماماً</p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       {showFilters && (
-        <div className="space-y-4 mb-6 sticky top-0 z-10 bg-slate-50/80 dark:bg-slate-900/80 backdrop-blur-md py-2">
-          {/* Type Filter */}
-          <div className="flex bg-white dark:bg-slate-800 p-1 rounded-2xl shadow-sm">
+        <div className="flex bg-slate-50/80 dark:bg-slate-900/80 p-1.5 rounded-[2rem] border border-slate-100 dark:border-slate-800 shadow-sm sticky top-0 z-10 backdrop-blur-xl transition-all">
+          {['all', 'expense', 'income'].map((type) => (
             <button
-              onClick={() => setTypeFilter('all')}
-              className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all ${typeFilter === 'all' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-500 dark:text-slate-400'}`}
+              key={type}
+              onClick={() => setTypeFilter(type as any)}
+              className={`flex-1 py-3.5 rounded-[1.6rem] text-[10px] font-black uppercase tracking-[0.15em] transition-all ${
+                typeFilter === type 
+                  ? 'bg-white dark:bg-slate-800 text-amber-600 shadow-md scale-[1.02]' 
+                  : 'text-slate-400 dark:text-slate-500 hover:text-slate-600'
+              }`}
             >
-              الكل
+              {type === 'all' ? 'الكل' : type === 'expense' ? 'المصاريف' : 'الدخل'}
             </button>
-            <button
-              onClick={() => setTypeFilter('expense')}
-              className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all ${typeFilter === 'expense' ? 'bg-rose-500 text-white shadow-md' : 'text-slate-500 dark:text-slate-400'}`}
-            >
-              مصروفات
-            </button>
-            <button
-              onClick={() => setTypeFilter('income')}
-              className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all ${typeFilter === 'income' ? 'bg-emerald-500 text-white shadow-md' : 'text-slate-500 dark:text-slate-400'}`}
-            >
-              دخل
-            </button>
-          </div>
-
-          {/* Category Filter */}
-          <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar">
-            <button
-              onClick={() => setSelectedCategoryId('all')}
-              className={`whitespace-nowrap px-4 py-2 rounded-full text-xs font-bold transition-all border ${selectedCategoryId === 'all' ? 'bg-indigo-100 border-indigo-200 text-indigo-700 dark:bg-indigo-900/40 dark:border-indigo-800 dark:text-indigo-300' : 'bg-white dark:bg-slate-800 border-slate-100 dark:border-slate-700 text-slate-500'}`}
-            >
-              جميع التصنيفات
-            </button>
-            {categories
-              .filter(cat => typeFilter === 'all' || cat.type === typeFilter)
-              .map(cat => (
-              <button
-                key={cat.id}
-                onClick={() => setSelectedCategoryId(cat.id)}
-                className={`whitespace-nowrap px-4 py-2 rounded-full text-xs font-bold flex items-center gap-2 transition-all border ${selectedCategoryId === cat.id ? 'bg-indigo-100 border-indigo-200 text-indigo-700 dark:bg-indigo-900/40 dark:border-indigo-800 dark:text-indigo-300' : 'bg-white dark:bg-slate-800 border-slate-100 dark:border-slate-700 text-slate-500'}`}
-              >
-                <span style={{ color: cat.color }}>{getIcon(cat.icon, 14)}</span>
-                {cat.name}
-              </button>
-            ))}
-          </div>
+          ))}
         </div>
       )}
 
-      {sortedTransactions.length === 0 ? (
-        <div className="text-center py-12 animate-entry">
-          <p className="text-slate-400 text-sm">لا توجد عمليات تطابق الفلتر المختار</p>
-          <button 
-            onClick={() => { setTypeFilter('all'); setSelectedCategoryId('all'); }}
-            className="mt-2 text-indigo-600 dark:text-indigo-400 text-xs font-bold"
-          >
-            إعادة تعيين الفلاتر
-          </button>
-        </div>
-      ) : (
-        sortedTransactions.map((tx, index) => {
+      <div className="space-y-4">
+        {sortedTransactions.map((tx, index) => {
           const category = categories.find(c => c.id === tx.categoryId);
+          const wallet = wallets.find(w => w.id === tx.walletId);
+          const isIncome = tx.type === 'income';
+
           return (
             <div 
               key={tx.id} 
-              className="group animate-entry bg-white dark:bg-slate-800 p-4 rounded-2xl shadow-sm flex items-center justify-between hover:shadow-md transition-all duration-300"
-              style={{ 
-                animationDelay: `${Math.min(index * 40, 400)}ms`, 
-                opacity: 0,
-                fillMode: 'forwards'
-              }}
+              className="group bg-white dark:bg-slate-900 p-5 rounded-[2.5rem] shadow-sm border border-slate-100 dark:border-slate-800/80 flex items-center justify-between hover:shadow-xl hover:shadow-slate-200/50 dark:hover:shadow-none hover:border-amber-200 dark:hover:border-amber-900/30 transition-all duration-500 active:scale-[0.98]"
+              style={{ animationDelay: `${index * 50}ms`, animation: 'fadeIn 0.6s ease-out forwards' }}
             >
-              <div className="flex items-center gap-4">
-                <div className="p-3 rounded-xl transition-transform duration-300 group-hover:scale-110" style={{ backgroundColor: `${category?.color}20`, color: category?.color }}>
-                  {getIcon(category?.icon || 'CreditCard')}
+              <div className="flex items-center gap-5">
+                <div className="w-14 h-14 rounded-2xl flex items-center justify-center transition-all group-hover:rotate-6 group-hover:scale-110 shadow-sm" style={{ backgroundColor: `${category?.color}15`, color: category?.color }}>
+                  {getIcon(category?.icon || 'CreditCard', 26)}
                 </div>
-                <div>
-                  <p className="font-bold dark:text-white transition-colors duration-300 group-hover:text-indigo-600 dark:group-hover:text-indigo-400">{category?.name || 'غير مصنف'}</p>
-                  <div className="flex gap-2 items-center">
-                    <span className="text-xs text-slate-400">{tx.date}</span>
-                    {tx.note && <span className="text-xs text-slate-400 truncate max-w-[120px]">• {tx.note}</span>}
+                <div className="space-y-1">
+                  <span className="font-black text-[13px] text-slate-800 dark:text-white block tracking-tight">{category?.name}</span>
+                  <div className="flex items-center gap-2 px-2 py-0.5 bg-slate-50 dark:bg-slate-800 rounded-full w-fit">
+                    <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: wallet?.color }} />
+                    <span className="text-[8px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">{wallet?.name}</span>
                   </div>
                 </div>
               </div>
               
-              <div className="flex items-center gap-4">
-                <div className={`text-right transition-transform duration-300 group-hover:scale-105 ${tx.type === 'income' ? 'text-emerald-500' : 'text-rose-500'}`}>
-                  <p className="font-bold">
-                    {tx.type === 'income' ? '+' : '-'}{tx.amount.toLocaleString()} {currencySymbol}
+              <div className="flex items-center gap-5">
+                <div className="text-left flex flex-col items-end">
+                  <p className={`font-black text-[15px] tracking-tight ${isIncome ? 'text-emerald-500' : 'text-rose-500'}`}>
+                    {isIncome ? '+' : '-'}{tx.amount.toLocaleString()}
                   </p>
-                  <p className="text-[10px] opacity-70 uppercase tracking-wider">{tx.frequency === 'once' ? '' : tx.frequency}</p>
+                  <span className="text-[9px] font-black text-slate-300 dark:text-slate-600 uppercase tracking-[0.2em]">{currencySymbol}</span>
                 </div>
                 <button 
-                  onClick={(e) => {
-                    const target = e.currentTarget.closest('.group') as HTMLElement;
-                    if (target) {
-                      target.style.transform = 'translateX(-20px) scale(0.95)';
-                      target.style.opacity = '0';
-                      target.style.pointerEvents = 'none';
-                    }
-                    setTimeout(() => onDelete(tx.id), 250);
-                  }}
-                  className="opacity-0 group-hover:opacity-100 p-2 text-slate-300 hover:text-rose-500 transition-all focus:opacity-100 focus:outline-none"
-                  aria-label="حذف العملية"
+                  onClick={() => onDelete(tx.id)}
+                  className="p-3 text-slate-200 dark:text-slate-800 hover:text-rose-500 dark:hover:text-rose-400 transition-all active:scale-75"
                 >
                   <Trash2 size={18} />
                 </button>
               </div>
             </div>
           );
-        })
-      )}
+        })}
+      </div>
     </div>
   );
 };

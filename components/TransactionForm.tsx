@@ -1,143 +1,137 @@
 
 import React, { useState } from 'react';
-import { X, Calendar, Type, DollarSign, StickyNote } from 'lucide-react';
-import { Transaction, Category, TransactionType } from '../types';
+import { X, Calendar, Type, DollarSign, StickyNote, ChevronDown, Wallet as WalletIcon } from 'lucide-react';
+import { Transaction, Category, TransactionType, Wallet } from '../types';
 import { getIcon } from '../constants';
 
 interface TransactionFormProps {
   categories: Category[];
+  wallets: Wallet[];
   onSubmit: (transaction: Omit<Transaction, 'id'>) => void;
   onClose: () => void;
   currency: string;
 }
 
-const TransactionForm: React.FC<TransactionFormProps> = ({ categories, onSubmit, onClose, currency }) => {
+const TransactionForm: React.FC<TransactionFormProps> = ({ categories, wallets, onSubmit, onClose, currency }) => {
   const [type, setType] = useState<TransactionType>('expense');
   const [amount, setAmount] = useState('');
   const [categoryId, setCategoryId] = useState('');
+  const [walletId, setWalletId] = useState(wallets[0]?.id || '');
   const [note, setNote] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
-  const [frequency, setFrequency] = useState<Transaction['frequency']>('once');
 
   const filteredCategories = categories.filter(c => c.type === type);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!amount || !categoryId) return;
-
-    onSubmit({
-      amount: parseFloat(amount),
-      type,
-      categoryId,
-      note,
-      date,
-      currency,
-      frequency
-    });
-  };
-
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-t-[2.5rem] sm:rounded-[2.5rem] p-8 shadow-2xl animate-in slide-in-from-bottom duration-300">
-        <div className="flex justify-between items-center mb-6">
-          <h3 className="text-xl font-bold dark:text-white">إضافة عملية جديدة</h3>
-          <button onClick={onClose} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors">
-            <X className="text-slate-500" />
+    <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-xl flex items-end justify-center z-[100] animate-fade">
+      <div className="bg-slate-900 w-full max-w-lg rounded-t-[3.5rem] p-8 shadow-2xl animate-slide-up relative max-h-[92vh] overflow-y-auto no-scrollbar border-t border-slate-800">
+        
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 w-12 h-1.5 bg-slate-800 rounded-full" />
+
+        <div className="flex justify-between items-center mb-8 pt-4">
+          <h3 className="text-2xl font-black text-white tracking-tight">إضافة عملية</h3>
+          <button onClick={onClose} className="p-3 bg-slate-800 rounded-2xl text-slate-500 active:scale-90 transition-all">
+            <X size={20} />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-2xl">
+        <form onSubmit={(e) => {
+          e.preventDefault();
+          if (amount && categoryId && walletId) onSubmit({ 
+            amount: parseFloat(amount), 
+            type, 
+            categoryId, 
+            walletId,
+            note, 
+            date, 
+            currency: 'SAR', 
+            frequency: 'once' 
+          });
+        }} className="space-y-8 pb-10">
+          
+          <div className="flex bg-slate-950 p-1.5 rounded-[2.2rem] border border-slate-800">
             <button
               type="button"
               onClick={() => setType('expense')}
-              className={`flex-1 py-3 rounded-xl font-medium transition-all ${type === 'expense' ? 'bg-white dark:bg-slate-700 shadow-sm text-rose-500' : 'text-slate-500'}`}
+              className={`flex-1 py-4 rounded-[1.8rem] font-black text-xs uppercase tracking-widest transition-all ${type === 'expense' ? 'bg-slate-800 shadow-md text-rose-500' : 'text-slate-600'}`}
             >
               مصروف
             </button>
             <button
               type="button"
               onClick={() => setType('income')}
-              className={`flex-1 py-3 rounded-xl font-medium transition-all ${type === 'income' ? 'bg-white dark:bg-slate-700 shadow-sm text-emerald-500' : 'text-slate-500'}`}
+              className={`flex-1 py-4 rounded-[1.8rem] font-black text-xs uppercase tracking-widest transition-all ${type === 'income' ? 'bg-slate-800 shadow-md text-emerald-500' : 'text-slate-600'}`}
             >
               دخل
             </button>
           </div>
 
           <div className="relative">
-            <span className="absolute left-4 top-1/2 -translate-y-1/2 font-bold text-slate-400">{currency}</span>
             <input
               type="number"
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
               placeholder="0.00"
-              className="w-full text-4xl font-bold text-center py-4 bg-transparent border-b-2 border-slate-100 dark:border-slate-800 focus:border-indigo-500 outline-none dark:text-white"
+              className="w-full text-6xl font-black text-center py-6 bg-transparent border-none outline-none text-white placeholder:opacity-5 transition-all focus:scale-105"
               autoFocus
             />
+            <span className="absolute left-0 right-0 -bottom-2 text-[10px] font-black text-slate-700 uppercase tracking-[0.5em] text-center">{currency}</span>
           </div>
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-slate-500 dark:text-slate-400 flex items-center gap-2">
-              <Type size={16} /> التصنيف
-            </label>
-            <div className="grid grid-cols-4 gap-3">
+          <div className="space-y-4">
+            <label className="text-[10px] font-black text-slate-600 uppercase tracking-[0.2em] px-2">اختر المحفظة</label>
+            <div className="flex gap-3 overflow-x-auto no-scrollbar py-1">
+              {wallets.map(w => (
+                <button
+                  key={w.id}
+                  type="button"
+                  onClick={() => setWalletId(w.id)}
+                  className={`px-6 py-4 rounded-[1.8rem] border-2 transition-all shrink-0 font-black text-xs ${walletId === w.id ? 'border-amber-500 bg-amber-900/20 text-amber-500' : 'border-transparent bg-slate-950 text-slate-600'}`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: w.color }} />
+                    {w.name}
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <label className="text-[10px] font-black text-slate-600 uppercase tracking-[0.2em] px-2">التصنيف</label>
+            <div className="grid grid-cols-4 gap-4 max-h-56 overflow-y-auto custom-scrollbar p-1">
               {filteredCategories.map(cat => (
                 <button
                   key={cat.id}
                   type="button"
                   onClick={() => setCategoryId(cat.id)}
-                  className={`flex flex-col items-center p-3 rounded-2xl border-2 transition-all ${categoryId === cat.id ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20' : 'border-transparent bg-slate-50 dark:bg-slate-800'}`}
+                  className={`flex flex-col items-center gap-3 p-4 rounded-[2rem] border-2 transition-all active:scale-90 ${categoryId === cat.id ? 'border-amber-500 bg-amber-900/20 shadow-lg shadow-amber-500/10' : 'border-transparent bg-slate-950'}`}
                 >
-                  <div className="p-2 rounded-xl mb-1" style={{ backgroundColor: `${cat.color}20`, color: cat.color }}>
+                  <div className="transition-transform duration-300" style={{ color: cat.color }}>
                     {getIcon(cat.icon, 24)}
                   </div>
-                  <span className="text-[10px] font-medium text-slate-600 dark:text-slate-300 truncate w-full text-center">{cat.name}</span>
+                  <span className="text-[9px] font-black truncate w-full text-center text-slate-500">{cat.name}</span>
                 </button>
               ))}
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1">
-              <label className="text-sm font-medium text-slate-500 flex items-center gap-2"><Calendar size={14}/> التاريخ</label>
-              <input
-                type="date"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-                className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border-none outline-none dark:text-white"
-              />
-            </div>
-            <div className="space-y-1">
-              <label className="text-sm font-medium text-slate-500 flex items-center gap-2"><DollarSign size={14}/> التكرار</label>
-              <select
-                value={frequency}
-                onChange={(e) => setFrequency(e.target.value as any)}
-                className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border-none outline-none dark:text-white"
-              >
-                <option value="once">مرة واحدة</option>
-                <option value="weekly">أسبوعي</option>
-                <option value="monthly">شهري</option>
-                <option value="yearly">سنوي</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="space-y-1">
-            <label className="text-sm font-medium text-slate-500 flex items-center gap-2"><StickyNote size={14}/> ملاحظات</label>
-            <input
-              type="text"
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              placeholder="مثال: بقالة الأسبوع"
-              className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border-none outline-none dark:text-white"
-            />
+             <div className="bg-slate-950 p-4 rounded-[1.8rem] flex items-center gap-3 border border-slate-800">
+                <Calendar size={16} className="text-slate-600" />
+                <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="bg-transparent border-none outline-none font-black text-xs text-slate-300 w-full" />
+             </div>
+             <div className="bg-slate-950 p-4 rounded-[1.8rem] flex items-center gap-3 border border-slate-800">
+                <StickyNote size={16} className="text-slate-600" />
+                <input type="text" value={note} onChange={(e) => setNote(e.target.value)} placeholder="ملاحظة..." className="bg-transparent border-none outline-none font-black text-xs text-slate-300 w-full" />
+             </div>
           </div>
 
           <button
             type="submit"
-            className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-2xl shadow-lg shadow-indigo-200 dark:shadow-none transition-all active:scale-95"
+            className="w-full py-6 bg-amber-500 text-slate-950 font-black rounded-[2.2rem] shadow-2xl active:scale-95 transition-all text-lg tracking-tight"
           >
-            حفظ العملية
+            تأكيد العملية
           </button>
         </form>
       </div>

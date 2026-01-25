@@ -1,47 +1,113 @@
 
 <!DOCTYPE html>
-<html lang="ar" dir="rtl">
+<html lang="ar" dir="rtl" class="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="theme-color" content="#4f46e5">
-    <title>Thari - ثري المحاسب الشخصي</title>
+    <meta name="apple-mobile-web-app-title" content="Thari">
+    <link rel="apple-touch-icon" href="/logo.svg">
+    
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#020617">
+    
+    <title>Thari - ثري المحاسب الذكي</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --sat: env(safe-area-inset-top);
+            --sar: env(safe-area-inset-right);
+            --sab: env(safe-area-inset-bottom);
+            --sal: env(safe-area-inset-left);
+        }
+
         body {
             font-family: 'IBM Plex Sans Arabic', sans-serif;
-            background-color: #f8fafc;
+            background-color: #020617;
+            color: #f8fafc;
             -webkit-tap-highlight-color: transparent;
             user-select: none;
-        }
-        .dark body {
-            background-color: #0f172a;
-        }
-        /* منع السحب لتحديث الصفحة في الجوال لتعزيز شعور التطبيق الأصلي */
-        body {
-            overscroll-behavior-y: contain;
+            -webkit-user-select: none;
+            overscroll-behavior-y: none;
+            margin: 0;
+            padding: 0;
         }
         
-        @keyframes entry-slide {
-            from { opacity: 0; transform: translateY(10px) scale(0.98); }
-            to { opacity: 1; transform: translateY(0) scale(1); }
+        #root {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
         }
-        .animate-entry {
-            animation: entry-slide 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+
+        .app-container {
+            width: 100%;
+            max-width: 500px;
+            margin: 0 auto;
+            position: relative;
+            min-height: 100vh;
+            background-color: #020617;
         }
+
+        .infinite-scroll {
+            display: flex;
+            overflow-x: auto;
+            scroll-snap-type: x mandatory;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+            scroll-behavior: auto;
+            padding-left: 20%;
+            padding-right: 20%;
+            will-change: scroll-position;
+        }
+        .infinite-scroll::-webkit-scrollbar { display: none; }
         
-        .no-scrollbar::-webkit-scrollbar { display: none; }
-        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-        
-        @media print {
-            .print\:hidden { display: none !important; }
-            body { background-color: white !important; color: black !important; padding: 0 !important; }
-            #root { padding: 0 !important; }
-            .bg-indigo-600 { background-color: transparent !important; border: 2px solid black !important; }
-            .text-white { color: black !important; }
+        .snap-item { 
+            scroll-snap-align: center; 
+            flex-shrink: 0; 
+            transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+            will-change: transform, opacity, filter;
+        }
+
+        .slider-mask {
+            position: relative;
+            mask-image: linear-gradient(to right, transparent, black 35%, black 65%, transparent);
+            -webkit-mask-image: linear-gradient(to right, transparent, black 35%, black 65%, transparent);
+        }
+
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: rgba(51, 65, 85, 0.3);
+            border-radius: 20px;
+        }
+
+        .premium-card {
+            background: #0f172a;
+            border: 1px solid rgba(30, 41, 59, 0.5);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+        }
+
+        .glass {
+            background: rgba(15, 23, 42, 0.9);
+            backdrop-filter: blur(25px) saturate(180%);
+            -webkit-backdrop-filter: blur(25px) saturate(180%);
+        }
+
+        .active-glow {
+            box-shadow: 0 10px 40px rgba(245, 158, 11, 0.2);
+        }
+
+        .nav-compact {
+            padding-top: 10px;
+            padding-bottom: calc(14px + var(--sab));
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
         }
     </style>
 <script type="importmap">
@@ -57,7 +123,7 @@
 }
 </script>
 </head>
-<body>
+<body class="dark overflow-x-hidden">
     <div id="root"></div>
 </body>
 </html>
