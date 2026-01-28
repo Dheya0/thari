@@ -16,7 +16,7 @@ import WelcomeScreen from './components/WelcomeScreen';
 import LockScreen from './components/LockScreen';
 import Logo from './components/Logo';
 
-const STORAGE_KEY = 'thari_app_v20_master';
+const STORAGE_KEY = 'thari_app_v21_final';
 
 const INITIAL_WALLETS: Wallet[] = [
   { id: 'w-sar-1', name: 'الراتب (SAR)', currencyCode: 'SAR', color: '#3b82f6' },
@@ -26,7 +26,11 @@ const INITIAL_WALLETS: Wallet[] = [
 const App: React.FC = () => {
   const [state, setState] = useState<AppState>(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) return JSON.parse(saved);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      // القفل يعمل فقط إذا كان المستخدم قد ضبط PIN مسبقاً
+      return { ...parsed, isLocked: !!parsed.pin };
+    }
     return {
       userName: 'مستخدم ثري',
       transactions: [],
@@ -37,8 +41,8 @@ const App: React.FC = () => {
       currency: DEFAULT_CURRENCIES[0],
       currencies: DEFAULT_CURRENCIES,
       isDarkMode: true,
-      pin: "1234",
-      isLocked: true, // يبدأ مقفلاً إذا كان هناك PIN
+      pin: null, // لا يوجد رمز تلقائي
+      isLocked: false, // لا يقفل تلقائياً
       hasAcceptedTerms: false,
     };
   });
@@ -83,7 +87,7 @@ const App: React.FC = () => {
     if (isAiLoading) return;
     setIsAiLoading(true);
     const advice = await getFinancialAdvice(currentCurrencyTransactions, state.categories, state.currency.symbol);
-    alert(advice); // يمكن تحسينه بنافذة منبثقة لاحقاً
+    alert(advice);
     setIsAiLoading(false);
   };
 
@@ -141,6 +145,7 @@ const App: React.FC = () => {
     return <WelcomeScreen onAccept={() => setState(p => ({ ...p, hasAcceptedTerms: true }))} onShowPrivacy={() => setShowPrivacyPolicy(true)} />;
   }
 
+  // يظهر شاشة القفل فقط إذا كان هناك PIN مخزن
   if (state.pin && state.isLocked) {
     return <LockScreen savedPin={state.pin} onUnlock={() => setState(p => ({ ...p, isLocked: false }))} />;
   }
