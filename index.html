@@ -1,26 +1,20 @@
-
 <!DOCTYPE html>
 <html lang="ar" dir="rtl" class="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     
-    <!-- وسوم منع الكاش الصارمة لحل مشكلة 304 العالقة -->
+    <!-- منع الكاش بقوة -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
     
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="Thari">
-    <link rel="apple-touch-icon" href="/logo.svg">
-    
-    <meta name="mobile-web-app-capable" content="yes">
-    <meta name="theme-color" content="#020617">
-    
     <title>Thari - ثري المحاسب الذكي</title>
+    <base href="/">
+
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
     <style>
         :root {
             --sat: env(safe-area-inset-top);
@@ -33,104 +27,51 @@
             font-family: 'IBM Plex Sans Arabic', sans-serif;
             background-color: #020617;
             color: #f8fafc;
-            -webkit-tap-highlight-color: transparent;
-            user-select: none;
-            -webkit-user-select: none;
-            overscroll-behavior-y: none;
             margin: 0;
             padding: 0;
+            overflow: hidden;
+            height: 100vh;
+            width: 100vw;
         }
         
         #root {
-            min-height: 100vh;
+            height: 100%;
+            width: 100%;
             display: flex;
             flex-direction: column;
         }
 
-        .app-container {
-            width: 100%;
-            max-width: 500px;
-            margin: 0 auto;
-            position: relative;
-            min-height: 100vh;
-            background-color: #020617;
+        /* لودر بسيط يظهر فقط إذا تأخر التحميل */
+        #root:empty::after {
+            content: "جاري تحميل ثري...";
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-weight: 900;
+            color: #f59e0b;
+            letter-spacing: 2px;
+            animation: pulse 1.5s infinite;
         }
-
-        .infinite-scroll {
-            display: flex;
-            overflow-x: auto;
-            scroll-snap-type: x mandatory;
-            -webkit-overflow-scrolling: touch;
-            scrollbar-width: none;
-            scroll-behavior: auto;
-            padding-left: 20%;
-            padding-right: 20%;
-            will-change: scroll-position;
-        }
-        .infinite-scroll::-webkit-scrollbar { display: none; }
-        
-        .snap-item { 
-            scroll-snap-align: center; 
-            flex-shrink: 0; 
-            transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
-            will-change: transform, opacity, filter;
-        }
-
-        .slider-mask {
-            position: relative;
-            mask-image: linear-gradient(to right, transparent, black 35%, black 65%, transparent);
-            -webkit-mask-image: linear-gradient(to right, transparent, black 35%, black 65%, transparent);
-        }
-
-        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .custom-scrollbar::-webkit-scrollbar-thumb {
-            background: rgba(51, 65, 85, 0.3);
-            border-radius: 20px;
-        }
-
-        .premium-card {
-            background: #0f172a;
-            border: 1px solid rgba(30, 41, 59, 0.5);
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
-        }
-
-        .glass {
-            background: rgba(15, 23, 42, 0.9);
-            backdrop-filter: blur(25px) saturate(180%);
-            -webkit-backdrop-filter: blur(25px) saturate(180%);
-        }
-
-        .active-glow {
-            box-shadow: 0 10px 40px rgba(245, 158, 11, 0.2);
-        }
-
-        .nav-compact {
-            padding-top: 10px;
-            padding-bottom: calc(14px + var(--sab));
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
     </style>
-<script type="importmap">
-{
-  "imports": {
-    "react/": "https://esm.sh/react@^19.2.3/",
-    "react": "https://esm.sh/react@^19.2.3",
-    "@google/genai": "https://esm.sh/@google/genai@^1.38.0",
-    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
-    "lucide-react": "https://esm.sh/lucide-react@^0.563.0",
-    "recharts": "https://esm.sh/recharts@^3.7.0"
-  }
-}
-</script>
+
+    <script type="importmap">
+    {
+      "imports": {
+        "react/": "https://esm.sh/react@^19.2.3/",
+        "react": "https://esm.sh/react@^19.2.3",
+        "@google/genai": "https://esm.sh/@google/genai@^1.38.0",
+        "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+        "lucide-react": "https://esm.sh/lucide-react@^0.563.0",
+        "recharts": "https://esm.sh/recharts@^3.7.0"
+      }
+    }
+    </script>
 </head>
-<body class="dark overflow-x-hidden">
+<body class="dark">
     <div id="root"></div>
-    <!-- تحميل التطبيق بشكل صريح مع كاش باستر -->
-    <script type="module" src="./index.tsx?v=production_v1"></script>
+    <!-- تحميل السكريبت مع كاش باستر فريد لكل عملية دفع (Deploy) -->
+    <script type="module" src="./index.tsx?ts=20260128"></script>
 </body>
 </html>
