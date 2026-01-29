@@ -1,36 +1,62 @@
 
 import { GoogleGenAI } from "@google/genai";
-import { Transaction, Category } from "../types";
+import { Transaction, Category, ChatMessage } from "../types";
 
-export const getFinancialAdvice = async (transactions: Transaction[], categories: Category[], currencySymbol: string) => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  
-  // Prepare a summary of data for the AI
-  const summary = transactions.slice(0, 50).map(t => {
-    const cat = categories.find(c => c.id === t.categoryId);
-    return `${t.date}: ${t.type === 'income' ? '+' : '-'}${t.amount}${currencySymbol} (${cat?.name || 'Unknown'}) - ${t.note}`;
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+
+export const chatWithThari = async (
+  userMessage: string, 
+  history: ChatMessage[], 
+  context: { transactions: Transaction[], categories: Category[], currency: string }
+) => {
+  const summary = context.transactions.slice(0, 50).map(t => {
+    const cat = context.categories.find(c => c.id === t.categoryId);
+    return `${t.date}: ${t.type === 'income' ? '+' : '-'}${t.amount}${context.currency} (${cat?.name || 'Unknown'}) - ${t.note}`;
   }).join('\n');
 
-  const prompt = `
-    You are a professional financial advisor. Here is a list of recent transactions for a user:
-    ${summary}
+  const systemPrompt = `أنت "ثري"، المساعد المالي الذكي والصديق الناصح. 
+  بيانات المستخدم الحالية:
+  ${summary}
+  قواعدك:
+  1. أجب باللغة العربية بلهجة ودودة ومهنية.
+  2. قدم نصائح بناءً على البيانات الفعلية المذكورة أعلاه.
+  3. كن مقتضباً ولكن مفيداً جداً.
+  4. إذا سألك عن قدرته على الشراء، حلل رصيده ومصاريفه السابقة.`;
 
-    Please analyze their spending habits and provide:
-    1. A summary of where most of their money goes.
-    2. Three actionable tips to save more money.
-    3. An overall "Financial Health Score" from 1-10.
-    
-    Provide the response in Arabic, formatted nicely for a mobile app (use short paragraphs and bullet points).
-  `;
+  try {
+    const chat = ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: [
+        { role: 'user', parts: [{ text: systemPrompt }] },
+        ...history.map(msg => ({
+          role: msg.role,
+          parts: [{ text: msg.text }]
+        })),
+        { role: 'user', parts: [{ text: userMessage }] }
+      ]
+    });
 
+    const response = await chat;
+    return response.text;
+  } catch (error) {
+    console.error("Chat AI Error:", error);
+    return "عذراً، عقلي مشتت قليلاً الآن. هل يمكننا الحديث لاحقاً؟";
+  }
+};
+
+export const analyzeReceipt = async (base64Image: string) => {
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: prompt,
+      contents: {
+        parts: [
+          { inlineData: { mimeType: 'image/jpeg', data: base64Image } },
+          { text: "حلل الفاتورة واستخرج JSON: {amount: number, date: string, category: string, note: string}" }
+        ]
+      },
     });
-    return response.text;
+    return JSON.parse(response.text.replace(/```json|```/g, '').trim());
   } catch (error) {
-    console.error("Gemini Error:", error);
-    return "عذراً، حدث خطأ أثناء تحليل بياناتك المالية. يرجى المحاولة لاحقاً.";
+    return null;
   }
 };

@@ -28,11 +28,21 @@ export interface Transaction {
   frequency: 'once' | 'weekly' | 'monthly' | 'yearly';
 }
 
+export interface Subscription {
+  id: string;
+  name: string;
+  amount: number;
+  period: 'monthly' | 'yearly';
+  categoryId: string;
+  nextBillingDate: string;
+  isActive: boolean;
+}
+
 export interface Debt {
   id: string;
   personName: string;
   amount: number;
-  type: 'to_me' | 'on_me'; // to_me: someone owes me, on_me: i owe someone
+  type: 'to_me' | 'on_me';
   dueDate?: string;
   isPaid: boolean;
   note: string;
@@ -50,9 +60,24 @@ export type Currency = {
   name: string;
 };
 
+export interface ChatMessage {
+  role: 'user' | 'model';
+  text: string;
+  timestamp: number;
+}
+
+export interface WealthScoreData {
+  score: number;
+  label: string;
+  color: string;
+  tips: string[];
+}
+
 export type AppState = {
   userName: string;
   transactions: Transaction[];
+  subscriptions: Subscription[];
+  chatHistory: ChatMessage[];
   categories: Category[];
   wallets: Wallet[];
   debts: Debt[];

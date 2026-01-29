@@ -1,10 +1,10 @@
+
 <!DOCTYPE html>
 <html lang="ar" dir="rtl" class="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     
-    <!-- منع الكاش بقوة -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
@@ -17,10 +17,10 @@
     
     <style>
         :root {
-            --sat: env(safe-area-inset-top);
-            --sar: env(safe-area-inset-right);
-            --sab: env(safe-area-inset-bottom);
-            --sal: env(safe-area-inset-left);
+            --sat: env(safe-area-inset-top, 0px);
+            --sab: env(safe-area-inset-bottom, 0px);
+            --sar: env(safe-area-inset-right, 0px);
+            --sal: env(safe-area-inset-left, 0px);
         }
 
         body {
@@ -30,18 +30,19 @@
             margin: 0;
             padding: 0;
             overflow: hidden;
+            overscroll-behavior-y: contain;
+            height: -webkit-fill-available;
             height: 100vh;
-            width: 100vw;
         }
         
         #root {
             height: 100%;
             width: 100%;
             display: flex;
-            flex-direction: column;
+            justify-content: center;
+            background-color: #020617;
         }
 
-        /* لودر بسيط يظهر فقط إذا تأخر التحميل */
         #root:empty::after {
             content: "جاري تحميل ثري...";
             position: fixed;
@@ -54,6 +55,37 @@
             animation: pulse 1.5s infinite;
         }
         @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+        ::-webkit-scrollbar {
+            display: none;
+        }
+
+        .glass-effect {
+            backdrop-filter: blur(12px) saturate(180%);
+            -webkit-backdrop-filter: blur(12px) saturate(180%);
+            background-color: rgba(15, 23, 42, 0.7);
+        }
+
+        /* Print Optimization */
+        @media print {
+            body {
+                background-color: white !important;
+                color: black !important;
+                overflow: visible !important;
+                height: auto !important;
+            }
+            #root {
+                display: block !important;
+                background-color: white !important;
+            }
+            .no-print {
+                display: none !important;
+            }
+            @page {
+                size: A4;
+                margin: 0;
+            }
+        }
     </style>
 
     <script type="importmap">
@@ -71,7 +103,6 @@
 </head>
 <body class="dark">
     <div id="root"></div>
-    <!-- تحميل السكريبت مع كاش باستر فريد لكل عملية دفع (Deploy) -->
     <script type="module" src="./index.tsx?ts=20260128"></script>
 </body>
 </html>

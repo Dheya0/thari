@@ -35,7 +35,7 @@ const PrivacyPolicy: React.FC<PrivacyPolicyProps> = ({ onBack }) => {
             <h4 className="font-black text-sm uppercase tracking-widest">تخزين البيانات</h4>
           </div>
           <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed font-medium">
-            تطبيق "ثري" مصمم ليعمل بمبدأ <strong>الخصوصية أولاً</strong>. يتم تخزين جميع بياناتك المالية (العمليات، الميزانيات، الأسماء) محلياً على جهازك فقط باستخدام تقنية LocalStorage. لا يتم إرسال هذه البيانات إلى أي خوادم خارجية تابعة لنا.
+            تطبيق "ثري" مصمم ليعمل بمبدأ <strong>الخصوصية أولاً</strong>. يتم تخزين جميع بياناتك المالية محلياً على جهازك فقط. لا يتم إرسال هذه البيانات إلى أي خوادم خارجية تابعة لنا.
           </p>
         </section>
 
@@ -45,7 +45,7 @@ const PrivacyPolicy: React.FC<PrivacyPolicyProps> = ({ onBack }) => {
             <h4 className="font-black text-sm uppercase tracking-widest">الذكاء الاصطناعي (Gemini)</h4>
           </div>
           <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed font-medium">
-            عند طلب نصيحة مالية، يتم إرسال ملخص مجهول الهوية لعملياتك الأخيرة إلى نموذج Gemini API التابع لشركة Google لمعالجتها وتقديم النصيحة. لا يتم تخزين هذه البيانات في سجلات دائمة، وتتم العملية عبر اتصال مشفر (SSL).
+            عند طلب نصيحة مالية، يتم إرسال ملخص مجهول الهوية لعملياتك الأخيرة إلى نموذج Gemini API التابع لشركة Google لمعالجتها. العملية تتم عبر اتصال مشفر وآمن بالكامل.
           </p>
         </section>
 
@@ -55,7 +55,7 @@ const PrivacyPolicy: React.FC<PrivacyPolicyProps> = ({ onBack }) => {
             <h4 className="font-black text-sm uppercase tracking-widest">أمن المعلومات</h4>
           </div>
           <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed font-medium">
-            يمكنك تفعيل رمز PIN لحماية الوصول إلى التطبيق. نحن نستخدم ميزات الأمان الافتراضية في نظام التشغيل (iOS/Android) لحماية حاوية البيانات المحلية الخاصة بالتطبيق.
+            يمكنك تفعيل رمز PIN لحماية الوصول إلى التطبيق. نحن نستخدم ميزات الأمان الافتراضية في نظام التشغيل لحماية حاوية البيانات المحلية الخاصة بالتطبيق.
           </p>
         </section>
 
@@ -65,17 +65,7 @@ const PrivacyPolicy: React.FC<PrivacyPolicyProps> = ({ onBack }) => {
             <h4 className="font-black text-sm uppercase tracking-widest">حقوق المستخدم والحذف</h4>
           </div>
           <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed font-medium">
-            بما أن البيانات محلية، فلديك السيطرة الكاملة عليها. يمكنك في أي وقت حذف كافة البيانات من خلال "إعدادات التطبيق > حذف كافة البيانات نهائياً". كما سيؤدي حذف التطبيق من جهازك إلى مسح كافة البيانات المرتبطة به فوراً.
-          </p>
-        </section>
-
-        <section className="space-y-4">
-          <div className="flex items-center gap-3 text-slate-400">
-            <Globe size={20} />
-            <h4 className="font-black text-sm uppercase tracking-widest">تعديلات السياسة</h4>
-          </div>
-          <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed font-medium">
-            قد نقوم بتحديث هذه السياسة من حين لآخر لتعكس التغييرات في ميزات التطبيق أو المتطلبات القانونية. سيتم إخطار المستخدمين بأي تغييرات جوهرية عبر تحديثات التطبيق.
+            بما أن البيانات محلية، فلديك السيطرة الكاملة عليها. يمكنك في أي وقت حذف كافة البيانات من خلال خيار مسح السجل المالي والديون من صفحة الإعدادات. كما سيؤدي حذف التطبيق من جهازك إلى مسح كافة البيانات المرتبطة به.
           </p>
         </section>
 
