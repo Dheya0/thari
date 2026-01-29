@@ -84,17 +84,18 @@ const App: React.FC = () => {
       <FinancialReport transactions={currentCurrencyTransactions} categories={state.categories} currency={state.currency} userName={state.userName} wallets={currentCurrencyWallets} />
       
       <div className="flex flex-col h-full print:hidden">
-        <header className="p-4 pt-[calc(var(--sat)+1rem)] space-y-4 glass-effect border-b border-white/5 z-30">
+        {/* Header with Safe Area Top */}
+        <header className="px-4 py-4 pt-[calc(var(--sat)+1rem)] space-y-4 glass-effect border-b border-white/5 z-30">
           <div className="flex justify-between items-center">
-            <Logo size={40} showText />
+            <Logo size={36} showText />
             <div className="flex gap-2">
-              <button onClick={() => setActiveTab('budgets')} className={`p-2.5 rounded-xl border border-white/5 transition-all ${activeTab === 'budgets' ? 'bg-indigo-500/20 text-indigo-400' : 'text-slate-400'}`}><Target size={20} /></button>
-              <button onClick={() => setActiveTab('chat')} className={`p-2.5 rounded-xl border border-white/5 transition-all ${activeTab === 'chat' ? 'bg-amber-500/20 text-amber-500' : 'text-slate-400'}`}><BrainCircuit size={20} /></button>
+              <button onClick={() => setActiveTab('budgets')} className={`p-2 rounded-xl border border-white/5 transition-all ${activeTab === 'budgets' ? 'bg-indigo-500/20 text-indigo-400' : 'text-slate-400'}`}><Target size={20} /></button>
+              <button onClick={() => setActiveTab('chat')} className={`p-2 rounded-xl border border-white/5 transition-all ${activeTab === 'chat' ? 'bg-amber-500/20 text-amber-500' : 'text-slate-400'}`}><BrainCircuit size={20} /></button>
             </div>
           </div>
           <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
             {state.currencies.map(curr => (
-              <button key={curr.code} onClick={() => setState(p => ({ ...p, currency: curr }))} className={`flex-shrink-0 px-4 py-2 rounded-full border text-[10px] font-black uppercase transition-all ${state.currency.code === curr.code ? 'bg-amber-500 border-amber-400 text-slate-950 shadow-lg' : 'bg-slate-900/40 border-white/5 text-slate-500'}`}>{curr.code}</button>
+              <button key={curr.code} onClick={() => setState(p => ({ ...p, currency: curr }))} className={`flex-shrink-0 px-4 py-1.5 rounded-full border text-[10px] font-black uppercase transition-all ${state.currency.code === curr.code ? 'bg-amber-500 border-amber-400 text-slate-950 shadow-lg' : 'bg-slate-900/40 border-white/5 text-slate-500'}`}>{curr.code}</button>
             ))}
           </div>
         </header>
@@ -126,12 +127,19 @@ const App: React.FC = () => {
           </div>
         </main>
 
-        <button onClick={() => setShowAddForm(true)} className="fixed bottom-24 left-1/2 -translate-x-1/2 w-14 h-14 bg-amber-500 text-slate-950 rounded-full shadow-lg flex items-center justify-center z-50 border-4 border-slate-950 active:scale-90 transition-all"><Plus size={28} strokeWidth={3} /></button>
+        {/* Action Button - Moved up slightly for Android Gestures */}
+        <button 
+          onClick={() => setShowAddForm(true)} 
+          className="fixed bottom-[calc(var(--sab)+5.5rem)] left-1/2 -translate-x-1/2 w-16 h-16 bg-amber-500 text-slate-950 rounded-full shadow-2xl flex items-center justify-center z-50 border-[6px] border-slate-950 active:scale-90 transition-all shadow-amber-500/20"
+        >
+          <Plus size={32} strokeWidth={3} />
+        </button>
 
-        <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-lg bg-slate-900/80 backdrop-blur-2xl border-t border-white/5 flex justify-around p-3 pb-8 z-40">
+        {/* Navigation with Safe Area Bottom */}
+        <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-lg bg-slate-900/90 backdrop-blur-3xl border-t border-white/5 flex justify-around p-3 pt-4 bottom-nav-safe z-40">
           <NavButton icon={<LayoutDashboard />} label="ثري" active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} />
           <NavButton icon={<HandCoins />} label="ديون" active={activeTab === 'debts'} onClick={() => setActiveTab('debts')} />
-          <div className="w-12" />
+          <div className="w-16" /> {/* Spacer for Floating Action Button */}
           <NavButton icon={<Repeat />} label="دوري" active={activeTab === 'subscriptions'} onClick={() => setActiveTab('subscriptions')} />
           <NavButton icon={<SettingsIcon />} label="المزيد" active={activeTab === 'settings'} onClick={() => setActiveTab('settings')} />
         </nav>
@@ -145,8 +153,8 @@ const App: React.FC = () => {
 
 const NavButton = ({ icon, label, active, onClick }: { icon: any, label: string, active: boolean, onClick: () => void }) => (
   <button onClick={onClick} className={`flex flex-col items-center gap-1 transition-all flex-1 ${active ? 'text-amber-500 scale-105 font-bold' : 'text-slate-500'}`}>
-    <div className={`p-2 rounded-xl ${active ? 'bg-amber-500/10' : ''}`}>{React.cloneElement(icon, { size: 20 })}</div>
-    <span className="text-[8px] font-black uppercase">{label}</span>
+    <div className={`p-2 rounded-xl transition-colors ${active ? 'bg-amber-500/10' : ''}`}>{React.cloneElement(icon, { size: 22 })}</div>
+    <span className="text-[9px] font-black uppercase tracking-tighter">{label}</span>
   </button>
 );
 
