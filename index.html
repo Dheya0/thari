@@ -4,90 +4,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    
-    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-    <meta http-equiv="Pragma" content="no-cache">
-    <meta http-equiv="Expires" content="0">
-    
     <title>Thari - ثري المحاسب الذكي</title>
-    <base href="/">
-
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    
     <style>
-        :root {
-            --sat: env(safe-area-inset-top, 0px);
-            --sab: env(safe-area-inset-bottom, 0px);
-            --sar: env(safe-area-inset-right, 0px);
-            --sal: env(safe-area-inset-left, 0px);
-        }
-
-        body {
-            font-family: 'IBM Plex Sans Arabic', sans-serif;
-            background-color: #020617;
-            color: #f8fafc;
-            margin: 0;
-            padding: 0;
-            overflow-x: hidden;
-            overscroll-behavior-y: contain;
-            height: 100vh;
-            height: -webkit-fill-available;
-        }
-        
-        #root {
-            height: 100%;
-            width: 100%;
-            display: flex;
-            justify-content: center;
-            background-color: #020617;
-        }
-
-        #root:empty::after {
-            content: "جاري تحميل ثري...";
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            font-weight: 900;
-            color: #f59e0b;
-            letter-spacing: 2px;
-            animation: pulse 1.5s infinite;
-        }
-        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
-
-        ::-webkit-scrollbar {
-            display: none;
-        }
-
-        .glass-effect {
-            backdrop-filter: blur(12px) saturate(180%);
-            -webkit-backdrop-filter: blur(12px) saturate(180%);
-            background-color: rgba(15, 23, 42, 0.7);
-        }
-
-        /* Print Optimization */
-        @media print {
-            body {
-                background-color: white !important;
-                color: black !important;
-                overflow: visible !important;
-                height: auto !important;
-            }
-            #root {
-                display: block !important;
-                background-color: white !important;
-            }
-            .no-print {
-                display: none !important;
-            }
-            @page {
-                size: A4;
-                margin: 0;
-            }
-        }
+        :root { --sat: env(safe-area-inset-top, 0px); --sab: env(safe-area-inset-bottom, 0px); }
+        body { font-family: 'IBM Plex Sans Arabic', sans-serif; background-color: #020617; color: #f8fafc; margin: 0; height: 100vh; overflow: hidden; }
+        #root { height: 100%; width: 100%; display: flex; justify-content: center; }
+        .glass-effect { backdrop-filter: blur(12px); background-color: rgba(15, 23, 42, 0.7); }
+        ::-webkit-scrollbar { display: none; }
     </style>
-
     <script type="importmap">
 {
   "imports": {
@@ -99,13 +25,13 @@
     "lucide-react": "https://esm.sh/lucide-react@0.463.0",
     "recharts": "https://esm.sh/recharts@2.13.3",
     "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
-    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2",
-    "vite": "https://esm.sh/vite@^7.3.1"
+    "vite": "https://esm.sh/vite@^7.3.1",
+    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2"
   }
 }
 </script>
 </head>
-<body class="dark">
+<body>
     <div id="root"></div>
     <script type="module" src="./index.tsx"></script>
 </body>
