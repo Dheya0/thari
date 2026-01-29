@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Plus, LayoutDashboard, History, Settings as SettingsIcon, BrainCircuit, Sparkles, HandCoins, Repeat } from 'lucide-react';
-import { Transaction, AppState, Wallet, Debt, Subscription, ChatMessage } from './types';
+import { Plus, LayoutDashboard, History, Settings as SettingsIcon, BrainCircuit, HandCoins, Repeat } from 'lucide-react';
+import { Transaction, AppState, Wallet, Debt, Subscription, ChatMessage, Budget } from './types';
 import { INITIAL_CATEGORIES, DEFAULT_CURRENCIES } from './constants';
 import BalanceCard from './components/BalanceCard';
 import TransactionForm from './components/TransactionForm';
@@ -18,36 +18,47 @@ import LockScreen from './components/LockScreen';
 import Logo from './components/Logo';
 import FinancialReport from './components/FinancialReport';
 
-const STORAGE_KEY = 'thari_app_v23_ultimate_responsive';
+const STORAGE_KEY = 'thari_app_v24_stable';
 
 const INITIAL_WALLETS: Wallet[] = [
   { id: 'w-sar-1', name: 'الراتب (SAR)', currencyCode: 'SAR', color: '#3b82f6' },
   { id: 'w-sar-2', name: 'نقداً (SAR)', currencyCode: 'SAR', color: '#10b981' },
 ];
 
+const INITIAL_STATE: AppState = {
+  userName: 'مستخدم ثري',
+  transactions: [],
+  subscriptions: [],
+  chatHistory: [],
+  categories: INITIAL_CATEGORIES,
+  wallets: INITIAL_WALLETS,
+  debts: [],
+  budgets: [],
+  currency: DEFAULT_CURRENCIES[0],
+  currencies: DEFAULT_CURRENCIES,
+  isDarkMode: true,
+  pin: null,
+  isLocked: false,
+  hasAcceptedTerms: false,
+};
+
 const App: React.FC = () => {
   const [state, setState] = useState<AppState>(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      return { ...parsed, isLocked: !!parsed.pin };
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        // دمج الحالة المخزنة مع الحالة الافتراضية لضمان عدم وجود حقول ناقصة
+        return { 
+          ...INITIAL_STATE, 
+          ...parsed, 
+          isLocked: !!parsed.pin 
+        };
+      }
+    } catch (e) {
+      console.error("Failed to load state", e);
     }
-    return {
-      userName: 'مستخدم ثري',
-      transactions: [],
-      subscriptions: [],
-      chatHistory: [],
-      categories: INITIAL_CATEGORIES,
-      wallets: INITIAL_WALLETS,
-      debts: [],
-      budgets: [],
-      currency: DEFAULT_CURRENCIES[0],
-      currencies: DEFAULT_CURRENCIES,
-      isDarkMode: true,
-      pin: null,
-      isLocked: false,
-      hasAcceptedTerms: false,
-    };
+    return INITIAL_STATE;
   });
 
   const [activeTab, setActiveTab] = useState<'dashboard' | 'transactions' | 'debts' | 'chat' | 'subscriptions' | 'settings'>('dashboard');
@@ -59,12 +70,12 @@ const App: React.FC = () => {
   }, [state]);
 
   const currentCurrencyTransactions = useMemo(() => {
-    return state.transactions.filter(t => t.currency === state.currency.code);
+    return (state.transactions || []).filter(t => t.currency === state.currency.code);
   }, [state.transactions, state.currency]);
 
   const walletBalances = useMemo(() => {
     const balances: Record<string, number> = {};
-    state.transactions.forEach(t => {
+    (state.transactions || []).forEach(t => {
       const val = t.type === 'income' ? t.amount : -t.amount;
       balances[t.walletId] = (balances[t.walletId] || 0) + val;
     });
@@ -72,7 +83,7 @@ const App: React.FC = () => {
   }, [state.transactions]);
 
   const currentCurrencyWallets = useMemo(() => {
-    return state.wallets.filter(w => w.currencyCode === state.currency.code);
+    return (state.wallets || []).filter(w => w.currencyCode === state.currency.code);
   }, [state.wallets, state.currency]);
 
   const totals = useMemo(() => {
@@ -93,7 +104,6 @@ const App: React.FC = () => {
   return (
     <div className="w-full max-w-lg mx-auto h-full flex flex-col bg-slate-950 transition-all duration-500 overflow-hidden relative shadow-[0_0_100px_rgba(0,0,0,0.5)] border-x border-white/5 print:bg-white print:max-w-none print:shadow-none print:border-none print:overflow-visible">
       
-      {/* Printable Report (Hidden in App View) */}
       <FinancialReport 
         transactions={currentCurrencyTransactions} 
         categories={state.categories} 
@@ -102,7 +112,6 @@ const App: React.FC = () => {
         wallets={currentCurrencyWallets}
       />
 
-      {/* Main App Content - Hidden in Print View */}
       <div className="flex flex-col h-full print:hidden relative">
         <div className="absolute top-[-5%] left-[-20%] w-[100%] h-[40%] bg-amber-500/5 blur-[120px] rounded-full pointer-events-none z-0" />
         <div className="absolute bottom-[-5%] right-[-20%] w-[80%] h-[30%] bg-blue-500/5 blur-[100px] rounded-full pointer-events-none z-0" />
@@ -218,7 +227,7 @@ const App: React.FC = () => {
                 onRestore={(json) => {
                   try {
                     const data = JSON.parse(json);
-                    setState(p => ({ ...p, ...data, isLocked: !!data.pin }));
+                    setState(p => ({ ...INITIAL_STATE, ...data, isLocked: !!data.pin }));
                   } catch (e) { alert('خطأ في استعادة البيانات'); }
                 }} 
                 onClearData={() => { if(confirm('حذف كل البيانات؟')) setState(p => ({...p, transactions: [], debts: [], budgets: [], subscriptions: [], chatHistory: []})) }} 

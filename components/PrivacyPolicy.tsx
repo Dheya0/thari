@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { ChevronRight, ShieldCheck, Lock, EyeOff, Database, Trash2, Cpu, Globe } from 'lucide-react';
+import { ChevronRight, ShieldCheck, Lock, Database, Trash2, Cpu, Globe } from 'lucide-react';
 
 interface PrivacyPolicyProps {
   onBack: () => void;
@@ -65,7 +65,17 @@ const PrivacyPolicy: React.FC<PrivacyPolicyProps> = ({ onBack }) => {
             <h4 className="font-black text-sm uppercase tracking-widest">حقوق المستخدم والحذف</h4>
           </div>
           <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed font-medium">
-            بما أن البيانات محلية، فلديك السيطرة الكاملة عليها. يمكنك في أي وقت حذف كافة البيانات من خلال خيار مسح السجل المالي والديون من صفحة الإعدادات. كما سيؤدي حذف التطبيق من جهازك إلى مسح كافة البيانات المرتبطة به.
+            بما أن البيانات محلية، فلديك السيطرة الكاملة عليها. يمكنك في أي وقت حذف كافة البيانات من خلال خيار مسح السجل المالي والديون من صفحة الإعدادات. كما سيؤدي حذف التطبيق من جهازك إلى مسح كافة البيانات المرتبطة به فوراً.
+          </p>
+        </section>
+
+        <section className="space-y-4">
+          <div className="flex items-center gap-3 text-slate-400">
+            <Globe size={20} />
+            <h4 className="font-black text-sm uppercase tracking-widest">تعديلات السياسة</h4>
+          </div>
+          <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed font-medium">
+            قد نقوم بتحديث هذه السياسة من حين لآخر لتعكس التغييرات في ميزات التطبيق أو المتطلبات القانونية. سيتم إخطار المستخدمين بأي تغييرات جوهرية عبر تحديثات التطبيق.
           </p>
         </section>
 
