@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
@@ -17,6 +16,7 @@ const startApp = () => {
   console.info("Thari App: Successfully Initialized.");
 };
 
+// تشغيل فوري لضمان عدم حدوث تأخير في عرض الواجهة
 if (document.readyState === 'complete' || document.readyState === 'interactive') {
   startApp();
 } else {
