@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="ar" dir="rtl" class="dark">
 <head>
@@ -7,7 +8,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     
-    <title>Thari - ثري المحاسب الذكي</title>
+    <title>Thari Elite - ثري النخبة</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -35,11 +36,39 @@
             width: 100%; 
             display: flex; 
             justify-content: center; 
+            position: relative;
+            z-index: 10;
+        }
+
+        /* Luxury Aurora Background */
+        .aurora-bg {
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            overflow: hidden;
+            background: #020617;
+        }
+        .aurora-blob {
+            position: absolute;
+            width: 600px;
+            height: 600px;
+            border-radius: 50%;
+            filter: blur(120px);
+            opacity: 0.15;
+            animation: move 20s infinite alternate;
+        }
+        .blob-1 { background: #f59e0b; top: -200px; right: -100px; animation-delay: 0s; }
+        .blob-2 { background: #3b82f6; bottom: -200px; left: -100px; animation-delay: -5s; }
+        .blob-3 { background: #10b981; top: 40%; left: 30%; animation-delay: -10s; }
+
+        @keyframes move {
+            from { transform: translate(0, 0) scale(1); }
+            to { transform: translate(100px, 100px) scale(1.2); }
         }
         
         .glass-effect { 
-            backdrop-filter: blur(12px); 
-            background-color: rgba(15, 23, 42, 0.7); 
+            backdrop-filter: blur(40px); 
+            background-color: rgba(15, 23, 42, 0.6); 
         }
         
         .bottom-nav-safe {
@@ -47,6 +76,24 @@
         }
 
         ::-webkit-scrollbar { display: none; }
+
+        .shimmer {
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.05), transparent);
+            background-size: 200% 100%;
+            animation: shimmer 3s infinite;
+        }
+        @keyframes shimmer {
+            0% { background-position: -200% 0; }
+            100% { background-position: 200% 0; }
+        }
+
+        @keyframes slideUp {
+            from { transform: translateY(30px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        .animate-luxury-pop {
+            animation: slideUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
     </style>
     
     <script type="importmap">
@@ -67,6 +114,11 @@
 </script>
 </head>
 <body>
+    <div class="aurora-bg">
+        <div class="aurora-blob blob-1"></div>
+        <div class="aurora-blob blob-2"></div>
+        <div class="aurora-blob blob-3"></div>
+    </div>
     <div id="root"></div>
     <script type="module" src="./index.tsx"></script>
 </body>

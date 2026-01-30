@@ -1,18 +1,28 @@
 
-export type TransactionType = 'income' | 'expense';
+export type TransactionType = 'income' | 'expense' | 'transfer_to_goal';
 
 export interface Category {
   id: string;
   name: string;
   icon: string;
   color: string;
-  type: TransactionType;
+  type: 'income' | 'expense';
 }
 
 export interface Wallet {
   id: string;
   name: string;
   currencyCode: string;
+  color: string;
+}
+
+export interface Goal {
+  id: string;
+  name: string;
+  targetAmount: number;
+  currentAmount: number;
+  deadline?: string;
+  icon: string;
   color: string;
 }
 
@@ -66,20 +76,14 @@ export interface ChatMessage {
   timestamp: number;
 }
 
-export interface WealthScoreData {
-  score: number;
-  label: string;
-  color: string;
-  tips: string[];
-}
-
-export type AppState = {
+export interface AppState {
   userName: string;
   transactions: Transaction[];
   subscriptions: Subscription[];
   chatHistory: ChatMessage[];
   categories: Category[];
   wallets: Wallet[];
+  goals: Goal[];
   debts: Debt[];
   budgets: Budget[];
   currency: Currency;
@@ -88,4 +92,4 @@ export type AppState = {
   pin: string | null;
   isLocked: boolean;
   hasAcceptedTerms: boolean;
-};
+}

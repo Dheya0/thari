@@ -1,12 +1,10 @@
 {
   "name": "Thari",
   "description": "A comprehensive personal finance tracker with AI-driven insights, budgeting, and detailed analytics for iOS and Android.",
-  "requestFramePermissions": [
-    "camera"
-  ],
+  "requestFramePermissions": [],
   "ios": {
     "bundleId": "com.thari.finance.app",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "displayName": "Thari"
   }
 }
