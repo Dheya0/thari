@@ -1,41 +1,20 @@
+<div align="center">
+<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
+</div>
+
+# Run and deploy your AI Studio app
+
+This contains everything you need to run your app locally.
+
+View your app in AI Studio: https://ai.studio/apps/drive/1YnUmhvTwpc54PasVczWP2W7qzE3bsQNQ
+
+## Run Locally
+
+**Prerequisites:**  Node.js
 
 
----
-
-## Thari – Take Control of Your Money
-
-توقّف عن التساؤل أين يذهب مالك.
-ابدأ برؤيته بوضوح.
-
-**Thari** هو تطبيق لإدارة المصروفات الشخصية يضع السيطرة المالية بين يديك. صُمّم ليكون سريعًا، واضحًا، وفعّالًا، دون تعقيد أو ميزات غير ضرورية.
-
-أدخل مصروفاتك. راقب نفقاتك. اتخذ قرارات أفضل.
-
-### لماذا Thari؟
-
-* تسجيل المصروفات يتم خلال ثوانٍ
-* رؤية واضحة ومباشرة للنفقات
-* واجهة نظيفة تركز على الجوهر
-* أداء سريع وتجربة استخدام مستقرة
-* جاهز للاستخدام أو التطوير مباشرة
-
-### أداة تُنجز ما وُجدت من أجله
-
-Thari لا يحاول أن يكون كل شيء.
-هو يركز على شيء واحد فقط:
-منحك فهمًا حقيقيًا لنفقاتك اليومية.
-
-سواء كنت مستخدمًا يريد الانضباط المالي، أو مطورًا يبحث عن مشروع حديث ونظيف، Thari يمنحك الأساس الصحيح.
-
-### مبني بأساس تقني قوي
-
-* TypeScript لضمان الجودة والاستقرار
-* React لبناء واجهة حديثة وتفاعلية
-* Vite لتجربة تطوير سريعة وخفيفة
-
-### الخلاصة
-
-تحكم. وضوح. بساطة.
-**Thari** — أدر أموالك بوعي، لا بالتخمين.
-
----
+1. Install dependencies:
+   `npm install`
+2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
+3. Run the app:
+   `npm run dev`
