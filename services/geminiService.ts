@@ -2,7 +2,13 @@
 import { GoogleGenAI } from "@google/genai";
 import { Transaction, Category, ChatMessage } from "../types";
 
-const getAI = () => new GoogleGenAI({ apiKey: process.env.API_KEY });
+const getAI = () => {
+  const apiKey = process.env.API_KEY;
+  if (!apiKey) {
+    console.warn("API_KEY is not defined. AI features will be limited.");
+  }
+  return new GoogleGenAI({ apiKey: apiKey || '' });
+};
 
 export const chatWithThari = async (
   userMessage: string, 
@@ -15,10 +21,16 @@ export const chatWithThari = async (
     return `${t.date}: ${t.type === 'income' ? '+' : '-'}${t.amount}${context.currency} (${cat?.name || 'Unknown'}) - ${t.note}`;
   }).join('\n');
 
-  const systemInstruction = `أنت "ثري"، المستشار المالي الأكثر فخامة وحكمة. 
-مهمتك تقديم نصائح استراتيجية للمال والوفرة.
-بيانات المستخدم: ${summary}.
-كن ملهماً، واثقاً، وموجزاً جداً. أجب بالعربية.`;
+  const systemInstruction = `أنت "ثري"، المستشار المالي الأكثر فخامة وحكمة في العالم. 
+مهمتك تقديم نصائح استراتيجية لتحقيق الوفرة المالية المطلقة.
+بيانات المستخدم الحالية:
+${summary}
+
+قواعدك:
+1. كن ملهماً، واثقاً، وموجزاً جداً.
+2. استخدم لغة عربية فخمة وراقية.
+3. قدم حلولاً عملية لزيادة الادخار والاستثمار.
+4. استخدم أداة البحث عن الأسواق والعملات عند الحاجة.`;
 
   try {
     const response = await ai.models.generateContent({
@@ -36,9 +48,10 @@ export const chatWithThari = async (
       }
     });
 
-    return response.text;
+    return response.text || "أنا هنا لدعم رحلتك المالية نحو الوفرة.";
   } catch (error) {
-    return "سأكون مستشارك المالي دائماً.";
+    console.error("AI Elite Error:", error);
+    return "سأكون مستشارك المالي دائماً، دعنا نركز على أهدافك القادمة.";
   }
 };
 
@@ -49,11 +62,11 @@ export const getEliteInsight = async (transactions: Transaction[], currency: str
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: `بناءً على هذه العمليات: [${summary}]، قدم نصيحة مالية واحدة فخمة ومختصرة جداً (أقل من 15 كلمة) تحفز المستخدم على الوفرة باللغة العربية.`,
-      config: { temperature: 0.8 }
+      contents: `بناءً على هذه العمليات المالية: [${summary}]، قدم ومضة مالية واحدة فخمة ومختصرة جداً (أقل من 12 كلمة) تحفز على الوفرة باللغة العربية.`,
+      config: { temperature: 0.9 }
     });
-    return response.text;
+    return response.text || "المال ينمو حيث يوجه الانتباه بالحكمة.";
   } catch {
-    return "المال ينمو حيث يوجه الانتباه بالحكمة.";
+    return "الاستثمار في الحكمة هو أفضل استثمار مالي.";
   }
 };
