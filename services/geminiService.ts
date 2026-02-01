@@ -5,9 +5,10 @@ import { Transaction, Category, ChatMessage } from "../types";
 const getAI = () => {
   const apiKey = process.env.API_KEY;
   if (!apiKey) {
-    console.warn("API_KEY is not defined. AI features will be limited.");
+    console.error("Thari AI Error: API_KEY or GEMINI_API_KEY is missing in environment variables.");
+    return null;
   }
-  return new GoogleGenAI({ apiKey: apiKey || '' });
+  return new GoogleGenAI({ apiKey });
 };
 
 export const chatWithThari = async (
@@ -16,6 +17,8 @@ export const chatWithThari = async (
   context: { transactions: Transaction[], categories: Category[], currency: string }
 ) => {
   const ai = getAI();
+  if (!ai) return "عذراً، خدمة الذكاء الاصطناعي غير مفعلة. يرجى التأكد من إضافة مفتاح API.";
+
   const summary = context.transactions.slice(0, 30).map(t => {
     const cat = context.categories.find(c => c.id === t.categoryId);
     return `${t.date}: ${t.type === 'income' ? '+' : '-'}${t.amount}${context.currency} (${cat?.name || 'Unknown'}) - ${t.note}`;
@@ -37,7 +40,7 @@ ${summary}
       model: 'gemini-3-pro-preview',
       contents: [
         ...history.slice(-10).map(msg => ({
-          role: msg.role === 'model' ? 'model' : 'user',
+          role: msg.role === 'model' ? 'model' : 'user' as const,
           parts: [{ text: msg.text }]
         })),
         { role: 'user', parts: [{ text: userMessage }] }
@@ -49,14 +52,19 @@ ${summary}
     });
 
     return response.text || "أنا هنا لدعم رحلتك المالية نحو الوفرة.";
-  } catch (error) {
+  } catch (error: any) {
     console.error("AI Elite Error:", error);
-    return "سأكون مستشارك المالي دائماً، دعنا نركز على أهدافك القادمة.";
+    if (error.message?.includes('API_KEY')) {
+        return "هناك مشكلة في مفتاح الربط (API Key). يرجى التحقق من الإعدادات.";
+    }
+    return "واجهت صعوبة في الاتصال بخوادم الحكمة المالية. حاول مرة أخرى لاحقاً.";
   }
 };
 
 export const getEliteInsight = async (transactions: Transaction[], currency: string) => {
   const ai = getAI();
+  if (!ai) return "المال ينمو حيث يوجه الانتباه.";
+
   const summary = transactions.slice(0, 20).map(t => `${t.amount} ${t.type}`).join(', ');
   
   try {
