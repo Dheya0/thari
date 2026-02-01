@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Calendar, StickyNote } from 'lucide-react';
 import { Transaction, Category, TransactionType, Wallet } from '../types';
 import { getIcon } from '../constants';
@@ -10,9 +10,10 @@ interface TransactionFormProps {
   onSubmit: (transaction: Omit<Transaction, 'id'>) => void;
   onClose: () => void;
   currency: string;
+  initialData?: Transaction | null;
 }
 
-const TransactionForm: React.FC<TransactionFormProps> = ({ categories, wallets, onSubmit, onClose, currency }) => {
+const TransactionForm: React.FC<TransactionFormProps> = ({ categories, wallets, onSubmit, onClose, currency, initialData }) => {
   const [type, setType] = useState<TransactionType>('expense');
   const [amount, setAmount] = useState('');
   const [categoryId, setCategoryId] = useState('');
@@ -20,14 +21,26 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, wallets, 
   const [note, setNote] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
 
+  // Pre-fill data if editing
+  useEffect(() => {
+    if (initialData) {
+      setType(initialData.type);
+      setAmount(initialData.amount.toString());
+      setCategoryId(initialData.categoryId);
+      setWalletId(initialData.walletId);
+      setNote(initialData.note);
+      setDate(initialData.date);
+    }
+  }, [initialData]);
+
   return (
-    <div className="fixed inset-0 bg-slate-950/98 backdrop-blur-3xl flex items-end justify-center z-[100] p-0 sm:p-4 animate-fade">
+    <div className="fixed inset-0 bg-slate-950/98 backdrop-blur-3xl flex items-end justify-center z-[100] p-0 sm:p-4 animate-fade no-print">
       <div className="bg-slate-900 w-full max-w-lg rounded-t-[3.5rem] sm:rounded-[4rem] p-6 sm:p-10 shadow-2xl relative max-h-[96vh] overflow-y-auto no-scrollbar border-t border-white/5">
         
         <div className="absolute top-4 left-1/2 -translate-x-1/2 w-14 h-1.5 bg-slate-800 rounded-full" />
 
         <div className="flex justify-between items-center mb-8 pt-4">
-          <h3 className="text-2xl font-black text-white">إضافة عملية</h3>
+          <h3 className="text-2xl font-black text-white">{initialData ? 'تعديل العملية' : 'إضافة عملية'}</h3>
           <button onClick={onClose} className="p-3.5 bg-slate-800 rounded-2xl text-slate-500 border border-white/5 active:scale-90 transition-transform">
             <X size={20} />
           </button>
@@ -42,7 +55,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, wallets, 
             walletId,
             note, 
             date, 
-            currency: 'SAR', 
+            currency: 'SAR', // This should ideally follow the wallet's currency
             frequency: 'once' 
           });
         }} className="space-y-8">
@@ -66,7 +79,23 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, wallets, 
           </div>
 
           <div className="space-y-4">
-            <label className="text-[10px] font-black text-slate-600 uppercase tracking-widest px-4">التصنيف المالي</label>
+            <label className="text-[10px] font-black text-slate-600 uppercase tracking-widest px-4">من أين / إلى أين؟</label>
+             <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2">
+              {wallets.map(w => (
+                 <button
+                  key={w.id}
+                  type="button"
+                  onClick={() => setWalletId(w.id)}
+                  className={`shrink-0 px-6 py-3 rounded-2xl border transition-all text-xs font-bold ${walletId === w.id ? 'bg-amber-500 text-slate-900 border-amber-500' : 'bg-slate-950 text-slate-400 border-slate-800'}`}
+                 >
+                   {w.name}
+                 </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <label className="text-[10px] font-black text-slate-600 uppercase tracking-widest px-4">التصنيف</label>
             <div className="grid grid-cols-4 gap-4 max-h-56 overflow-y-auto no-scrollbar p-1">
               {categories.filter(c => c.type === (type === 'transfer_to_goal' ? 'expense' : type)).map(cat => (
                 <button
@@ -94,7 +123,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, wallets, 
           </div>
 
           <button type="submit" className="w-full py-6 bg-amber-500 text-slate-950 font-black rounded-[2.5rem] shadow-2xl active:scale-95 transition-all text-lg hover:brightness-110">
-            تأكيد العملية الماليـة
+            {initialData ? 'حفظ التعديلات' : 'تأكيد العملية'}
           </button>
         </form>
       </div>

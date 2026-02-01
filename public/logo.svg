@@ -1,31 +1,13 @@
 
 <svg width="100" height="100" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <defs>
-    <linearGradient id="gold-grad" x1="0" y1="0" x2="100" y2="100" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#FDE68A" />
-      <stop offset="50%" stop-color="#F59E0B" />
-      <stop offset="100%" stop-color="#92400E" />
-    </linearGradient>
-    <linearGradient id="emerald-grad" x1="50" y1="20" x2="50" y2="80" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#34D399" />
-      <stop offset="100%" stop-color="#059669" />
-    </linearGradient>
-  </defs>
-
-  <!-- Solid Outer Shell -->
-  <path d="M50 2L93.3 27V73L50 98L6.7 73V27L50 2Z" fill="url(#gold-grad)" />
+  <!-- القاعدة الصلبة -->
+  <rect x="10" y="10" width="80" height="80" rx="20" fill="#f59e0b" />
   
-  <!-- Inner Contrast Layer -->
-  <path d="M50 10L86.6 31V69L50 90L13.4 69V31L50 10Z" fill="#0F172A" />
-
-  <!-- Robust "ث" Symbol -->
-  <path d="M30 65C30 72 40 76 50 76C60 76 70 72 70 65" stroke="url(#gold-grad)" stroke-width="7" stroke-linecap="round" />
+  <!-- النقاط المفرغة -->
+  <circle cx="50" cy="40" r="8" fill="#0f172a" />
+  <circle cx="70" cy="65" r="8" fill="#0f172a" />
+  <circle cx="30" cy="65" r="8" fill="#0f172a" />
   
-  <!-- Bold Growth Indicator -->
-  <path d="M50 78V38M50 38L40 48M50 38L60 48" stroke="url(#emerald-grad)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" />
-
-  <!-- Distinct Nodes -->
-  <circle cx="38" cy="50" r="5" fill="#34D399" />
-  <circle cx="62" cy="50" r="5" fill="#34D399" />
-  <circle cx="50" cy="38" r="6" fill="#10B981" />
+  <!-- خط الاتصال -->
+  <path d="M30 65C30 80 70 80 70 65" stroke="#0f172a" stroke-width="6" stroke-linecap="round" />
 </svg>

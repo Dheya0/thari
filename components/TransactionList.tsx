@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo } from 'react';
-import { Trash2, Wallet as WalletIcon, ArrowDownLeft, ArrowUpRight, ArrowRightLeft } from 'lucide-react';
+import { Trash2, Edit2, Wallet as WalletIcon } from 'lucide-react';
 import { Transaction, Category, TransactionType, Wallet } from '../types';
 import { getIcon } from '../constants';
 
@@ -9,6 +9,7 @@ interface TransactionListProps {
   categories: Category[];
   wallets: Wallet[];
   onDelete: (id: string) => void;
+  onEdit: (transaction: Transaction) => void;
   currencySymbol: string;
   showFilters?: boolean;
 }
@@ -17,7 +18,8 @@ const TransactionList: React.FC<TransactionListProps> = ({
   transactions, 
   categories, 
   wallets,
-  onDelete, 
+  onDelete,
+  onEdit,
   currencySymbol,
   showFilters = false
 }) => {
@@ -94,12 +96,21 @@ const TransactionList: React.FC<TransactionListProps> = ({
                   </p>
                   <span className="text-[9px] font-black text-slate-300 dark:text-slate-600 uppercase tracking-[0.2em]">{currencySymbol}</span>
                 </div>
-                <button 
-                  onClick={() => onDelete(tx.id)}
-                  className="p-3 text-slate-200 dark:text-slate-800 hover:text-rose-500 dark:hover:text-rose-400 transition-all active:scale-75"
-                >
-                  <Trash2 size={18} />
-                </button>
+                
+                <div className="flex gap-2">
+                   <button 
+                    onClick={() => onEdit(tx)}
+                    className="p-2 text-slate-400 hover:text-amber-500 transition-all active:scale-75 bg-slate-100 dark:bg-slate-800 rounded-xl"
+                  >
+                    <Edit2 size={16} />
+                  </button>
+                  <button 
+                    onClick={() => onDelete(tx.id)}
+                    className="p-2 text-slate-400 hover:text-rose-500 transition-all active:scale-75 bg-slate-100 dark:bg-slate-800 rounded-xl"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
               </div>
             </div>
           );
