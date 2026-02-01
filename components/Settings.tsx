@@ -1,9 +1,9 @@
 
 import React, { useState, useRef } from 'react';
 import { 
-  Trash2, User, Wallet as WalletIcon, Lock, Upload, Edit2, Plus, Tag, Coins, X, Check, Printer, FileDown, ChevronDown, AlertCircle, AlertTriangle
+  Trash2, User, Wallet as WalletIcon, Lock, Upload, Edit2, Plus, Tag, Coins, X, Check, Printer, FileDown, ChevronDown, AlertCircle, AlertTriangle, FileSpreadsheet, Code
 } from 'lucide-react';
-import { Currency, Wallet, Category } from '../types';
+import { Currency, Wallet, Category, Transaction } from '../types';
 import { encryptData, decryptData } from '../services/encryptionService';
 
 interface SettingsProps {
@@ -90,49 +90,36 @@ const Settings: React.FC<SettingsProps> = ({
 
   // وظيفة تنزيل الملف بشكل آمن
   const downloadFile = (content: string, fileName: string, mimeType: string) => {
-      // إنشاء Blob
       const blob = new Blob([content], { type: mimeType });
-      // إنشاء رابط مؤقت
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
       link.download = fileName;
       link.style.display = 'none';
       document.body.appendChild(link);
-      
-      // النقر وتنزيل الملف
       link.click();
-      
-      // التنظيف بعد فترة قصيرة
       setTimeout(() => {
           document.body.removeChild(link);
           window.URL.revokeObjectURL(url);
       }, 200);
   };
 
-  const handleExport = async () => {
+  // Backup (.thari) - Encrypted
+  const handleExportBackup = async () => {
     if (isExporting) return;
     setIsExporting(true);
-    
-    // استخدام setTimeout للسماح للواجهة بالتحديث قبل تنفيذ العمليات الثقيلة
     setTimeout(async () => {
         try {
           const password = prompt("🔒 لحماية النسخة، أدخل كلمة مرور.\n(اترك الحقل فارغاً واضغط 'موافق' لحفظ نسخة عادية)");
-          
-          if (password === null) {
-              setIsExporting(false); 
-              return; 
-          }
+          if (password === null) { setIsExporting(false); return; }
 
           const dataStr = JSON.stringify(appState);
           const dateStr = new Date().toISOString().split('T')[0];
           
           if (!password) {
-              // تصدير عادي JSON
               downloadFile(dataStr, `Thari_Backup_${dateStr}.json`, 'application/json');
               showToast("تم حفظ النسخة (غير مشفرة)");
           } else {
-              // تصدير مشفر
               const encrypted = await encryptData(dataStr, password);
               downloadFile(encrypted, `Thari_Backup_Secure_${dateStr}.thari`, 'text/plain');
               showToast("تم حفظ النسخة المشفرة بنجاح");
@@ -144,6 +131,47 @@ const Settings: React.FC<SettingsProps> = ({
           setIsExporting(false);
         }
     }, 100);
+  };
+
+  // Export CSV (Excel)
+  const handleExportCSV = () => {
+    try {
+        const transactions: Transaction[] = appState.transactions;
+        const headers = ["التاريخ", "النوع", "المبلغ", "العملة", "التصنيف", "المحفظة", "ملاحظات"];
+        
+        // Add BOM for Excel Arabic support
+        let csvContent = "\uFEFF" + headers.join(",") + "\n";
+
+        transactions.forEach(t => {
+            const cat = categories.find(c => c.id === t.categoryId)?.name || 'غير مصنف';
+            const wallet = wallets.find(w => w.id === t.walletId)?.name || 'محفظة محذوفة';
+            const type = t.type === 'income' ? 'دخل' : 'صرف';
+            const note = t.note ? `"${t.note.replace(/"/g, '""')}"` : "";
+            
+            const row = [
+                t.date,
+                type,
+                t.amount,
+                t.currency,
+                cat,
+                wallet,
+                note
+            ];
+            csvContent += row.join(",") + "\n";
+        });
+
+        downloadFile(csvContent, `Thari_Report_${new Date().toISOString().split('T')[0]}.csv`, 'text/csv;charset=utf-8;');
+        showToast("تم تصدير ملف Excel بنجاح");
+    } catch (e) {
+        showToast("حدث خطأ أثناء التصدير", 'error');
+    }
+  };
+
+  // Export JSON (Raw)
+  const handleExportJSON = () => {
+      const dataStr = JSON.stringify(appState, null, 2);
+      downloadFile(dataStr, `Thari_Data_Raw_${new Date().toISOString().split('T')[0]}.json`, 'application/json');
+      showToast("تم تصدير البيانات الخام");
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -158,7 +186,6 @@ const Settings: React.FC<SettingsProps> = ({
         const content = event.target?.result as string;
         let parsedData;
 
-        // التحقق من نوع الملف
         if (content.startsWith("THARI_")) {
             const password = prompt("🔓 الملف مشفر. أدخل كلمة المرور:");
             if (!password) return;
@@ -199,9 +226,6 @@ const Settings: React.FC<SettingsProps> = ({
           window.print();
       }
   };
-
-  // ... (Currencies, Wallets, Categories sections remain unchanged as per previous logic)
-  // To verify functionality without re-rendering unnecessary parts, we focus on the Main Settings return
 
   // --- Currency Section ---
   if (activeSection === 'currencies') {
@@ -355,40 +379,59 @@ const Settings: React.FC<SettingsProps> = ({
         </div>
 
         <div className="p-6">
-            <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">العمليات والطباعة</h4>
+            <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">البيانات والتقارير</h4>
             <div className="space-y-3">
-                {/* Backup & Restore Row */}
+                
+                {/* Export Options Grid */}
                 <div className="grid grid-cols-2 gap-3">
                     <button 
-                        type="button"
-                        onClick={handleExport}
-                        disabled={isExporting} 
-                        className="flex flex-col items-center justify-center gap-3 p-6 bg-slate-800 rounded-[2rem] active:scale-95 transition-all relative overflow-hidden group hover:bg-slate-700 border border-slate-700/50"
-                    >
-                        {isExporting && <div className="absolute inset-0 bg-slate-950/50 flex items-center justify-center z-10"><div className="w-5 h-5 border-2 border-amber-500 border-t-transparent rounded-full animate-spin"></div></div>}
-                        <FileDown size={28} className="text-amber-500 group-hover:scale-110 transition-transform mb-1" />
-                        <span className="text-sm font-black text-white">نسخ احتياطي</span>
-                    </button>
-
-                    <button 
-                        type="button"
-                        onClick={() => fileInputRef.current?.click()} 
+                        onClick={handleExportCSV}
                         className="flex flex-col items-center justify-center gap-3 p-6 bg-slate-800 rounded-[2rem] active:scale-95 transition-all group hover:bg-slate-700 border border-slate-700/50"
                     >
-                        <Upload size={28} className="text-blue-500 group-hover:scale-110 transition-transform mb-1" />
-                        <span className="text-sm font-black text-white">استعادة</span>
+                        <FileSpreadsheet size={28} className="text-emerald-500 group-hover:scale-110 transition-transform mb-1" />
+                        <span className="text-sm font-black text-white">تصدير Excel</span>
+                    </button>
+                    <button 
+                        onClick={handleExportJSON}
+                        className="flex flex-col items-center justify-center gap-3 p-6 bg-slate-800 rounded-[2rem] active:scale-95 transition-all group hover:bg-slate-700 border border-slate-700/50"
+                    >
+                        <Code size={28} className="text-blue-500 group-hover:scale-110 transition-transform mb-1" />
+                        <span className="text-sm font-black text-white">تصدير JSON</span>
                     </button>
                 </div>
-                
-                {/* Print Button - Dashed Style as requested */}
+
+                {/* Print Button */}
                 <button 
                   type="button"
                   onClick={handlePrintClick} 
                   className="w-full flex items-center justify-center gap-3 p-5 bg-slate-800/50 rounded-[2rem] active:scale-95 transition-all border-2 border-dashed border-slate-700 hover:border-emerald-500/50 hover:bg-slate-800 group"
                 >
-                  <span className="text-sm font-black text-white">طباعة تقرير شامل</span>
-                  <Printer size={22} className="text-emerald-500 group-hover:scale-110 transition-transform" />
+                  <span className="text-sm font-black text-white">طباعة كشف حساب (PDF)</span>
+                  <Printer size={22} className="text-white group-hover:scale-110 transition-transform" />
                 </button>
+
+                {/* Backup & Restore */}
+                <div className="grid grid-cols-2 gap-3 pt-4 border-t border-slate-800">
+                    <button 
+                        type="button"
+                        onClick={handleExportBackup}
+                        disabled={isExporting} 
+                        className="flex items-center justify-center gap-2 p-4 bg-slate-800 rounded-3xl active:scale-95 transition-all relative overflow-hidden group hover:bg-slate-700 border border-slate-700/50"
+                    >
+                        {isExporting && <div className="absolute inset-0 bg-slate-950/50 flex items-center justify-center z-10"><div className="w-4 h-4 border-2 border-amber-500 border-t-transparent rounded-full animate-spin"></div></div>}
+                        <FileDown size={18} className="text-amber-500" />
+                        <span className="text-xs font-black text-white">نسخ احتياطي</span>
+                    </button>
+
+                    <button 
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()} 
+                        className="flex items-center justify-center gap-2 p-4 bg-slate-800 rounded-3xl active:scale-95 transition-all group hover:bg-slate-700 border border-slate-700/50"
+                    >
+                        <Upload size={18} className="text-slate-400" />
+                        <span className="text-xs font-black text-white">استعادة</span>
+                    </button>
+                </div>
             </div>
             <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept=".thari,.json,text/plain,*/*" />
         </div>
@@ -400,7 +443,7 @@ const Settings: React.FC<SettingsProps> = ({
            </button>
        </div>
 
-      {/* Currency Modal (Simplified for brevity) */}
+      {/* Currency Modal */}
       {showCurrencyModal && (
         <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-xl z-[200] flex items-end justify-center animate-fade">
             <div className="bg-slate-900 w-full max-w-lg rounded-t-[3rem] p-8 pb-12 shadow-2xl border-t border-slate-800 animate-slide-up">
