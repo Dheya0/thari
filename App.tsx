@@ -18,6 +18,7 @@ import WelcomeScreen from './components/WelcomeScreen';
 import LockScreen from './components/LockScreen';
 import Logo from './components/Logo';
 import FinancialReport from './components/FinancialReport';
+import SmartAlerts from './components/SmartAlerts';
 
 const STORAGE_KEY = 'thari_app_v4';
 
@@ -28,13 +29,13 @@ const INITIAL_STATE: AppState = {
   chatHistory: [],
   categories: INITIAL_CATEGORIES,
   wallets: [
-    { id: 'w-sar-1', name: 'الراتب', currencyCode: 'SAR', color: '#f59e0b' },
-    { id: 'w-sar-2', name: 'كاش', currencyCode: 'SAR', color: '#10b981' }
+    { id: 'w-yer-1', name: 'الراتب', currencyCode: 'YER', color: '#f59e0b' },
+    { id: 'w-yer-2', name: 'كاش', currencyCode: 'YER', color: '#10b981' }
   ],
   goals: [],
   debts: [],
   budgets: [],
-  currency: DEFAULT_CURRENCIES[0],
+  currency: DEFAULT_CURRENCIES[0], // YER is now first
   currencies: DEFAULT_CURRENCIES,
   isDarkMode: true,
   pin: null,
@@ -94,12 +95,12 @@ const App: React.FC = () => {
     if (editingTransaction) {
         setState(p => ({
             ...p,
-            transactions: p.transactions.map(t => t.id === editingTransaction.id ? { ...txData, id: t.id, currency: state.currency.code } : t)
+            transactions: p.transactions.map(t => t.id === editingTransaction.id ? { ...txData, id: t.id } : t)
         }));
     } else {
         setState(p => ({ 
             ...p, 
-            transactions: [{ ...txData, id: 'tx-' + Date.now(), currency: state.currency.code }, ...p.transactions] 
+            transactions: [{ ...txData, id: 'tx-' + Date.now() }, ...p.transactions] 
         }));
     }
     setShowAddForm(false);
@@ -179,6 +180,13 @@ const App: React.FC = () => {
           <div className="py-6 space-y-8">
             {activeTab === 'dashboard' && (
               <>
+                <SmartAlerts 
+                    budgets={state.budgets} 
+                    transactions={currentCurrencyTransactions}
+                    debts={state.debts}
+                    subscriptions={state.subscriptions}
+                    categories={state.categories}
+                />
                 <BalanceCard totalBalance={totals.balance} totalIncome={totals.income} totalExpense={totals.expense} symbol={state.currency.symbol} />
                 <section className="space-y-4">
                   <div className="flex justify-between items-center px-2">
@@ -194,6 +202,18 @@ const App: React.FC = () => {
                     currencySymbol={state.currency.symbol} 
                   />
                 </section>
+                
+                {/* Shortcuts Grid */}
+                <div className="grid grid-cols-2 gap-3">
+                    <button onClick={() => setActiveTab('goals')} className="p-4 bg-slate-900 border border-slate-800 rounded-[2rem] flex flex-col items-center gap-2 hover:bg-slate-800 transition-colors">
+                        <Coins className="text-amber-500" size={24} />
+                        <span className="text-xs font-black text-white">الأهداف</span>
+                    </button>
+                     <button onClick={() => setActiveTab('budgets')} className="p-4 bg-slate-900 border border-slate-800 rounded-[2rem] flex flex-col items-center gap-2 hover:bg-slate-800 transition-colors">
+                        <LayoutDashboard className="text-blue-500" size={24} />
+                        <span className="text-xs font-black text-white">الميزانية</span>
+                    </button>
+                </div>
               </>
             )}
             
@@ -253,8 +273,7 @@ const App: React.FC = () => {
         {showAddForm && (
             <TransactionForm 
                 categories={state.categories} 
-                wallets={state.wallets.filter(w => w.currencyCode === state.currency.code)} 
-                currency={state.currency.symbol} 
+                wallets={state.wallets} 
                 onSubmit={handleSubmitTransaction} 
                 onClose={() => { setShowAddForm(false); setEditingTransaction(null); }}
                 initialData={editingTransaction}

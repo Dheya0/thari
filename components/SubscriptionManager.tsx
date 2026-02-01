@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { CreditCard, Plus, X, Calendar, RefreshCw, Trash2, Zap } from 'lucide-react';
+import { CreditCard, Plus, X, Calendar, RefreshCw, Trash2, Zap, Clock } from 'lucide-react';
 import { Subscription, Category } from '../types';
 import { getIcon } from '../constants';
 
@@ -18,6 +18,7 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ subscriptions
   const [amount, setAmount] = useState('');
   const [period, setPeriod] = useState<'monthly' | 'yearly'>('monthly');
   const [categoryId, setCategoryId] = useState('');
+  const [nextBilling, setNextBilling] = useState('');
 
   const totalMonthly = subscriptions.reduce((sum, sub) => {
     return sum + (sub.period === 'monthly' ? sub.amount : sub.amount / 12);
@@ -52,9 +53,16 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ subscriptions
                 </div>
                 <div>
                   <h4 className="font-black text-white">{sub.name}</h4>
-                  <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-1">
-                    <RefreshCw size={10} /> {sub.period === 'monthly' ? 'شهري' : 'سنوي'}
-                  </p>
+                  <div className="flex flex-col gap-1">
+                     <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-1">
+                        <RefreshCw size={10} /> {sub.period === 'monthly' ? 'شهري' : 'سنوي'}
+                     </p>
+                     {sub.nextBillingDate && (
+                         <p className="text-[10px] font-bold text-indigo-400 flex items-center gap-1">
+                            <Clock size={10} /> {sub.nextBillingDate}
+                         </p>
+                     )}
+                  </div>
                 </div>
               </div>
               <div className="flex items-center gap-4">
@@ -86,15 +94,21 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ subscriptions
                     <option value="yearly">سنوي</option>
                   </select>
                 </div>
+                <div className="flex gap-4">
+                    <div className="flex-1 space-y-2">
+                        <label className="text-[10px] font-black text-slate-500 px-2 uppercase tracking-widest">تاريخ التجديد القادم</label>
+                        <input type="date" value={nextBilling} onChange={e => setNextBilling(e.target.value)} className="w-full p-5 rounded-2xl bg-slate-950 border border-slate-800 text-slate-400 font-bold outline-none" />
+                    </div>
+                </div>
                 <select value={categoryId} onChange={e => setCategoryId(e.target.value)} className="w-full p-5 rounded-2xl bg-slate-950 border border-slate-800 text-white font-bold outline-none">
                   <option value="">اختر التصنيف</option>
                   {categories.filter(c => c.type === 'expense').map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
                 <button onClick={() => {
                   if (name && amount && categoryId) {
-                    onAdd({ name, amount: parseFloat(amount), period, categoryId, nextBillingDate: '', isActive: true });
+                    onAdd({ name, amount: parseFloat(amount), period, categoryId, nextBillingDate: nextBilling, isActive: true });
                     setShowAdd(false);
-                    setName(''); setAmount('');
+                    setName(''); setAmount(''); setNextBilling('');
                   }
                 }} className="w-full py-6 bg-amber-500 text-slate-950 font-black rounded-[2.2rem] text-lg shadow-xl">حفظ الاشتراك</button>
              </div>

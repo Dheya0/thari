@@ -8,12 +8,36 @@ import {
 import { Category, Currency } from './types';
 
 export const DEFAULT_CURRENCIES: Currency[] = [
-  { code: 'SAR', symbol: 'ر.س', name: 'ريال سعودي' },
   { code: 'YER', symbol: 'ر.ي', name: 'ريال يمني' },
+  { code: 'SAR', symbol: 'ر.س', name: 'ريال سعودي' },
   { code: 'USD', symbol: '$', name: 'دولار أمريكي' },
-  { code: 'EGP', symbol: 'ج.م', name: 'جنيه مصري' },
+  { code: 'EUR', symbol: '€', name: 'يورو' },
   { code: 'AED', symbol: 'د.إ', name: 'درهم إماراتي' },
+  { code: 'KWD', symbol: 'د.ك', name: 'دينار كويتي' },
+  { code: 'EGP', symbol: 'ج.م', name: 'جنيه مصري' },
+  { code: 'OMR', symbol: 'ر.ع', name: 'ريال عماني' },
+  { code: 'QAR', symbol: 'ر.ق', name: 'ريال قطري' },
+  { code: 'JOD', symbol: 'د.أ', name: 'دينار أردني' },
+  { code: 'INR', symbol: '₹', name: 'روبية هندية' },
 ];
+
+// Exchange Rates relative to YER (Base)
+// 1 Unit of [KEY] = [VALUE] YER
+export const CURRENCY_RATES: Record<string, number> = {
+  YER: 1,        // Base
+  SAR: 428,      // 100 SAR = 42800 YER -> 1 SAR = 428 YER
+  USD: 1633,
+  EUR: 1479,
+  AED: 342,
+  EGP: 81,
+  OMR: 3253,
+  QAR: 345,
+  KWD: 4094,
+  JOD: 1767,
+  INR: 18,
+  BHD: 4330,     // Estimated based on USD peg if needed, but sticking to provided list mostly
+  GBP: 2050,     // Placeholder/Estimated
+};
 
 export const INITIAL_CATEGORIES: Category[] = [
   // Expenses
