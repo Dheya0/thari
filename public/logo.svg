@@ -1,13 +1,28 @@
 
-<svg width="100" height="100" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <!-- القاعدة الصلبة -->
-  <rect x="10" y="10" width="80" height="80" rx="20" fill="#f59e0b" />
+<svg width="512" height="512" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="gold-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fbbf24" />
+      <stop offset="50%" stop-color="#d97706" />
+      <stop offset="100%" stop-color="#b45309" />
+    </linearGradient>
+    <linearGradient id="bg-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a" />
+      <stop offset="100%" stop-color="#020617" />
+    </linearGradient>
+  </defs>
+
+  <!-- الخلفية الداكنة الفاخرة -->
+  <rect width="100" height="100" rx="28" fill="url(#bg-gradient)" />
   
-  <!-- النقاط المفرغة -->
-  <circle cx="50" cy="40" r="8" fill="#0f172a" />
-  <circle cx="70" cy="65" r="8" fill="#0f172a" />
-  <circle cx="30" cy="65" r="8" fill="#0f172a" />
-  
-  <!-- خط الاتصال -->
-  <path d="M30 65C30 80 70 80 70 65" stroke="#0f172a" stroke-width="6" stroke-linecap="round" />
+  <!-- إطار ذهبي نحيف -->
+  <rect x="2" y="2" width="96" height="96" rx="26" stroke="url(#gold-gradient)" stroke-width="1" stroke-opacity="0.5" />
+
+  <!-- الرمز: أعمدة النمو (تمثل نقاط الثاء) -->
+  <rect x="24" y="45" width="12" height="20" rx="6" fill="url(#gold-gradient)" />
+  <rect x="44" y="25" width="12" height="40" rx="6" fill="url(#gold-gradient)" />
+  <rect x="64" y="35" width="12" height="30" rx="6" fill="url(#gold-gradient)" />
+
+  <!-- المنحنى السفلي -->
+  <path d="M 24 78 Q 50 92 76 78" stroke="url(#gold-gradient)" stroke-width="5" stroke-linecap="round" />
 </svg>
