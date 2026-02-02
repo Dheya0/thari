@@ -115,7 +115,7 @@
             -webkit-mask-image: linear-gradient(to left, transparent, black 15%, black 85%, transparent);
         }
         
-        /* Critical Print Styles - Ensure only report is visible */
+        /* Improved Print Styles */
         @media print {
             body {
                 background: white !important;
@@ -123,7 +123,7 @@
                 height: auto !important;
                 overflow: visible !important;
             }
-            .aurora-bg, header, nav, .glass-effect, .no-print, button, .settings-ui { 
+            .aurora-bg, header, nav, .glass-effect, .no-print, button, select, input, .fixed { 
                 display: none !important; 
             }
             #root {
@@ -132,22 +132,22 @@
                 position: static !important;
                 overflow: visible !important;
             }
-            /* Hide everything in App except the report */
-            #root > *:not(#printable-report) {
-                display: none !important;
+            /* Ensure the report container and all its parents are visible */
+            .print\:block {
+                display: block !important;
             }
             #printable-report { 
                 display: block !important; 
-                position: static !important;
+                position: absolute !important;
+                top: 0 !important;
+                left: 0 !important;
                 width: 100% !important;
-                height: auto !important;
-                margin: 0 !important;
-                padding: 0 !important;
                 background: white !important;
                 color: black !important;
+                z-index: 9999 !important;
             }
             @page {
-                margin: 1cm;
+                margin: 1.5cm;
                 size: A4;
             }
         }

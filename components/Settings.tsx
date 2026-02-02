@@ -1,10 +1,90 @@
 
 import React, { useState, useRef } from 'react';
 import { 
-  Trash2, User, Wallet as WalletIcon, Lock, Upload, Edit2, Plus, Tag, Coins, X, Check, Printer, FileDown, ChevronDown, AlertCircle, AlertTriangle, FileSpreadsheet, Code
+  Trash2, User, Wallet as WalletIcon, Lock, Upload, Edit2, Plus, Tag, Coins, X, Check, Printer, FileDown, ChevronDown, AlertCircle, AlertTriangle, FileSpreadsheet, Code, ChevronLeft, Palette, Type,
+  // Fix: Added missing icons used in the component
+  ChevronRight, TrendingUp
 } from 'lucide-react';
 import { Currency, Wallet, Category, Transaction } from '../types';
 import { encryptData, decryptData } from '../services/encryptionService';
+import { getIcon } from '../constants';
+
+const COLORS = ['#f59e0b', '#10b981', '#3b82f6', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16', '#f43f5e', '#64748b'];
+const ICONS = ['Utensils', 'Car', 'Home', 'Receipt', 'Film', 'HeartPulse', 'GraduationCap', 'Briefcase', 'Wallet', 'CreditCard', 'ShoppingBag', 'Gift', 'PiggyBank', 'Coffee', 'Zap', 'Bus', 'Plane', 'Smartphone', 'ShieldCheck'];
+
+// --- Reusable Helper Components (Moved up to fix hoisting/typing issues) ---
+
+// Fix: Explicitly define children prop and move definition before usage to avoid TS errors
+const Modal = ({ title, children, onClose }: { title: string, children: React.ReactNode, onClose: () => void }) => (
+    <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-2xl z-[400] flex items-end justify-center animate-fade">
+        <div className="bg-slate-900 w-full max-w-lg rounded-t-[3.5rem] p-8 pb-12 shadow-2xl border-t border-slate-800 animate-slide-up overflow-y-auto no-scrollbar max-h-[95vh]">
+            <div className="flex justify-between items-center mb-10">
+                <h3 className="text-2xl font-black text-white tracking-tight">{title}</h3>
+                <button onClick={onClose} className="p-3 bg-slate-800 rounded-2xl text-slate-500 active:scale-90 transition-all"><X size={20} /></button>
+            </div>
+            {children}
+        </div>
+    </div>
+);
+
+const InputField = ({ label, value, onChange, placeholder, ...props }: any) => (
+    <div className="space-y-2">
+        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2">{label}</label>
+        <input 
+            type="text" 
+            value={value} 
+            onChange={e => onChange(e.target.value)} 
+            placeholder={placeholder} 
+            className="w-full p-5 rounded-2xl bg-slate-950 border border-slate-800 text-white font-bold outline-none focus:border-amber-500 transition-all shadow-inner"
+            {...props}
+        />
+    </div>
+);
+
+const ActionButton = ({ label, onClick }: any) => (
+    <button onClick={onClick} className="w-full py-6 bg-amber-500 text-slate-950 font-black rounded-[2.2rem] text-lg shadow-xl active:scale-95 transition-all mt-4">
+        {label}
+    </button>
+);
+
+const ColorPicker = ({ selected, onSelect }: { selected: string, onSelect: (c: string) => void }) => (
+    <div className="space-y-3">
+        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2 flex items-center gap-2"><Palette size={14} /> اللون المميز</label>
+        <div className="flex gap-3 overflow-x-auto no-scrollbar p-1">
+            {COLORS.map(color => (
+                <button key={color} onClick={() => onSelect(color)} className={`w-10 h-10 rounded-full border-4 transition-all shrink-0 ${selected === color ? 'border-white scale-125 shadow-lg' : 'border-transparent'}`} style={{ backgroundColor: color }} />
+            ))}
+        </div>
+    </div>
+);
+
+const ToastNotification = ({ toast }: { toast: { message: string, type: 'success' | 'error' } | null }) => {
+  if (!toast) return null;
+  return (
+    <div className={`fixed top-6 left-1/2 -translate-x-1/2 px-6 py-3 rounded-2xl shadow-2xl z-[500] flex items-center gap-3 animate-fade ${toast.type === 'success' ? 'bg-emerald-500 text-white' : 'bg-rose-500 text-white'}`}>
+      {toast.type === 'success' ? <Check size={18} /> : <AlertCircle size={18} />}
+      <span className="font-bold text-sm">{toast.message}</span>
+    </div>
+  );
+};
+
+const ConfirmDialog = ({ confirmData, onCancel }: { confirmData: { message: string, action: () => void } | null, onCancel: () => void }) => {
+  if (!confirmData) return null;
+  return (
+    <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[500] flex items-center justify-center p-4 animate-fade">
+      <div className="bg-slate-900 p-8 rounded-[2.5rem] max-w-sm w-full border border-slate-800 shadow-2xl space-y-6 text-center">
+        <div className="w-16 h-16 bg-amber-500/10 rounded-full flex items-center justify-center mx-auto text-amber-500">
+           <AlertTriangle size={32} />
+        </div>
+        <p className="text-white font-bold text-lg leading-relaxed">{confirmData.message}</p>
+        <div className="grid grid-cols-2 gap-3">
+           <button onClick={onCancel} className="py-4 bg-slate-950 text-slate-400 rounded-2xl font-black text-sm hover:bg-slate-800 transition-colors">إلغاء</button>
+           <button onClick={() => { confirmData.action(); onCancel(); }} className="py-4 bg-amber-500 text-slate-950 rounded-2xl font-black text-sm shadow-lg shadow-amber-500/20 hover:bg-amber-400 transition-colors">تأكيد</button>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 interface SettingsProps {
   userName: string;
@@ -29,34 +109,6 @@ interface SettingsProps {
   onPrint?: (type: 'summary' | 'detailed') => void;
 }
 
-const ToastNotification = ({ toast }: { toast: { message: string, type: 'success' | 'error' } | null }) => {
-  if (!toast) return null;
-  return (
-    <div className={`fixed top-6 left-1/2 -translate-x-1/2 px-6 py-3 rounded-2xl shadow-2xl z-[300] flex items-center gap-3 animate-fade ${toast.type === 'success' ? 'bg-emerald-500 text-white' : 'bg-rose-500 text-white'}`}>
-      {toast.type === 'success' ? <Check size={18} /> : <AlertCircle size={18} />}
-      <span className="font-bold text-sm">{toast.message}</span>
-    </div>
-  );
-};
-
-const ConfirmDialog = ({ confirmData, onCancel }: { confirmData: { message: string, action: () => void } | null, onCancel: () => void }) => {
-  if (!confirmData) return null;
-  return (
-    <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[300] flex items-center justify-center p-4 animate-fade">
-      <div className="bg-slate-900 p-8 rounded-[2.5rem] max-w-sm w-full border border-slate-800 shadow-2xl space-y-6 text-center">
-        <div className="w-16 h-16 bg-amber-500/10 rounded-full flex items-center justify-center mx-auto text-amber-500">
-           <AlertTriangle size={32} />
-        </div>
-        <p className="text-white font-bold text-lg leading-relaxed">{confirmData.message}</p>
-        <div className="grid grid-cols-2 gap-3">
-           <button onClick={onCancel} className="py-4 bg-slate-950 text-slate-400 rounded-2xl font-black text-sm hover:bg-slate-800 transition-colors">إلغاء</button>
-           <button onClick={() => { confirmData.action(); onCancel(); }} className="py-4 bg-amber-500 text-slate-950 rounded-2xl font-black text-sm shadow-lg shadow-amber-500/20 hover:bg-amber-400 transition-colors">تأكيد</button>
-        </div>
-      </div>
-    </div>
-  );
-};
-
 const Settings: React.FC<SettingsProps> = ({ 
   userName, pin, currency, currencies, wallets, categories, appState, onUpdateSettings, 
   onAddCurrency, onRemoveCurrency, onAddWallet, onUpdateWallet, onRemoveWallet,
@@ -72,12 +124,21 @@ const Settings: React.FC<SettingsProps> = ({
   
   const [toast, setToast] = useState<{message: string, type: 'success' | 'error'} | null>(null);
   const [confirmData, setConfirmData] = useState<{message: string, action: () => void} | null>(null);
+  
   const [showAddCurrencyForm, setShowAddCurrencyForm] = useState(false);
   const [newCurrency, setNewCurrency] = useState({ name: '', code: '', symbol: '' });
 
+  // Wallet Form State
+  const [showWalletForm, setShowWalletForm] = useState(false);
+  const [editingWallet, setEditingWallet] = useState<Wallet | null>(null);
+  const [walletData, setWalletData] = useState({ name: '', currencyCode: currency.code, color: COLORS[0] });
+
+  // Category Form State
+  const [showCategoryForm, setShowCategoryForm] = useState(false);
+  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  const [categoryData, setCategoryData] = useState({ name: '', icon: ICONS[0], color: COLORS[0], type: 'expense' as 'income' | 'expense' });
+
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editName, setEditName] = useState('');
 
   const showToast = (message: string, type: 'success' | 'error' = 'success') => {
     setToast({ message, type });
@@ -88,7 +149,6 @@ const Settings: React.FC<SettingsProps> = ({
     setConfirmData({ message, action });
   };
 
-  // وظيفة تنزيل الملف بشكل آمن
   const downloadFile = (content: string, fileName: string, mimeType: string) => {
       const blob = new Blob([content], { type: mimeType });
       const url = window.URL.createObjectURL(blob);
@@ -104,7 +164,6 @@ const Settings: React.FC<SettingsProps> = ({
       }, 200);
   };
 
-  // Backup (.thari) - Encrypted
   const handleExportBackup = async () => {
     if (isExporting) return;
     setIsExporting(true);
@@ -112,10 +171,8 @@ const Settings: React.FC<SettingsProps> = ({
         try {
           const password = prompt("🔒 لحماية النسخة، أدخل كلمة مرور.\n(اترك الحقل فارغاً واضغط 'موافق' لحفظ نسخة عادية)");
           if (password === null) { setIsExporting(false); return; }
-
           const dataStr = JSON.stringify(appState);
           const dateStr = new Date().toISOString().split('T')[0];
-          
           if (!password) {
               downloadFile(dataStr, `Thari_Backup_${dateStr}.json`, 'application/json');
               showToast("تم حفظ النسخة (غير مشفرة)");
@@ -125,7 +182,6 @@ const Settings: React.FC<SettingsProps> = ({
               showToast("تم حفظ النسخة المشفرة بنجاح");
           }
         } catch (e) {
-          console.error("Export Error:", e);
           showToast("فشل النسخ الاحتياطي", 'error');
         } finally {
           setIsExporting(false);
@@ -133,33 +189,19 @@ const Settings: React.FC<SettingsProps> = ({
     }, 100);
   };
 
-  // Export CSV (Excel)
   const handleExportCSV = () => {
     try {
         const transactions: Transaction[] = appState.transactions;
         const headers = ["التاريخ", "النوع", "المبلغ", "العملة", "التصنيف", "المحفظة", "ملاحظات"];
-        
-        // Add BOM for Excel Arabic support
         let csvContent = "\uFEFF" + headers.join(",") + "\n";
-
         transactions.forEach(t => {
             const cat = categories.find(c => c.id === t.categoryId)?.name || 'غير مصنف';
             const wallet = wallets.find(w => w.id === t.walletId)?.name || 'محفظة محذوفة';
-            const type = t.type === 'income' ? 'دخل' : 'صرف';
+            const typeLabel = t.type === 'income' ? 'دخل' : 'صرف';
             const note = t.note ? `"${t.note.replace(/"/g, '""')}"` : "";
-            
-            const row = [
-                t.date,
-                type,
-                t.amount,
-                t.currency,
-                cat,
-                wallet,
-                note
-            ];
+            const row = [t.date, typeLabel, t.amount, t.currency, cat, wallet, note];
             csvContent += row.join(",") + "\n";
         });
-
         downloadFile(csvContent, `Thari_Report_${new Date().toISOString().split('T')[0]}.csv`, 'text/csv;charset=utf-8;');
         showToast("تم تصدير ملف Excel بنجاح");
     } catch (e) {
@@ -167,7 +209,6 @@ const Settings: React.FC<SettingsProps> = ({
     }
   };
 
-  // Export JSON (Raw)
   const handleExportJSON = () => {
       const dataStr = JSON.stringify(appState, null, 2);
       downloadFile(dataStr, `Thari_Data_Raw_${new Date().toISOString().split('T')[0]}.json`, 'application/json');
@@ -177,37 +218,27 @@ const Settings: React.FC<SettingsProps> = ({
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    
     e.target.value = ''; 
-
     const reader = new FileReader();
     reader.onload = async (event) => {
       try {
         const content = event.target?.result as string;
         let parsedData;
-
         if (content.startsWith("THARI_")) {
             const password = prompt("🔓 الملف مشفر. أدخل كلمة المرور:");
             if (!password) return;
             const decrypted = await decryptData(content, password);
             parsedData = JSON.parse(decrypted);
         } else {
-            try {
-                parsedData = JSON.parse(content);
-            } catch {
-                throw new Error("تنسيق الملف غير صالح");
-            }
+            parsedData = JSON.parse(content);
         }
-
-        if (parsedData && (parsedData.transactions || parsedData.userName)) {
+        if (parsedData) {
             onRestore(parsedData);
             showToast("تم استعادة البيانات بنجاح!");
             setTimeout(() => window.location.reload(), 1500);
-        } else {
-            throw new Error("البيانات في الملف غير مكتملة");
         }
       } catch (e: any) {
-        showToast(e.message || "فشل الاستعادة", 'error');
+        showToast("فشل الاستعادة: " + e.message, 'error');
       }
     };
     reader.readAsText(file);
@@ -218,94 +249,80 @@ const Settings: React.FC<SettingsProps> = ({
     onUpdateSettings({ userName: localUserName, pin: finalPin });
     showToast("تم حفظ الإعدادات العامة");
   };
-  
-  const handlePrintClick = () => {
-      if (onPrint) {
-          onPrint('detailed');
-      } else {
-          window.print();
-      }
+
+  // --- Wallet Actions ---
+  const openWalletEdit = (w: Wallet) => {
+    setEditingWallet(w);
+    setWalletData({ name: w.name, currencyCode: w.currencyCode, color: w.color });
+    setShowWalletForm(true);
+  };
+  const saveWallet = () => {
+    if (!walletData.name) return showToast("يرجى إدخال اسم المحفظة", "error");
+    if (editingWallet) onUpdateWallet(editingWallet.id, walletData);
+    else onAddWallet(walletData);
+    setShowWalletForm(false);
+    setEditingWallet(null);
+    showToast("تم حفظ المحفظة");
   };
 
-  // --- Currency Section ---
+  // --- Category Actions ---
+  const openCategoryEdit = (c: Category) => {
+    setEditingCategory(c);
+    setCategoryData({ name: c.name, icon: c.icon, color: c.color, type: c.type });
+    setShowCategoryForm(true);
+  };
+  const saveCategory = () => {
+    if (!categoryData.name) return showToast("يرجى إدخال اسم التصنيف", "error");
+    if (editingCategory) onUpdateCategory(editingCategory.id, categoryData);
+    else onAddCategory(categoryData);
+    setShowCategoryForm(false);
+    setEditingCategory(null);
+    showToast("تم حفظ التصنيف");
+  };
+
+  // --- Currencies Section ---
   if (activeSection === 'currencies') {
     return (
       <div className="space-y-6 pb-24 animate-fade">
         <div className="flex items-center gap-4 mb-4">
-           <button onClick={() => setActiveSection('main')} className="p-2 bg-slate-800 rounded-full text-slate-400"><X size={20} /></button>
+           <button onClick={() => setActiveSection('main')} className="p-3 bg-slate-900 rounded-2xl border border-slate-800 text-slate-400 active:scale-90 transition-all"><ChevronRight size={20} /></button>
            <h3 className="font-black text-white text-lg">إدارة العملات</h3>
         </div>
         <div className="space-y-4">
            {currencies.map(c => (
-             <div key={c.code} className="bg-slate-900 p-4 rounded-2xl flex items-center justify-between border border-slate-800">
-                <div className="flex items-center gap-3">
-                    <span className="bg-slate-800 text-amber-500 font-black px-3 py-1.5 rounded-lg text-sm">{c.symbol}</span>
+             <div key={c.code} className="bg-slate-900 p-5 rounded-[2rem] flex items-center justify-between border border-slate-800">
+                <div className="flex items-center gap-4">
+                    <span className="bg-slate-800 text-amber-500 font-black w-12 h-12 flex items-center justify-center rounded-2xl border border-white/5">{c.symbol}</span>
                     <div className="flex flex-col">
                         <span className="font-bold text-white text-base">{c.name}</span>
-                        <span className="text-[10px] text-slate-500 font-black">{c.code}</span>
+                        <span className="text-[10px] text-slate-500 font-black uppercase tracking-widest">{c.code}</span>
                     </div>
                 </div>
                 {currency.code !== c.code && (
                     <button 
-                        onClick={() => triggerConfirm(
-                            `هل أنت متأكد من حذف عملة ${c.name} (${c.code})؟`,
-                            () => {
-                                onRemoveCurrency(c.code);
-                                showToast("تم حذف العملة بنجاح");
-                            }
-                        )} 
-                        className="p-3 bg-slate-800 text-rose-500 rounded-xl hover:bg-rose-500/10 border border-slate-700 hover:border-rose-500/30 transition-all active:scale-95"
+                        onClick={() => triggerConfirm(`هل أنت متأكد من حذف عملة ${c.name}؟`, () => onRemoveCurrency(c.code))} 
+                        className="p-3 bg-slate-800 text-rose-500 rounded-xl hover:bg-rose-500/10 border border-slate-700 active:scale-95"
                     >
                         <Trash2 size={18} />
                     </button>
                 )}
              </div>
            ))}
-           <button onClick={() => setShowAddCurrencyForm(true)} className="w-full py-5 bg-amber-500/10 text-amber-500 font-black rounded-2xl border border-amber-500/20 flex items-center justify-center gap-2 hover:bg-amber-500/20 transition-all active:scale-95">
+           <button onClick={() => setShowAddCurrencyForm(true)} className="w-full py-5 bg-amber-500/10 text-amber-500 font-black rounded-2xl border border-amber-500/20 flex items-center justify-center gap-2 active:scale-95">
               <Plus size={20} /> إضافة عملة جديدة
            </button>
         </div>
-        {/* Add Currency Modal Logic Same as before */}
         {showAddCurrencyForm && (
-            <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-xl z-[250] flex items-end justify-center animate-fade">
-                <div className="bg-slate-900 w-full max-w-lg rounded-t-[3rem] p-8 pb-12 shadow-2xl border-t border-slate-800 animate-slide-up">
-                    <div className="flex justify-between items-center mb-8">
-                        <h3 className="text-2xl font-black text-white">إضافة عملة</h3>
-                        <button onClick={() => setShowAddCurrencyForm(false)} className="p-3 bg-slate-800 rounded-2xl text-slate-500"><X size={20} /></button>
+            <Modal title="إضافة عملة" onClose={() => setShowAddCurrencyForm(false)}>
+                <div className="space-y-6">
+                    <InputField label="اسم العملة" value={newCurrency.name} onChange={(v: string) => setNewCurrency({...newCurrency, name: v})} placeholder="ريال سعودي" />
+                    <div className="grid grid-cols-2 gap-4">
+                        <InputField label="الرمز (USD)" value={newCurrency.code} onChange={(v: string) => setNewCurrency({...newCurrency, code: v.toUpperCase()})} placeholder="USD" maxLength={3} />
+                        <InputField label="الشعار ($)" value={newCurrency.symbol} onChange={(v: string) => setNewCurrency({...newCurrency, symbol: v})} placeholder="$" />
                     </div>
-                    <div className="space-y-5">
-                        <div className="space-y-2">
-                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2">اسم العملة</label>
-                            <input type="text" value={newCurrency.name} onChange={e => setNewCurrency({...newCurrency, name: e.target.value})} placeholder="مثال: دينار كويتي" className="w-full p-4 rounded-2xl bg-slate-950 border border-slate-800 text-white font-bold outline-none focus:border-amber-500" />
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2">الرمز (Code)</label>
-                                <input type="text" value={newCurrency.code} onChange={e => setNewCurrency({...newCurrency, code: e.target.value.toUpperCase()})} placeholder="KWD" maxLength={3} className="w-full p-4 rounded-2xl bg-slate-950 border border-slate-800 text-white font-bold outline-none focus:border-amber-500 uppercase text-center" />
-                            </div>
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2">الشعار (Symbol)</label>
-                                <input type="text" value={newCurrency.symbol} onChange={e => setNewCurrency({...newCurrency, symbol: e.target.value})} placeholder="د.ك" className="w-full p-4 rounded-2xl bg-slate-950 border border-slate-800 text-white font-bold outline-none focus:border-amber-500 text-center" />
-                            </div>
-                        </div>
-                        <button 
-                            onClick={() => {
-                                if(!newCurrency.name || !newCurrency.code || !newCurrency.symbol) {
-                                    showToast("يرجى تعبئة جميع الحقول المطلوبة", 'error');
-                                    return;
-                                }
-                                onAddCurrency(newCurrency);
-                                showToast("تم إضافة العملة بنجاح");
-                                setNewCurrency({ name: '', code: '', symbol: '' });
-                                setShowAddCurrencyForm(false);
-                            }} 
-                            className="w-full py-5 bg-amber-500 text-slate-950 font-black rounded-[2rem] text-lg shadow-xl active:scale-95 transition-all mt-4"
-                        >
-                            حفظ العملة
-                        </button>
-                    </div>
+                    <ActionButton label="حفظ العملة" onClick={() => { onAddCurrency(newCurrency); setShowAddCurrencyForm(false); showToast("تم إضافة العملة"); }} />
                 </div>
-            </div>
+            </Modal>
         )}
         <ToastNotification toast={toast} />
         <ConfirmDialog confirmData={confirmData} onCancel={() => setConfirmData(null)} />
@@ -313,154 +330,234 @@ const Settings: React.FC<SettingsProps> = ({
     );
   }
 
-  if (activeSection === 'wallets') { return <div className="p-4 text-white">Wallets Section Placeholder (Handled in main logic)</div>; }
-  if (activeSection === 'categories') { return <div className="p-4 text-white">Categories Section Placeholder (Handled in main logic)</div>; }
+  // --- Wallets Section ---
+  if (activeSection === 'wallets') {
+    return (
+      <div className="space-y-6 pb-24 animate-fade">
+        <div className="flex items-center gap-4 mb-4">
+           <button onClick={() => setActiveSection('main')} className="p-3 bg-slate-900 rounded-2xl border border-slate-800 text-slate-400 active:scale-90 transition-all"><ChevronRight size={20} /></button>
+           <h3 className="font-black text-white text-lg">إدارة المحافظ</h3>
+        </div>
+        <div className="space-y-4">
+            {wallets.map(w => (
+                <div key={w.id} className="bg-slate-900 p-5 rounded-[2.5rem] flex items-center justify-between border border-slate-800 hover:border-amber-500/30 transition-all">
+                    <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-white" style={{ backgroundColor: w.color }}>
+                            <WalletIcon size={24} />
+                        </div>
+                        <div>
+                            <p className="font-bold text-white text-base">{w.name}</p>
+                            <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest">{w.currencyCode}</p>
+                        </div>
+                    </div>
+                    <div className="flex gap-2">
+                        <button onClick={() => openWalletEdit(w)} className="p-3 bg-slate-800 text-amber-500 rounded-xl active:scale-95"><Edit2 size={18} /></button>
+                        <button onClick={() => triggerConfirm(`هل تريد حذف محفظة ${w.name}؟`, () => onRemoveWallet(w.id))} className="p-3 bg-slate-800 text-rose-500 rounded-xl active:scale-95"><Trash2 size={18} /></button>
+                    </div>
+                </div>
+            ))}
+            <button onClick={() => { setEditingWallet(null); setWalletData({ name: '', currencyCode: currency.code, color: COLORS[0] }); setShowWalletForm(true); }} className="w-full py-5 bg-amber-500/10 text-amber-500 font-black rounded-2xl border border-amber-500/20 flex items-center justify-center gap-2 active:scale-95">
+                <Plus size={20} /> إضافة محفظة
+            </button>
+        </div>
+        {showWalletForm && (
+            <Modal title={editingWallet ? "تعديل محفظة" : "إضافة محفظة"} onClose={() => setShowWalletForm(false)}>
+                <div className="space-y-6">
+                    <InputField label="اسم المحفظة" value={walletData.name} onChange={(v: string) => setWalletData({...walletData, name: v})} placeholder="كاش، راتب..." />
+                    <div className="space-y-2">
+                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2">العملة</label>
+                        <select value={walletData.currencyCode} onChange={e => setWalletData({...walletData, currencyCode: e.target.value})} className="w-full p-4 rounded-2xl bg-slate-950 border border-slate-800 text-white font-bold outline-none">
+                            {currencies.map(c => <option key={c.code} value={c.code}>{c.name} ({c.code})</option>)}
+                        </select>
+                    </div>
+                    <ColorPicker selected={walletData.color} onSelect={c => setWalletData({...walletData, color: c})} />
+                    <ActionButton label="حفظ المحفظة" onClick={saveWallet} />
+                </div>
+            </Modal>
+        )}
+        <ToastNotification toast={toast} />
+        <ConfirmDialog confirmData={confirmData} onCancel={() => setConfirmData(null)} />
+      </div>
+    );
+  }
+
+  // --- Categories Section ---
+  if (activeSection === 'categories') {
+    return (
+      <div className="space-y-6 pb-24 animate-fade">
+        <div className="flex items-center gap-4 mb-4">
+           <button onClick={() => setActiveSection('main')} className="p-3 bg-slate-900 rounded-2xl border border-slate-800 text-slate-400 active:scale-90 transition-all"><ChevronRight size={20} /></button>
+           <h3 className="font-black text-white text-lg">إدارة التصنيفات</h3>
+        </div>
+        <div className="space-y-8">
+            {['expense', 'income'].map(type => (
+                <div key={type} className="space-y-4">
+                    <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2 flex items-center gap-2">
+                        {type === 'expense' ? <TrendingUp size={14} className="rotate-180 text-rose-500" /> : <TrendingUp size={14} className="text-emerald-500" />}
+                        {type === 'expense' ? 'تصنيفات المصروفات' : 'تصنيفات الدخل'}
+                    </h4>
+                    <div className="grid grid-cols-2 gap-3">
+                        {categories.filter(c => c.type === type).map(c => (
+                            <div key={c.id} onClick={() => openCategoryEdit(c)} className="bg-slate-900 p-4 rounded-[2rem] border border-slate-800 flex items-center gap-3 cursor-pointer hover:border-amber-500/30 active:scale-95 transition-all">
+                                <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: `${c.color}20`, color: c.color }}>
+                                    {getIcon(c.icon, 20)}
+                                </div>
+                                <span className="font-bold text-white text-sm truncate">{c.name}</span>
+                            </div>
+                        ))}
+                        <button onClick={() => { setEditingCategory(null); setCategoryData({ name: '', icon: ICONS[0], color: COLORS[0], type: type as any }); setShowCategoryForm(true); }} className="p-4 bg-slate-900/40 rounded-[2rem] border-2 border-dashed border-slate-800 flex items-center justify-center text-slate-500 active:scale-95 transition-all">
+                            <Plus size={20} />
+                        </button>
+                    </div>
+                </div>
+            ))}
+        </div>
+        {showCategoryForm && (
+            <Modal title={editingCategory ? "تعديل تصنيف" : "إضافة تصنيف"} onClose={() => setShowCategoryForm(false)}>
+                <div className="space-y-6">
+                    <div className="flex bg-slate-950 p-1 rounded-2xl border border-slate-800">
+                        <button onClick={() => setCategoryData({...categoryData, type: 'expense'})} className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase transition-all ${categoryData.type === 'expense' ? 'bg-rose-500 text-white' : 'text-slate-600'}`}>صرف</button>
+                        <button onClick={() => setCategoryData({...categoryData, type: 'income'})} className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase transition-all ${categoryData.type === 'income' ? 'bg-emerald-500 text-white' : 'text-slate-600'}`}>دخل</button>
+                    </div>
+                    <InputField label="اسم التصنيف" value={categoryData.name} onChange={(v: string) => setCategoryData({...categoryData, name: v})} placeholder="طعام، مواصلات..." />
+                    <div className="space-y-3">
+                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2">الأيقونة</label>
+                        <div className="grid grid-cols-5 gap-3 max-h-40 overflow-y-auto no-scrollbar p-1">
+                            {ICONS.map(icon => (
+                                <button key={icon} onClick={() => setCategoryData({...categoryData, icon})} className={`w-12 h-12 rounded-xl flex items-center justify-center border transition-all ${categoryData.icon === icon ? 'border-amber-500 bg-amber-500/10 text-amber-500' : 'border-slate-800 text-slate-500'}`}>
+                                    {getIcon(icon, 20)}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                    <ColorPicker selected={categoryData.color} onSelect={c => setCategoryData({...categoryData, color: c})} />
+                    <div className="flex gap-3">
+                        {editingCategory && (
+                            <button onClick={() => triggerConfirm(`حذف تصنيف ${editingCategory.name}؟`, () => { onRemoveCategory(editingCategory.id); setShowCategoryForm(false); })} className="p-4 bg-rose-500/10 text-rose-500 border border-rose-500/20 rounded-2xl active:scale-95"><Trash2 size={24} /></button>
+                        )}
+                        <button onClick={saveCategory} className="flex-1 py-5 bg-amber-500 text-slate-950 font-black rounded-2xl shadow-xl active:scale-95">حفظ التصنيف</button>
+                    </div>
+                </div>
+            </Modal>
+        )}
+        <ToastNotification toast={toast} />
+        <ConfirmDialog confirmData={confirmData} onCancel={() => setConfirmData(null)} />
+      </div>
+    );
+  }
 
   // --- Main Settings View ---
   return (
     <div className="space-y-6 pb-24 animate-fade">
-      <div className="flex justify-between items-center bg-slate-900 p-4 rounded-3xl border border-slate-800">
-        <h3 className="font-black text-white">الإعدادات العامة</h3>
-        <button onClick={handleSaveProfile} className="bg-amber-500 text-slate-950 px-6 py-2 rounded-2xl font-black text-sm active:scale-95 transition-all">حفظ</button>
+      <div className="flex justify-between items-center bg-slate-900 p-5 rounded-[2.5rem] border border-slate-800">
+        <h3 className="font-black text-white text-lg">الإعدادات العامة</h3>
+        <button onClick={handleSaveProfile} className="bg-amber-500 text-slate-950 px-8 py-3 rounded-2xl font-black text-sm active:scale-95 transition-all shadow-lg shadow-amber-500/10">حفظ</button>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
-         <button onClick={() => setActiveSection('wallets')} className="bg-slate-900 p-4 rounded-3xl border border-slate-800 flex flex-col items-center gap-2 text-white font-bold hover:bg-slate-800 transition-colors">
-            <WalletIcon className="text-amber-500" size={24} /> 
-            <span className="text-xs">المحافظ</span>
+      <div className="grid grid-cols-2 gap-4">
+         <button onClick={() => setActiveSection('wallets')} className="bg-slate-900 p-6 rounded-[2.5rem] border border-slate-800 flex flex-col items-center gap-4 text-white font-bold hover:bg-slate-800 transition-all active:scale-95">
+            <div className="w-12 h-12 bg-amber-500/10 text-amber-500 flex items-center justify-center rounded-2xl"><WalletIcon size={24} /></div>
+            <span className="text-xs font-black uppercase tracking-widest">المحافظ</span>
          </button>
-         <button onClick={() => setActiveSection('categories')} className="bg-slate-900 p-4 rounded-3xl border border-slate-800 flex flex-col items-center gap-2 text-white font-bold hover:bg-slate-800 transition-colors">
-            <Tag className="text-blue-500" size={24} /> 
-            <span className="text-xs">التصنيفات</span>
+         <button onClick={() => setActiveSection('categories')} className="bg-slate-900 p-6 rounded-[2.5rem] border border-slate-800 flex flex-col items-center gap-4 text-white font-bold hover:bg-slate-800 transition-all active:scale-95">
+            <div className="w-12 h-12 bg-blue-500/10 text-blue-500 flex items-center justify-center rounded-2xl"><Tag size={24} /></div>
+            <span className="text-xs font-black uppercase tracking-widest">التصنيفات</span>
          </button>
-         <button onClick={() => setActiveSection('currencies')} className="col-span-2 bg-slate-900 p-4 rounded-3xl border border-slate-800 flex items-center justify-between text-white font-bold hover:bg-slate-800 transition-colors">
-            <div className="flex items-center gap-3">
-                <Coins className="text-emerald-500" size={24} />
-                <span>إعدادات العملات</span>
+         <button onClick={() => setActiveSection('currencies')} className="col-span-2 bg-slate-900 p-6 rounded-[2.5rem] border border-slate-800 flex items-center justify-between text-white font-bold hover:bg-slate-800 transition-all active:scale-95">
+            <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-emerald-500/10 text-emerald-500 flex items-center justify-center rounded-2xl"><Coins size={24} /></div>
+                <span className="text-xs font-black uppercase tracking-widest">إعدادات العملات</span>
             </div>
-            <Edit2 size={16} className="text-slate-600" />
+            <ChevronLeft size={20} className="text-slate-600" />
          </button>
       </div>
       
-      {/* Currency Selector */}
       <button 
         onClick={() => setShowCurrencyModal(true)}
-        className="w-full bg-slate-900 p-5 rounded-[2.5rem] border border-slate-800 flex items-center justify-between group active:scale-[0.98] transition-all hover:border-amber-500/30"
+        className="w-full bg-slate-900 p-6 rounded-[2.5rem] border border-slate-800 flex items-center justify-between group active:scale-[0.98] transition-all hover:border-amber-500/30"
       >
-        <div className="flex items-center gap-4">
-             <div className="w-12 h-12 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-center text-amber-500">
-                 <span className="text-lg font-black">{currency.symbol}</span>
+        <div className="flex items-center gap-5">
+             <div className="w-14 h-14 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-center text-amber-500 shadow-xl">
+                 <span className="text-xl font-black">{currency.symbol}</span>
              </div>
              <div className="text-right">
-                 <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">العملة الأساسية</p>
-                 <p className="text-white font-bold text-lg">{currency.name}</p>
+                 <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">العملة الأساسية للنظام</p>
+                 <p className="text-white font-black text-lg">{currency.name}</p>
              </div>
         </div>
         <ChevronDown size={20} className="text-slate-500" />
       </button>
 
-      {/* Main Controls Section */}
-      <div className="bg-slate-900 rounded-[2.5rem] border border-slate-800 divide-y divide-slate-800">
-        <div className="p-6 space-y-4">
-          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2"><User size={14} /> الاسم</label>
-          <input type="text" value={localUserName} onChange={e => setLocalUserName(e.target.value)} className="w-full p-4 rounded-2xl bg-slate-800 text-white font-bold border-none outline-none focus:ring-1 focus:ring-amber-500" />
+      <div className="bg-slate-900 rounded-[3rem] border border-slate-800 divide-y divide-slate-800 overflow-hidden">
+        <div className="p-8 space-y-4">
+          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2 px-2"><User size={14} /> اسم صاحب الحساب</label>
+          <input type="text" value={localUserName} onChange={e => setLocalUserName(e.target.value)} className="w-full p-5 rounded-2xl bg-slate-800 text-white font-bold border-none outline-none focus:ring-1 focus:ring-amber-500 shadow-inner" />
         </div>
 
-        <div className="p-6 space-y-4">
-          <div className="flex justify-between items-center">
-            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2"><Lock size={14} /> رمز القفل (PIN)</label>
-            <div className={`w-12 h-6 rounded-full p-1 cursor-pointer transition-colors ${isSecurityEnabled ? 'bg-amber-500' : 'bg-slate-700'}`} onClick={() => setIsSecurityEnabled(!isSecurityEnabled)}>
-              <div className={`w-4 h-4 bg-white rounded-full transition-transform ${isSecurityEnabled ? 'translate-x-6' : 'translate-x-0'}`} />
+        <div className="p-8 space-y-6">
+          <div className="flex justify-between items-center px-2">
+            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2"><Lock size={14} /> حماية الخصوصية (PIN)</label>
+            <div className={`w-14 h-7 rounded-full p-1 cursor-pointer transition-all ${isSecurityEnabled ? 'bg-amber-500 shadow-[0_0_15px_rgba(245,158,11,0.3)]' : 'bg-slate-700'}`} onClick={() => setIsSecurityEnabled(!isSecurityEnabled)}>
+              <div className={`w-5 h-5 bg-white rounded-full shadow-md transition-transform ${isSecurityEnabled ? 'translate-x-7' : 'translate-x-0'}`} />
             </div>
           </div>
           {isSecurityEnabled && (
-            <input type="password" value={localPin} onChange={e => setLocalPin(e.target.value.replace(/\D/g, '').slice(0, 4))} className="w-full p-4 rounded-2xl bg-slate-800 text-white font-bold text-center tracking-[1em]" placeholder="****" />
+            <input type="password" value={localPin} onChange={e => setLocalPin(e.target.value.replace(/\D/g, '').slice(0, 4))} className="w-full p-5 rounded-2xl bg-slate-800 text-white font-black text-center text-2xl tracking-[1em]" placeholder="****" />
           )}
         </div>
 
-        <div className="p-6">
-            <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">البيانات والتقارير</h4>
-            <div className="space-y-3">
-                
-                {/* Export Options Grid */}
-                <div className="grid grid-cols-2 gap-3">
-                    <button 
-                        onClick={handleExportCSV}
-                        className="flex flex-col items-center justify-center gap-3 p-6 bg-slate-800 rounded-[2rem] active:scale-95 transition-all group hover:bg-slate-700 border border-slate-700/50"
-                    >
-                        <FileSpreadsheet size={28} className="text-emerald-500 group-hover:scale-110 transition-transform mb-1" />
-                        <span className="text-sm font-black text-white">تصدير Excel</span>
+        <div className="p-8">
+            <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-6 px-2">البيانات والتقارير</h4>
+            <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                    <button onClick={handleExportCSV} className="flex flex-col items-center justify-center gap-3 p-6 bg-slate-800/50 rounded-[2.5rem] active:scale-95 transition-all group hover:bg-slate-800 border border-slate-800/50">
+                        <FileSpreadsheet size={28} className="text-emerald-500 mb-1" />
+                        <span className="text-[10px] font-black text-white uppercase tracking-widest">تصدير Excel</span>
                     </button>
-                    <button 
-                        onClick={handleExportJSON}
-                        className="flex flex-col items-center justify-center gap-3 p-6 bg-slate-800 rounded-[2rem] active:scale-95 transition-all group hover:bg-slate-700 border border-slate-700/50"
-                    >
-                        <Code size={28} className="text-blue-500 group-hover:scale-110 transition-transform mb-1" />
-                        <span className="text-sm font-black text-white">تصدير JSON</span>
+                    <button onClick={handleExportJSON} className="flex flex-col items-center justify-center gap-3 p-6 bg-slate-800/50 rounded-[2.5rem] active:scale-95 transition-all group hover:bg-slate-800 border border-slate-800/50">
+                        <Code size={28} className="text-blue-500 mb-1" />
+                        <span className="text-[10px] font-black text-white uppercase tracking-widest">تصدير JSON</span>
                     </button>
                 </div>
-
-                {/* Print Button */}
-                <button 
-                  type="button"
-                  onClick={handlePrintClick} 
-                  className="w-full flex items-center justify-center gap-3 p-5 bg-slate-800/50 rounded-[2rem] active:scale-95 transition-all border-2 border-dashed border-slate-700 hover:border-emerald-500/50 hover:bg-slate-800 group"
-                >
+                <button onClick={() => onPrint?.('detailed')} className="w-full flex items-center justify-center gap-4 p-6 bg-slate-800/50 rounded-[2.5rem] active:scale-95 transition-all border-2 border-dashed border-slate-800 hover:border-amber-500/50 hover:bg-slate-800 group">
+                  <Printer size={22} className="text-amber-500" />
                   <span className="text-sm font-black text-white">طباعة كشف حساب (PDF)</span>
-                  <Printer size={22} className="text-white group-hover:scale-110 transition-transform" />
                 </button>
-
-                {/* Backup & Restore */}
-                <div className="grid grid-cols-2 gap-3 pt-4 border-t border-slate-800">
-                    <button 
-                        type="button"
-                        onClick={handleExportBackup}
-                        disabled={isExporting} 
-                        className="flex items-center justify-center gap-2 p-4 bg-slate-800 rounded-3xl active:scale-95 transition-all relative overflow-hidden group hover:bg-slate-700 border border-slate-700/50"
-                    >
-                        {isExporting && <div className="absolute inset-0 bg-slate-950/50 flex items-center justify-center z-10"><div className="w-4 h-4 border-2 border-amber-500 border-t-transparent rounded-full animate-spin"></div></div>}
+                <div className="grid grid-cols-2 gap-4 pt-4">
+                    <button onClick={handleExportBackup} disabled={isExporting} className="flex items-center justify-center gap-3 p-5 bg-slate-800 rounded-3xl active:scale-95 border border-slate-700/50">
                         <FileDown size={18} className="text-amber-500" />
                         <span className="text-xs font-black text-white">نسخ احتياطي</span>
                     </button>
-
-                    <button 
-                        type="button"
-                        onClick={() => fileInputRef.current?.click()} 
-                        className="flex items-center justify-center gap-2 p-4 bg-slate-800 rounded-3xl active:scale-95 transition-all group hover:bg-slate-700 border border-slate-700/50"
-                    >
+                    <button onClick={() => fileInputRef.current?.click()} className="flex items-center justify-center gap-3 p-5 bg-slate-800 rounded-3xl active:scale-95 border border-slate-700/50">
                         <Upload size={18} className="text-slate-400" />
                         <span className="text-xs font-black text-white">استعادة</span>
                     </button>
                 </div>
             </div>
-            <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept=".thari,.json,text/plain,*/*" />
+            <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" />
         </div>
       </div>
       
        <div className="px-1">
-           <button onClick={() => triggerConfirm("هل أنت متأكد من مسح جميع بيانات التطبيق؟", () => { onClearData(); showToast("تم مسح البيانات بنجاح"); })} className="w-full py-5 text-rose-500 font-black text-sm border border-rose-500/20 bg-rose-500/5 rounded-[2rem] hover:bg-rose-500/10 transition-all active:scale-95 flex items-center justify-center gap-2">
-             <Trash2 size={18} /> حذف كافة البيانات
+           <button onClick={() => triggerConfirm("هل أنت متأكد من مسح جميع بيانات التطبيق؟", onClearData)} className="w-full py-6 text-rose-500 font-black text-sm border border-rose-500/20 bg-rose-500/5 rounded-[2.5rem] active:scale-95 flex items-center justify-center gap-3">
+             <Trash2 size={20} /> مسح السجل المالي نهائياً
            </button>
        </div>
 
-      {/* Currency Modal */}
       {showCurrencyModal && (
-        <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-xl z-[200] flex items-end justify-center animate-fade">
-            <div className="bg-slate-900 w-full max-w-lg rounded-t-[3rem] p-8 pb-12 shadow-2xl border-t border-slate-800 animate-slide-up">
-                <div className="flex justify-between items-center mb-8">
-                    <h3 className="text-2xl font-black text-white">اختر العملة</h3>
-                    <button onClick={() => setShowCurrencyModal(false)} className="p-3 bg-slate-800 rounded-2xl text-slate-500"><X size={20} /></button>
-                </div>
-                <div className="space-y-3 max-h-[60vh] overflow-y-auto no-scrollbar">
-                    {currencies.map(c => (
-                        <button key={c.code} onClick={() => { onUpdateSettings({ currency: c }); setShowCurrencyModal(false); showToast(`تم التغيير إلى ${c.name}`); }} className="w-full p-4 rounded-3xl flex items-center justify-between border border-slate-800 bg-slate-950 text-white">
-                            <span className="font-bold">{c.name} ({c.code})</span>
-                            {currency.code === c.code && <Check size={20} className="text-amber-500" />}
-                        </button>
-                    ))}
-                </div>
+        <Modal title="اختر العملة" onClose={() => setShowCurrencyModal(false)}>
+            <div className="space-y-3 max-h-[60vh] overflow-y-auto no-scrollbar pr-1">
+                {currencies.map(c => (
+                    <button key={c.code} onClick={() => { onUpdateSettings({ currency: c }); setShowCurrencyModal(false); showToast(`العملة الحالية: ${c.name}`); }} className="w-full p-5 rounded-3xl flex items-center justify-between border border-slate-800 bg-slate-950 text-white transition-all active:scale-95">
+                        <div className="flex items-center gap-4">
+                            <span className="text-lg font-black text-amber-500">{c.symbol}</span>
+                            <span className="font-bold text-base">{c.name}</span>
+                        </div>
+                        {currency.code === c.code && <Check size={24} className="text-amber-500" />}
+                    </button>
+                ))}
             </div>
-        </div>
+        </Modal>
       )}
       
       <ToastNotification toast={toast} />

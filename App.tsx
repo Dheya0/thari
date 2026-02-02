@@ -83,7 +83,7 @@ const App: React.FC = () => {
     // Increased timeout to ensure React renders the hidden print view before browser print dialog opens
     setTimeout(() => {
         window.print();
-    }, 500);
+    }, 800);
   };
 
   const handleEditTransaction = (tx: Transaction) => {
@@ -111,12 +111,9 @@ const App: React.FC = () => {
   if (state.pin && state.isLocked) return <LockScreen savedPin={state.pin} onUnlock={() => setState(p => ({ ...p, isLocked: false }))} />;
 
   return (
-    <div className="w-full max-w-lg mx-auto h-full flex flex-col bg-transparent transition-all overflow-hidden relative border-x border-white/5 print:bg-white print:max-w-none print:h-auto print:overflow-visible print:block">
+    <div className="w-full max-w-lg mx-auto h-full flex flex-col bg-transparent transition-all overflow-hidden relative border-x border-white/5 print:block print:bg-white print:max-w-none print:h-auto print:overflow-visible">
       
-      {/* 
-         التقرير المالي موجود دائماً في الصفحة ولكنه مخفي عبر CSS
-         يظهر فقط عند الطباعة (@media print)
-      */}
+      {/* Financial Report - Rendered always, controlled by CSS in index.html for @media print */}
       <FinancialReport 
           transactions={currentCurrencyTransactions} 
           categories={state.categories} 
