@@ -2,7 +2,6 @@
 import React, { useState, useRef } from 'react';
 import { 
   Trash2, User, Wallet as WalletIcon, Lock, Upload, Edit2, Plus, Tag, Coins, X, Check, Printer, FileDown, ChevronDown, AlertCircle, AlertTriangle, FileSpreadsheet, Code, ChevronLeft, Palette, Type,
-  // Fix: Added missing icons used in the component
   ChevronRight, TrendingUp
 } from 'lucide-react';
 import { Currency, Wallet, Category, Transaction } from '../types';
@@ -12,10 +11,10 @@ import { getIcon } from '../constants';
 const COLORS = ['#f59e0b', '#10b981', '#3b82f6', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16', '#f43f5e', '#64748b'];
 const ICONS = ['Utensils', 'Car', 'Home', 'Receipt', 'Film', 'HeartPulse', 'GraduationCap', 'Briefcase', 'Wallet', 'CreditCard', 'ShoppingBag', 'Gift', 'PiggyBank', 'Coffee', 'Zap', 'Bus', 'Plane', 'Smartphone', 'ShieldCheck'];
 
-// --- Reusable Helper Components (Moved up to fix hoisting/typing issues) ---
+// --- Reusable Helper Components ---
 
-// Fix: Explicitly define children prop and move definition before usage to avoid TS errors
-const Modal = ({ title, children, onClose }: { title: string, children: React.ReactNode, onClose: () => void }) => (
+// Fix: Explicitly define children as optional in the type to prevent TypeScript from reporting it as missing when used in JSX.
+const Modal = ({ title, children, onClose }: { title: string, children?: React.ReactNode, onClose: () => void }) => (
     <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-2xl z-[400] flex items-end justify-center animate-fade">
         <div className="bg-slate-900 w-full max-w-lg rounded-t-[3.5rem] p-8 pb-12 shadow-2xl border-t border-slate-800 animate-slide-up overflow-y-auto no-scrollbar max-h-[95vh]">
             <div className="flex justify-between items-center mb-10">

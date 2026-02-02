@@ -24,6 +24,8 @@ export interface Goal {
   deadline?: string;
   icon: string;
   color: string;
+  walletId?: string; // Linked wallet
+  targetDate?: string; // When the user wants to reach this
 }
 
 export interface Transaction {

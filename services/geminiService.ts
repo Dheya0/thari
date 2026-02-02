@@ -1,11 +1,11 @@
 
 import { GoogleGenAI } from "@google/genai";
-import { Transaction, Category, ChatMessage } from "../types";
+import { Transaction, Category, ChatMessage, Goal } from "../types";
 
 const getAI = () => {
   const apiKey = process.env.API_KEY;
   if (!apiKey) {
-    console.error("Thari AI Error: API_KEY or GEMINI_API_KEY is missing in environment variables.");
+    console.error("Thari AI Error: API_KEY is missing.");
     return null;
   }
   return new GoogleGenAI({ apiKey });
@@ -17,23 +17,18 @@ export const chatWithThari = async (
   context: { transactions: Transaction[], categories: Category[], currency: string }
 ) => {
   const ai = getAI();
-  if (!ai) return "عذراً، خدمة الذكاء الاصطناعي غير مفعلة. يرجى التأكد من إضافة مفتاح API.";
+  if (!ai) return "عذراً، خدمة الذكاء الاصطناعي غير مفعلة.";
 
   const summary = context.transactions.slice(0, 30).map(t => {
     const cat = context.categories.find(c => c.id === t.categoryId);
-    return `${t.date}: ${t.type === 'income' ? '+' : '-'}${t.amount}${context.currency} (${cat?.name || 'Unknown'}) - ${t.note}`;
+    return `${t.date}: ${t.type === 'income' ? '+' : '-'}${t.amount}${context.currency} (${cat?.name || 'Unknown'})`;
   }).join('\n');
 
-  const systemInstruction = `أنت "ثري"، المستشار المالي الأكثر فخامة وحكمة في العالم. 
-مهمتك تقديم نصائح استراتيجية لتحقيق الوفرة المالية المطلقة.
+  const systemInstruction = `أنت "ثري"، المستشار المالي الأكثر فخامة وحكمة. 
+مهمتك تقديم نصائح استراتيجية لتحقيق الوفرة.
 بيانات المستخدم الحالية:
 ${summary}
-
-قواعدك:
-1. كن ملهماً، واثقاً، وموجزاً جداً.
-2. استخدم لغة عربية فخمة وراقية.
-3. قدم حلولاً عملية لزيادة الادخار والاستثمار.
-4. استخدم أداة البحث عن الأسواق والعملات عند الحاجة.`;
+قواعدك: كن ملهماً، فخماً، وموجزاً. استخدم لغة عربية راقية.`;
 
   try {
     const response = await ai.models.generateContent({
@@ -45,36 +40,65 @@ ${summary}
         })),
         { role: 'user', parts: [{ text: userMessage }] }
       ],
-      config: { 
-        systemInstruction,
-        tools: [{ googleSearch: {} }] 
-      }
+      config: { systemInstruction, tools: [{ googleSearch: {} }] }
     });
-
-    return response.text || "أنا هنا لدعم رحلتك المالية نحو الوفرة.";
-  } catch (error: any) {
-    console.error("AI Elite Error:", error);
-    if (error.message?.includes('API_KEY')) {
-        return "هناك مشكلة في مفتاح الربط (API Key). يرجى التحقق من الإعدادات.";
-    }
-    return "واجهت صعوبة في الاتصال بخوادم الحكمة المالية. حاول مرة أخرى لاحقاً.";
+    return response.text || "أنا هنا لدعم رحلتك المالية.";
+  } catch (error) {
+    return "واجهت صعوبة في الاتصال بخوادم الحكمة المالية.";
   }
 };
 
-export const getEliteInsight = async (transactions: Transaction[], currency: string) => {
+/**
+ * محاكاة المستقبل المالي بناءً على البيانات الحالية
+ */
+export const getFinancialForecast = async (transactions: Transaction[], currency: string) => {
   const ai = getAI();
-  if (!ai) return "المال ينمو حيث يوجه الانتباه.";
+  if (!ai) return null;
 
-  const summary = transactions.slice(0, 20).map(t => `${t.amount} ${t.type}`).join(', ');
+  const summary = transactions.slice(0, 50).map(t => `${t.type}: ${t.amount}`).join(', ');
   
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: `بناءً على هذه العمليات المالية: [${summary}]، قدم ومضة مالية واحدة فخمة ومختصرة جداً (أقل من 12 كلمة) تحفز على الوفرة باللغة العربية.`,
-      config: { temperature: 0.9 }
+      contents: `بناءً على تاريخ العمليات المالي التالي: [${summary}]، قم بإنتاج توقع مالي لـ 6 أشهر القادمة.
+أجب بتنسيق JSON حصراً:
+{
+  "projectedBalance": number,
+  "insight": "نصيحة فخمة جداً ومختصرة"،
+  "savingPotential": "مبلغ يمكن توفيره شهرياً"
+}`,
+      config: { responseMimeType: "application/json" }
     });
-    return response.text || "المال ينمو حيث يوجه الانتباه بالحكمة.";
+    return JSON.parse(response.text || '{}');
   } catch {
-    return "الاستثمار في الحكمة هو أفضل استثمار مالي.";
+    return null;
+  }
+};
+
+/**
+ * تحسين الوصول للأهداف المالية
+ */
+export const getGoalAdvice = async (goal: Goal, transactions: Transaction[], currency: string) => {
+  const ai = getAI();
+  if (!ai) return null;
+
+  const monthlySavings = transactions
+    .filter(t => {
+      const date = new Date(t.date);
+      const oneMonthAgo = new Date();
+      oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+      return date > oneMonthAgo;
+    })
+    .reduce((acc, t) => acc + (t.type === 'income' ? t.amount : -t.amount), 0);
+
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: `الهدف: ${goal.name}, المبلغ المطلوب: ${goal.targetAmount}, المبلغ الحالي: ${goal.currentAmount}, متوسط الادخار الشهري الحالي: ${monthlySavings} ${currency}.
+قدم نصيحة واحدة فخمة جداً (أقل من 15 كلمة) حول كيفية الوصول للهدف أسرع.`,
+    });
+    return response.text;
+  } catch {
+    return "الاستمرار في العادات المالية الصحيحة هو مفتاح الثروة.";
   }
 };
