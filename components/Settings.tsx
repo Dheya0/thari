@@ -2,7 +2,7 @@
 import React, { useState, useRef } from 'react';
 import { 
   Trash2, User, Wallet as WalletIcon, Lock, Upload, Edit2, Plus, Tag, Coins, X, Check, Printer, FileDown, ChevronDown, AlertCircle, AlertTriangle, FileSpreadsheet, Code, ChevronLeft, Palette, Type,
-  ChevronRight, TrendingUp
+  ChevronRight, TrendingUp, ShieldCheck, ShieldAlert, Key
 } from 'lucide-react';
 import { Currency, Wallet, Category, Transaction } from '../types';
 import { encryptData, decryptData } from '../services/encryptionService';
@@ -13,7 +13,6 @@ const ICONS = ['Utensils', 'Car', 'Home', 'Receipt', 'Film', 'HeartPulse', 'Grad
 
 // --- Reusable Helper Components ---
 
-// Fix: Explicitly define children as optional in the type to prevent TypeScript from reporting it as missing when used in JSX.
 const Modal = ({ title, children, onClose }: { title: string, children?: React.ReactNode, onClose: () => void }) => (
     <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-2xl z-[400] flex items-end justify-center animate-fade">
         <div className="bg-slate-900 w-full max-w-lg rounded-t-[3.5rem] p-8 pb-12 shadow-2xl border-t border-slate-800 animate-slide-up overflow-y-auto no-scrollbar max-h-[95vh]">
@@ -40,8 +39,13 @@ const InputField = ({ label, value, onChange, placeholder, ...props }: any) => (
     </div>
 );
 
-const ActionButton = ({ label, onClick }: any) => (
-    <button onClick={onClick} className="w-full py-6 bg-amber-500 text-slate-950 font-black rounded-[2.2rem] text-lg shadow-xl active:scale-95 transition-all mt-4">
+const ActionButton = ({ label, onClick, variant = 'primary' }: any) => (
+    <button 
+      onClick={onClick} 
+      className={`w-full py-6 font-black rounded-[2.2rem] text-lg shadow-xl active:scale-95 transition-all mt-4 ${
+        variant === 'primary' ? 'bg-amber-500 text-slate-950 shadow-amber-500/10' : 'bg-slate-800 text-white border border-white/5'
+      }`}
+    >
         {label}
     </button>
 );
@@ -67,18 +71,23 @@ const ToastNotification = ({ toast }: { toast: { message: string, type: 'success
   );
 };
 
-const ConfirmDialog = ({ confirmData, onCancel }: { confirmData: { message: string, action: () => void } | null, onCancel: () => void }) => {
+const ConfirmDialog = ({ confirmData, onCancel }: { confirmData: { message: string, action: () => void, title?: string, type?: 'danger' | 'info' } | null, onCancel: () => void }) => {
   if (!confirmData) return null;
+  const isDanger = confirmData.type === 'danger';
+  
   return (
     <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[500] flex items-center justify-center p-4 animate-fade">
       <div className="bg-slate-900 p-8 rounded-[2.5rem] max-w-sm w-full border border-slate-800 shadow-2xl space-y-6 text-center">
-        <div className="w-16 h-16 bg-amber-500/10 rounded-full flex items-center justify-center mx-auto text-amber-500">
-           <AlertTriangle size={32} />
+        <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto ${isDanger ? 'bg-rose-500/10 text-rose-500' : 'bg-amber-500/10 text-amber-500'}`}>
+           {isDanger ? <Trash2 size={32} /> : <AlertTriangle size={32} />}
         </div>
-        <p className="text-white font-bold text-lg leading-relaxed">{confirmData.message}</p>
+        <div className="space-y-2">
+            {confirmData.title && <h3 className="text-white font-black text-lg">{confirmData.title}</h3>}
+            <p className="text-slate-400 font-bold text-sm leading-relaxed">{confirmData.message}</p>
+        </div>
         <div className="grid grid-cols-2 gap-3">
            <button onClick={onCancel} className="py-4 bg-slate-950 text-slate-400 rounded-2xl font-black text-sm hover:bg-slate-800 transition-colors">إلغاء</button>
-           <button onClick={() => { confirmData.action(); onCancel(); }} className="py-4 bg-amber-500 text-slate-950 rounded-2xl font-black text-sm shadow-lg shadow-amber-500/20 hover:bg-amber-400 transition-colors">تأكيد</button>
+           <button onClick={() => { confirmData.action(); onCancel(); }} className={`py-4 rounded-2xl font-black text-sm shadow-lg transition-colors ${isDanger ? 'bg-rose-500 text-white shadow-rose-500/20 hover:bg-rose-400' : 'bg-amber-500 text-slate-950 shadow-amber-500/20 hover:bg-amber-400'}`}>تأكيد</button>
         </div>
       </div>
     </div>
@@ -120,9 +129,11 @@ const Settings: React.FC<SettingsProps> = ({
   const [isExporting, setIsExporting] = useState(false);
   const [activeSection, setActiveSection] = useState<'main' | 'wallets' | 'categories' | 'currencies'>('main');
   const [showCurrencyModal, setShowCurrencyModal] = useState(false);
+  const [showBackupModal, setShowBackupModal] = useState(false);
+  const [backupPassword, setBackupPassword] = useState('');
   
   const [toast, setToast] = useState<{message: string, type: 'success' | 'error'} | null>(null);
-  const [confirmData, setConfirmData] = useState<{message: string, action: () => void} | null>(null);
+  const [confirmData, setConfirmData] = useState<{message: string, action: () => void, title?: string, type?: 'danger' | 'info'} | null>(null);
   
   const [showAddCurrencyForm, setShowAddCurrencyForm] = useState(false);
   const [newCurrency, setNewCurrency] = useState({ name: '', code: '', symbol: '' });
@@ -144,8 +155,8 @@ const Settings: React.FC<SettingsProps> = ({
     setTimeout(() => setToast(null), 3000);
   };
 
-  const triggerConfirm = (message: string, action: () => void) => {
-    setConfirmData({ message, action });
+  const triggerConfirm = (message: string, action: () => void, title?: string, type: 'danger' | 'info' = 'info') => {
+    setConfirmData({ message, action, title, type });
   };
 
   const downloadFile = (content: string, fileName: string, mimeType: string) => {
@@ -163,29 +174,30 @@ const Settings: React.FC<SettingsProps> = ({
       }, 200);
   };
 
-  const handleExportBackup = async () => {
-    if (isExporting) return;
+  const executeExport = async (password: string | null) => {
     setIsExporting(true);
-    setTimeout(async () => {
-        try {
-          const password = prompt("🔒 لحماية النسخة، أدخل كلمة مرور.\n(اترك الحقل فارغاً واضغط 'موافق' لحفظ نسخة عادية)");
-          if (password === null) { setIsExporting(false); return; }
-          const dataStr = JSON.stringify(appState);
-          const dateStr = new Date().toISOString().split('T')[0];
-          if (!password) {
-              downloadFile(dataStr, `Thari_Backup_${dateStr}.json`, 'application/json');
-              showToast("تم حفظ النسخة (غير مشفرة)");
-          } else {
-              const encrypted = await encryptData(dataStr, password);
-              downloadFile(encrypted, `Thari_Backup_Secure_${dateStr}.thari`, 'text/plain');
-              showToast("تم حفظ النسخة المشفرة بنجاح");
-          }
-        } catch (e) {
-          showToast("فشل النسخ الاحتياطي", 'error');
-        } finally {
-          setIsExporting(false);
+    setShowBackupModal(false);
+    try {
+        const dataStr = JSON.stringify(appState);
+        const dateStr = new Date().toISOString().split('T')[0];
+        if (!password) {
+            downloadFile(dataStr, `Thari_Backup_${dateStr}.json`, 'application/json');
+            showToast("تم حفظ النسخة بنجاح");
+        } else {
+            const encrypted = await encryptData(dataStr, password);
+            downloadFile(encrypted, `Thari_Backup_Secure_${dateStr}.thari`, 'text/plain');
+            showToast("تم حفظ النسخة المشفرة بنجاح");
         }
-    }, 100);
+    } catch (e) {
+        showToast("فشل النسخ الاحتياطي", 'error');
+    } finally {
+        setIsExporting(false);
+        setBackupPassword('');
+    }
+  };
+
+  const handleExportBackup = () => {
+    setShowBackupModal(true);
   };
 
   const handleExportCSV = () => {
@@ -299,7 +311,7 @@ const Settings: React.FC<SettingsProps> = ({
                 </div>
                 {currency.code !== c.code && (
                     <button 
-                        onClick={() => triggerConfirm(`هل أنت متأكد من حذف عملة ${c.name}؟`, () => onRemoveCurrency(c.code))} 
+                        onClick={() => triggerConfirm(`هل أنت متأكد من حذف عملة ${c.name}؟`, () => onRemoveCurrency(c.code), "حذف العملة", "danger")} 
                         className="p-3 bg-slate-800 text-rose-500 rounded-xl hover:bg-rose-500/10 border border-slate-700 active:scale-95"
                     >
                         <Trash2 size={18} />
@@ -351,7 +363,7 @@ const Settings: React.FC<SettingsProps> = ({
                     </div>
                     <div className="flex gap-2">
                         <button onClick={() => openWalletEdit(w)} className="p-3 bg-slate-800 text-amber-500 rounded-xl active:scale-95"><Edit2 size={18} /></button>
-                        <button onClick={() => triggerConfirm(`هل تريد حذف محفظة ${w.name}؟`, () => onRemoveWallet(w.id))} className="p-3 bg-slate-800 text-rose-500 rounded-xl active:scale-95"><Trash2 size={18} /></button>
+                        <button onClick={() => triggerConfirm(`هل تريد حذف محفظة ${w.name}؟`, () => onRemoveWallet(w.id), "حذف المحفظة", "danger")} className="p-3 bg-slate-800 text-rose-500 rounded-xl active:scale-95"><Trash2 size={18} /></button>
                     </div>
                 </div>
             ))}
@@ -432,7 +444,7 @@ const Settings: React.FC<SettingsProps> = ({
                     <ColorPicker selected={categoryData.color} onSelect={c => setCategoryData({...categoryData, color: c})} />
                     <div className="flex gap-3">
                         {editingCategory && (
-                            <button onClick={() => triggerConfirm(`حذف تصنيف ${editingCategory.name}؟`, () => { onRemoveCategory(editingCategory.id); setShowCategoryForm(false); })} className="p-4 bg-rose-500/10 text-rose-500 border border-rose-500/20 rounded-2xl active:scale-95"><Trash2 size={24} /></button>
+                            <button onClick={() => triggerConfirm(`حذف تصنيف ${editingCategory.name}؟`, () => { onRemoveCategory(editingCategory.id); setShowCategoryForm(false); }, "حذف التصنيف", "danger")} className="p-4 bg-rose-500/10 text-rose-500 border border-rose-500/20 rounded-2xl active:scale-95"><Trash2 size={24} /></button>
                         )}
                         <button onClick={saveCategory} className="flex-1 py-5 bg-amber-500 text-slate-950 font-black rounded-2xl shadow-xl active:scale-95">حفظ التصنيف</button>
                     </div>
@@ -538,10 +550,47 @@ const Settings: React.FC<SettingsProps> = ({
       </div>
       
        <div className="px-1">
-           <button onClick={() => triggerConfirm("هل أنت متأكد من مسح جميع بيانات التطبيق؟", onClearData)} className="w-full py-6 text-rose-500 font-black text-sm border border-rose-500/20 bg-rose-500/5 rounded-[2.5rem] active:scale-95 flex items-center justify-center gap-3">
+           <button onClick={() => triggerConfirm("هل أنت متأكد من مسح جميع بيانات التطبيق؟ سيتم حذف جميع المعاملات والديون والاشتراكات بشكل نهائي.", onClearData, "تنبيه هام جداً", "danger")} className="w-full py-6 text-rose-500 font-black text-sm border border-rose-500/20 bg-rose-500/5 rounded-[2.5rem] active:scale-95 flex items-center justify-center gap-3">
              <Trash2 size={20} /> مسح السجل المالي نهائياً
            </button>
        </div>
+
+      {/* Backup Secure Password Modal */}
+      {showBackupModal && (
+        <Modal title="تأمين النسخة الاحتياطية" onClose={() => { setShowBackupModal(false); setBackupPassword(''); }}>
+            <div className="space-y-8">
+                <div className="bg-amber-500/10 p-6 rounded-[2rem] border border-amber-500/20 flex gap-4">
+                    <ShieldCheck size={32} className="text-amber-500 shrink-0" />
+                    <p className="text-[11px] font-bold text-slate-300 leading-relaxed">
+                        ينصح "ثري" دائماً بتشفير نسختك بكلمة مرور. في حال ضياع هاتفك، ستبقى بياناتك المالية آمنة ولا يمكن لأحد قراءتها إلا بهذه الكلمة.
+                    </p>
+                </div>
+
+                <div className="space-y-4">
+                   <div className="space-y-2">
+                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2 flex items-center gap-2"><Key size={12} /> كلمة المرور (اختياري)</label>
+                        <input 
+                            type="password" 
+                            value={backupPassword} 
+                            onChange={e => setBackupPassword(e.target.value)} 
+                            placeholder="اترك الحقل فارغاً لنسخة غير مشفرة" 
+                            className="w-full p-5 rounded-2xl bg-slate-950 border border-slate-800 text-white font-bold outline-none focus:border-amber-500 transition-all shadow-inner text-center tracking-[0.2em]"
+                        />
+                   </div>
+                </div>
+
+                <div className="space-y-3">
+                    <ActionButton 
+                        label={backupPassword ? "تصدير نسخة مشفرة آمنة" : "تصدير نسخة عادية"} 
+                        onClick={() => executeExport(backupPassword || null)} 
+                    />
+                    {!backupPassword && (
+                        <p className="text-[9px] font-black text-rose-500 uppercase tracking-widest text-center mt-2 opacity-60">تنبيه: النسخة العادية لا تحتوي على حماية</p>
+                    )}
+                </div>
+            </div>
+        </Modal>
+      )}
 
       {showCurrencyModal && (
         <Modal title="اختر العملة" onClose={() => setShowCurrencyModal(false)}>

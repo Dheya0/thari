@@ -55,7 +55,8 @@ export interface Debt {
   personName: string;
   amount: number;
   type: 'to_me' | 'on_me';
-  dueDate?: string;
+  createdAt: string; // Date the debt was created
+  dueDate?: string;  // Expected repayment date
   isPaid: boolean;
   note: string;
   currency: string;
