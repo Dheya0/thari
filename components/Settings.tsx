@@ -2,7 +2,7 @@
 import React, { useState, useRef } from 'react';
 import { 
   Trash2, User, Wallet as WalletIcon, Lock, Upload, Edit2, Plus, Tag, Coins, X, Check, Printer, FileDown, ChevronDown, AlertCircle, AlertTriangle, FileSpreadsheet, Code, ChevronLeft, Palette, Type,
-  ChevronRight, TrendingUp, ShieldCheck, ShieldAlert, Key
+  ChevronRight, TrendingUp, ShieldCheck, ShieldAlert, Key, Unlock
 } from 'lucide-react';
 import { Currency, Wallet, Category, Transaction } from '../types';
 import { encryptData, decryptData } from '../services/encryptionService';
@@ -129,8 +129,13 @@ const Settings: React.FC<SettingsProps> = ({
   const [isExporting, setIsExporting] = useState(false);
   const [activeSection, setActiveSection] = useState<'main' | 'wallets' | 'categories' | 'currencies'>('main');
   const [showCurrencyModal, setShowCurrencyModal] = useState(false);
+  
+  // Backup/Restore Modals State
   const [showBackupModal, setShowBackupModal] = useState(false);
   const [backupPassword, setBackupPassword] = useState('');
+  const [showRestoreModal, setShowRestoreModal] = useState(false);
+  const [restorePassword, setRestorePassword] = useState('');
+  const [pendingRestoreContent, setPendingRestoreContent] = useState<string | null>(null);
   
   const [toast, setToast] = useState<{message: string, type: 'success' | 'error'} | null>(null);
   const [confirmData, setConfirmData] = useState<{message: string, action: () => void, title?: string, type?: 'danger' | 'info'} | null>(null);
@@ -200,6 +205,52 @@ const Settings: React.FC<SettingsProps> = ({
     setShowBackupModal(true);
   };
 
+  const executeRestore = async () => {
+    if (!pendingRestoreContent) return;
+    try {
+        const decrypted = await decryptData(pendingRestoreContent, restorePassword);
+        const parsedData = JSON.parse(decrypted);
+        if (parsedData) {
+            onRestore(parsedData);
+            setShowRestoreModal(false);
+            setRestorePassword('');
+            setPendingRestoreContent(null);
+            showToast("تم استعادة البيانات بنجاح!");
+            setTimeout(() => window.location.reload(), 1500);
+        }
+    } catch (e: any) {
+        showToast("كلمة المرور خاطئة أو الملف تالف", 'error');
+    }
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = ''; 
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const content = event.target?.result as string;
+        
+        // التحقق مما إذا كان الملف مشفراً (يبدأ بكلمة THARI)
+        if (content.startsWith("THARI_")) {
+            setPendingRestoreContent(content);
+            setShowRestoreModal(true);
+        } else {
+            const parsedData = JSON.parse(content);
+            if (parsedData) {
+                onRestore(parsedData);
+                showToast("تم استعادة البيانات بنجاح!");
+                setTimeout(() => window.location.reload(), 1500);
+            }
+        }
+      } catch (e: any) {
+        showToast("فشل الاستعادة: الملف غير صالح", 'error');
+      }
+    };
+    reader.readAsText(file);
+  };
+
   const handleExportCSV = () => {
     try {
         const transactions: Transaction[] = appState.transactions;
@@ -226,35 +277,6 @@ const Settings: React.FC<SettingsProps> = ({
       showToast("تم تصدير البيانات الخام");
   };
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    e.target.value = ''; 
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-      try {
-        const content = event.target?.result as string;
-        let parsedData;
-        if (content.startsWith("THARI_")) {
-            const password = prompt("🔓 الملف مشفر. أدخل كلمة المرور:");
-            if (!password) return;
-            const decrypted = await decryptData(content, password);
-            parsedData = JSON.parse(decrypted);
-        } else {
-            parsedData = JSON.parse(content);
-        }
-        if (parsedData) {
-            onRestore(parsedData);
-            showToast("تم استعادة البيانات بنجاح!");
-            setTimeout(() => window.location.reload(), 1500);
-        }
-      } catch (e: any) {
-        showToast("فشل الاستعادة: " + e.message, 'error');
-      }
-    };
-    reader.readAsText(file);
-  };
-
   const handleSaveProfile = () => {
     const finalPin = isSecurityEnabled ? (localPin.length === 4 ? localPin : pin) : null;
     onUpdateSettings({ userName: localUserName, pin: finalPin });
@@ -268,7 +290,7 @@ const Settings: React.FC<SettingsProps> = ({
     setShowWalletForm(true);
   };
   const saveWallet = () => {
-    if (!walletData.name) return showToast("يرجى إدخال اسم المحفظة", "error");
+    if (!walletData.name) return showToast("يرجى إدخل اسم المحفظة", "error");
     if (editingWallet) onUpdateWallet(editingWallet.id, walletData);
     else onAddWallet(walletData);
     setShowWalletForm(false);
@@ -584,10 +606,40 @@ const Settings: React.FC<SettingsProps> = ({
                         label={backupPassword ? "تصدير نسخة مشفرة آمنة" : "تصدير نسخة عادية"} 
                         onClick={() => executeExport(backupPassword || null)} 
                     />
-                    {!backupPassword && (
-                        <p className="text-[9px] font-black text-rose-500 uppercase tracking-widest text-center mt-2 opacity-60">تنبيه: النسخة العادية لا تحتوي على حماية</p>
-                    )}
                 </div>
+            </div>
+        </Modal>
+      )}
+
+      {/* Restore Password Modal */}
+      {showRestoreModal && (
+        <Modal title="فك تشفير البيانات" onClose={() => { setShowRestoreModal(false); setRestorePassword(''); setPendingRestoreContent(null); }}>
+            <div className="space-y-8">
+                <div className="bg-blue-500/10 p-6 rounded-[2rem] border border-blue-500/20 flex gap-4">
+                    <Unlock size={32} className="text-blue-500 shrink-0" />
+                    <p className="text-[11px] font-bold text-slate-300 leading-relaxed">
+                        هذا الملف محمي بنظام تشفير "ثري". يرجى إدخال كلمة المرور التي استخدمتها أثناء النسخ الاحتياطي لفتح البيانات.
+                    </p>
+                </div>
+
+                <div className="space-y-4">
+                   <div className="space-y-2">
+                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2 flex items-center gap-2"><Key size={12} /> كلمة المرور المطلوبة</label>
+                        <input 
+                            type="password" 
+                            value={restorePassword} 
+                            onChange={e => setRestorePassword(e.target.value)} 
+                            placeholder="أدخل كلمة المرور هنا" 
+                            className="w-full p-5 rounded-2xl bg-slate-950 border border-slate-800 text-white font-bold outline-none focus:border-amber-500 transition-all shadow-inner text-center tracking-[0.2em]"
+                            autoFocus
+                        />
+                   </div>
+                </div>
+
+                <ActionButton 
+                    label="بدء الاستعادة الآمنة" 
+                    onClick={executeRestore} 
+                />
             </div>
         </Modal>
       )}
