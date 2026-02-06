@@ -250,6 +250,7 @@ const DebtManager: React.FC<DebtManagerProps> = ({ debts, wallets, onAddDebt, on
                          <div 
                            onClick={() => setIncludeWalletTransaction(!includeWalletTransaction)}
                            className={`w-14 h-8 rounded-full p-1 cursor-pointer transition-all ${includeWalletTransaction ? 'bg-amber-500' : 'bg-slate-800'}`}
+                           dir="ltr"
                          >
                             <div className={`w-6 h-6 bg-white rounded-full shadow-md transition-transform ${includeWalletTransaction ? 'translate-x-6' : 'translate-x-0'}`} />
                          </div>

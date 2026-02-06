@@ -530,7 +530,7 @@ const Settings: React.FC<SettingsProps> = ({
         <div className="p-8 space-y-6">
           <div className="flex justify-between items-center px-2">
             <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2"><Lock size={14} /> حماية الخصوصية (PIN)</label>
-            <div className={`w-14 h-7 rounded-full p-1 cursor-pointer transition-all ${isSecurityEnabled ? 'bg-amber-500 shadow-[0_0_15px_rgba(245,158,11,0.3)]' : 'bg-slate-700'}`} onClick={() => setIsSecurityEnabled(!isSecurityEnabled)}>
+            <div dir="ltr" className={`w-14 h-7 rounded-full p-1 cursor-pointer transition-all ${isSecurityEnabled ? 'bg-amber-500 shadow-[0_0_15px_rgba(245,158,11,0.3)]' : 'bg-slate-700'}`} onClick={() => setIsSecurityEnabled(!isSecurityEnabled)}>
               <div className={`w-5 h-5 bg-white rounded-full shadow-md transition-transform ${isSecurityEnabled ? 'translate-x-7' : 'translate-x-0'}`} />
             </div>
           </div>
