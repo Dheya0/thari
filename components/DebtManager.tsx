@@ -1,14 +1,14 @@
 
 import React, { useState, useMemo } from 'react';
-import { User, Trash2, CheckCircle, Clock, Plus, X, ArrowUpRight, ArrowDownLeft, Wallet as WalletIcon, Calendar, Edit3, UserMinus, UserPlus, Info } from 'lucide-react';
+import { User, Trash2, CheckCircle, Clock, Plus, X, ArrowUpRight, ArrowDownLeft, Wallet as WalletIcon, Calendar, Edit3, UserMinus, UserPlus, Info, Link2, Link2Off, EyeOff } from 'lucide-react';
 import { Debt, Wallet } from '../types';
 
 interface DebtManagerProps {
   debts: Debt[];
   wallets: Wallet[];
-  onAddDebt: (debt: Omit<Debt, 'id'>) => void;
+  onAddDebt: (debt: Omit<Debt, 'id'>, walletId?: string) => void;
   onUpdateDebt: (id: string, updates: Partial<Debt>) => void;
-  onSettleDebt: (id: string, walletId: string) => void;
+  onSettleDebt: (id: string, walletId?: string) => void;
   onDeleteDebt: (id: string) => void;
   currencySymbol: string;
   currencyCode: string;
@@ -26,6 +26,10 @@ const DebtManager: React.FC<DebtManagerProps> = ({ debts, wallets, onAddDebt, on
   const [note, setNote] = useState('');
   const [createdAt, setCreatedAt] = useState(new Date().toISOString().split('T')[0]);
   const [dueDate, setDueDate] = useState('');
+  
+  // New State for Transaction Link
+  const [includeWalletTransaction, setIncludeWalletTransaction] = useState(true);
+  const [selectedWalletId, setSelectedWalletId] = useState(wallets[0]?.id || '');
 
   const stats = useMemo(() => {
     const iOwe = debts.filter(d => !d.isPaid && d.type === 'on_me').reduce((s, d) => s + d.amount, 0);
@@ -39,7 +43,9 @@ const DebtManager: React.FC<DebtManagerProps> = ({ debts, wallets, onAddDebt, on
 
   const openAdd = () => {
     setEditingDebt(null);
-    setPersonName(''); setAmount(''); setNote(''); setDueDate(''); setCreatedAt(new Date().toISOString().split('T')[0]);
+    setPersonName(''); setAmount(''); setNote(''); setDueDate(''); 
+    setCreatedAt(new Date().toISOString().split('T')[0]);
+    setIncludeWalletTransaction(true); // Default to including transaction
     setShowAddForm(true);
   };
 
@@ -71,7 +77,8 @@ const DebtManager: React.FC<DebtManagerProps> = ({ debts, wallets, onAddDebt, on
       if (editingDebt) {
         onUpdateDebt(editingDebt.id, data);
       } else {
-        onAddDebt(data);
+        // Pass walletId ONLY if includeWalletTransaction is true
+        onAddDebt(data, includeWalletTransaction ? selectedWalletId : undefined);
       }
       
       setShowAddForm(false);
@@ -181,7 +188,6 @@ const DebtManager: React.FC<DebtManagerProps> = ({ debts, wallets, onAddDebt, on
               
               {debt.isPaid && (
                   <div className="mt-4 flex items-center justify-center gap-2 py-2 bg-emerald-500/10 rounded-xl text-emerald-500 font-black text-[10px] uppercase tracking-[0.2em]">
-                      {/* Fix: Changed non-existent CheckCircle2 to CheckCircle */}
                       <CheckCircle size={12} /> تم تسوية هذه الذمة بالكامل
                   </div>
               )}
@@ -228,13 +234,56 @@ const DebtManager: React.FC<DebtManagerProps> = ({ debts, wallets, onAddDebt, on
                  </div>
               </div>
 
+              {/* Transaction Link Toggle - Only when adding new debt */}
+              {!editingDebt && (
+                 <div className="bg-slate-950 p-6 rounded-[2.5rem] border border-white/5 space-y-6">
+                    <div className="flex items-center justify-between">
+                         <div className="flex items-center gap-3">
+                             <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${includeWalletTransaction ? 'bg-amber-500 text-slate-950' : 'bg-slate-800 text-slate-500'}`}>
+                                 {includeWalletTransaction ? <Link2 size={20} /> : <Link2Off size={20} />}
+                             </div>
+                             <div>
+                                 <p className="font-bold text-white text-sm">تسجيل عملية مالية</p>
+                                 <p className="text-[10px] text-slate-500">هل أثر هذا الدين على رصيد محفظتك؟</p>
+                             </div>
+                         </div>
+                         <div 
+                           onClick={() => setIncludeWalletTransaction(!includeWalletTransaction)}
+                           className={`w-14 h-8 rounded-full p-1 cursor-pointer transition-all ${includeWalletTransaction ? 'bg-amber-500' : 'bg-slate-800'}`}
+                         >
+                            <div className={`w-6 h-6 bg-white rounded-full shadow-md transition-transform ${includeWalletTransaction ? 'translate-x-6' : 'translate-x-0'}`} />
+                         </div>
+                    </div>
+
+                    {includeWalletTransaction && (
+                        <div className="animate-fade space-y-3">
+                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2">
+                                {type === 'to_me' ? 'سحب المبلغ من:' : 'إيداع المبلغ في:'}
+                            </label>
+                            <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+                                {wallets.map(w => (
+                                    <button
+                                    key={w.id}
+                                    type="button"
+                                    onClick={() => setSelectedWalletId(w.id)}
+                                    className={`shrink-0 px-6 py-4 rounded-2xl border transition-all text-xs font-bold flex flex-col items-center gap-1 ${selectedWalletId === w.id ? 'bg-amber-500/20 text-amber-500 border-amber-500' : 'bg-slate-900 text-slate-400 border-slate-800'}`}
+                                    >
+                                    <span>{w.name}</span>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                 </div>
+              )}
+
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-4">ملاحظات إضافية</label>
                 <textarea value={note} onChange={e => setNote(e.target.value)} placeholder="أي تفاصيل أخرى حول هذا الدين..." className="w-full p-5 rounded-2xl bg-slate-950 border border-white/5 outline-none text-white font-bold text-xs min-h-[100px] resize-none" />
               </div>
 
               <button type="submit" className="w-full py-6 bg-amber-500 text-slate-950 font-black rounded-[2.5rem] shadow-2xl text-lg hover:brightness-110 active:scale-95 transition-all">
-                {editingDebt ? 'تحديث البيانات' : 'تأكيد التسجيل'}
+                {editingDebt ? 'تحديث البيانات' : 'حفظ السجل'}
               </button>
             </form>
           </div>
@@ -248,23 +297,34 @@ const DebtManager: React.FC<DebtManagerProps> = ({ debts, wallets, onAddDebt, on
             <div className="w-20 h-20 bg-emerald-500/10 rounded-[2rem] flex items-center justify-center mx-auto text-emerald-500 mb-6">
                 <CheckCircle size={40} />
             </div>
-            <h3 className="text-2xl font-black text-white mb-3">من أي محفظة تم التسوية؟</h3>
-            <p className="text-slate-500 text-xs font-bold mb-10 leading-relaxed px-6">سيتم تسجيل هذه التسوية كعملية مالية رسمية في السجل لتحديث رصيد المحفظة تلقائياً.</p>
+            <h3 className="text-2xl font-black text-white mb-3">تأكيد تسوية الدين</h3>
+            <p className="text-slate-500 text-xs font-bold mb-10 leading-relaxed px-6">
+                إذا تم السداد عن طريق إحدى محافظك، اختر المحفظة لتحديث رصيدها. <br/>
+                إذا كان السداد خارجياً، اختر "تسوية خارجية".
+            </p>
             
-            <div className="grid grid-cols-2 gap-4 mb-10">
+            <div className="grid grid-cols-2 gap-4 mb-4">
               {wallets.map(w => (
                 <button 
                   key={w.id} 
                   onClick={() => { onSettleDebt(showSettleModal, w.id); setShowSettleModal(null); }}
-                  className="p-6 rounded-[2.5rem] bg-slate-950 border border-white/5 hover:border-amber-500/50 transition-all flex flex-col items-center gap-3 group active:scale-95 shadow-inner"
+                  className="p-5 rounded-[2.5rem] bg-slate-950 border border-white/5 hover:border-amber-500/50 transition-all flex flex-col items-center gap-3 group active:scale-95 shadow-inner"
                 >
                   <div className="p-3 rounded-xl bg-slate-900" style={{ color: w.color }}>
-                    <WalletIcon size={24} className="group-hover:scale-110 transition-transform" />
+                    <WalletIcon size={20} className="group-hover:scale-110 transition-transform" />
                   </div>
-                  <span className="text-[11px] font-black text-white">{w.name}</span>
+                  <span className="text-[10px] font-black text-white">{w.name}</span>
                 </button>
               ))}
             </div>
+            
+            <button 
+                onClick={() => { onSettleDebt(showSettleModal, undefined); setShowSettleModal(null); }}
+                className="w-full py-5 rounded-[2.5rem] bg-slate-800 text-slate-300 font-bold text-xs mb-8 flex items-center justify-center gap-2 active:scale-95"
+            >
+                <EyeOff size={16} /> تسوية خارجية (لا تؤثر على الرصيد)
+            </button>
+
             <button onClick={() => setShowSettleModal(null)} className="text-slate-600 font-black text-[10px] uppercase tracking-[0.4em] hover:text-white transition-colors">إلغاء العملية</button>
           </div>
         </div>

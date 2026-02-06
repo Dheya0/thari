@@ -110,6 +110,73 @@ const App: React.FC = () => {
     }));
   };
 
+  // Logic for adding a debt AND the corresponding transaction
+  const handleAddDebt = (debtData: Omit<Debt, 'id'>, walletId?: string) => {
+    const newDebtId = 'd-' + Date.now();
+    const newTransactionId = 'tx-' + Date.now();
+    
+    // Create the debt record
+    const newDebt: Debt = { ...debtData, id: newDebtId };
+
+    // Logic for Transaction:
+    // If I lent money ('to_me') -> Money leaves my wallet -> Expense
+    // If I borrowed money ('on_me') -> Money enters my wallet -> Income
+    let newTransaction: Transaction | null = null;
+
+    if (walletId) {
+        newTransaction = {
+            id: newTransactionId,
+            amount: debtData.amount,
+            type: debtData.type === 'to_me' ? 'expense' : 'income',
+            categoryId: debtData.type === 'to_me' ? '12' : '11', // Using 12 (Gift/Transfer logic) or 11 (Investment logic) as placeholders, or generic
+            walletId: walletId,
+            note: debtData.type === 'to_me' 
+                ? `إقراض مبلغ لـ: ${debtData.personName}` 
+                : `استلاف مبلغ من: ${debtData.personName}`,
+            date: debtData.createdAt,
+            currency: debtData.currency,
+            frequency: 'once'
+        };
+    }
+
+    setState(p => ({
+        ...p,
+        debts: [newDebt, ...p.debts],
+        transactions: newTransaction ? [newTransaction, ...p.transactions] : p.transactions
+    }));
+  };
+
+  // Logic for settling a debt
+  const handleSettleDebt = (id: string, walletId?: string) => {
+    const debt = state.debts.find(d => d.id === id);
+    if (!debt) return;
+
+    // Logic for Transaction (Only if walletId is provided):
+    let newTransaction: Transaction | null = null;
+    
+    if (walletId) {
+        newTransaction = {
+            id: 'tx-' + Date.now(),
+            amount: debt.amount,
+            type: debt.type === 'to_me' ? 'income' : 'expense',
+            categoryId: debt.type === 'to_me' ? '11' : '4', // Investment return or Bills/Payment
+            walletId: walletId,
+            note: debt.type === 'to_me' 
+                ? `استرداد دين من: ${debt.personName}` 
+                : `سداد دين لـ: ${debt.personName}`,
+            date: new Date().toISOString().split('T')[0],
+            currency: debt.currency,
+            frequency: 'once'
+        };
+    }
+
+    setState(p => ({
+        ...p,
+        transactions: newTransaction ? [newTransaction, ...p.transactions] : p.transactions,
+        debts: p.debts.map(d => d.id === id ? { ...d, isPaid: true } : d)
+    }));
+  };
+
   if (!state.hasAcceptedTerms) return <WelcomeScreen onAccept={() => setState(p => ({ ...p, hasAcceptedTerms: true }))} onShowPrivacy={() => setShowPrivacyPolicy(true)} />;
   if (state.pin && state.isLocked) return <LockScreen savedPin={state.pin} onUnlock={() => setState(p => ({ ...p, isLocked: false }))} />;
 
@@ -181,10 +248,16 @@ const App: React.FC = () => {
             {activeTab === 'goals' && <GoalTracker goals={state.goals} wallets={state.wallets} transactions={currentCurrencyTransactions} onAddGoal={(g) => setState(p => ({ ...p, goals: [...p.goals, { ...g, id: 'g-'+Date.now() }] }))} onUpdateGoalAmount={(id, amt) => setState(p => ({ ...p, goals: p.goals.map(g => g.id === id ? { ...g, currentAmount: g.currentAmount + amt } : g) }))} currencySymbol={state.currency.symbol} />}
             {activeTab === 'budgets' && <BudgetManager budgets={state.budgets} categories={state.categories} transactions={currentCurrencyTransactions} onSetBudget={(catId, amount) => setState(p => ({ ...p, budgets: [...p.budgets.filter(b => b.categoryId !== catId), { categoryId: catId, amount }] }))} currencySymbol={state.currency.symbol} />}
             {activeTab === 'chat' && <AIChat history={state.chatHistory} transactions={currentCurrencyTransactions} categories={state.categories} currency={state.currency.symbol} onSendMessage={(msg) => setState(p => ({ ...p, chatHistory: [...p.chatHistory, msg].slice(-30) }))} />}
-            {activeTab === 'debts' && <DebtManager debts={state.debts.filter(d => d.currency === state.currency.code)} wallets={state.wallets.filter(w => w.currencyCode === state.currency.code)} onAddDebt={(d) => setState(p => ({ ...p, debts: [{...d, id: 'd-'+Date.now()}, ...p.debts] }))} onUpdateDebt={handleUpdateDebt} onSettleDebt={(id, wId) => {
-              const debt = state.debts.find(d => d.id === id);
-              if (debt) setState(p => ({ ...p, transactions: [{ id: 'tx-'+Date.now(), amount: debt.amount, type: debt.type === 'on_me' ? 'expense' : 'income', categoryId: debt.type === 'on_me' ? '4' : '9', walletId: wId, note: `تسديد دين: ${debt.personName}`, date: new Date().toISOString().split('T')[0], currency: debt.currency, frequency: 'once' }, ...p.transactions], debts: p.debts.map(d => d.id === id ? { ...d, isPaid: true } : d) }));
-            }} onDeleteDebt={(id) => setState(p => ({ ...p, debts: p.debts.filter(d => d.id !== id) }))} currencySymbol={state.currency.symbol} currencyCode={state.currency.code} />}
+            {activeTab === 'debts' && <DebtManager 
+                debts={state.debts.filter(d => d.currency === state.currency.code)} 
+                wallets={state.wallets.filter(w => w.currencyCode === state.currency.code)} 
+                onAddDebt={handleAddDebt} 
+                onUpdateDebt={handleUpdateDebt} 
+                onSettleDebt={handleSettleDebt} 
+                onDeleteDebt={(id) => setState(p => ({ ...p, debts: p.debts.filter(d => d.id !== id) }))} 
+                currencySymbol={state.currency.symbol} 
+                currencyCode={state.currency.code} 
+            />}
             {activeTab === 'subscriptions' && <SubscriptionManager subscriptions={state.subscriptions} categories={state.categories} onAdd={(sub) => setState(p => ({ ...p, subscriptions: [{...sub, id: 's-'+Date.now()}, ...p.subscriptions] }))} onRemove={(id) => setState(p => ({ ...p, subscriptions: p.subscriptions.filter(s => s.id !== id) }))} currencySymbol={state.currency.symbol} />}
             
             {activeTab === 'transactions' && (
