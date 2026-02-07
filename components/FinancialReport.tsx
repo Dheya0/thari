@@ -1,6 +1,7 @@
 
 import React from 'react';
 import { Transaction, Category, Currency, Wallet } from '../types';
+import { convertCurrency } from '../constants';
 
 interface FinancialReportProps {
   transactions: Transaction[];
@@ -12,18 +13,28 @@ interface FinancialReportProps {
 }
 
 const FinancialReport: React.FC<FinancialReportProps> = ({ transactions, categories, currency, userName, wallets, type }) => {
-  // Use all provided transactions for calculation
+  // Use all provided transactions but CONVERT them to the selected currency
   const totals = {
-    income: transactions.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0),
-    expense: transactions.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0),
+    income: transactions
+        .filter(t => t.type === 'income')
+        .reduce((s, t) => s + convertCurrency(t.amount, t.currency, currency.code), 0),
+    
+    expense: transactions
+        .filter(t => t.type === 'expense')
+        .reduce((s, t) => s + convertCurrency(t.amount, t.currency, currency.code), 0),
   };
   const netBalance = totals.income - totals.expense;
 
   const walletBalances = wallets.map(w => {
-    const balance = transactions
+    // Original balance in wallet's currency
+    const rawBalance = transactions
       .filter(t => t.walletId === w.id)
       .reduce((s, t) => s + (t.type === 'income' ? t.amount : -t.amount), 0);
-    return { ...w, balance };
+    
+    // Converted to Report Currency
+    const convertedBalance = convertCurrency(rawBalance, w.currencyCode, currency.code);
+
+    return { ...w, balance: convertedBalance };
   });
 
   const categoryBreakdown = categories
@@ -31,7 +42,7 @@ const FinancialReport: React.FC<FinancialReportProps> = ({ transactions, categor
     .map(c => {
       const amount = transactions
         .filter(t => t.categoryId === c.id && t.type === 'expense')
-        .reduce((s, t) => s + t.amount, 0);
+        .reduce((s, t) => s + convertCurrency(t.amount, t.currency, currency.code), 0);
       return { ...c, amount };
     })
     .filter(c => c.amount > 0)
@@ -43,7 +54,7 @@ const FinancialReport: React.FC<FinancialReportProps> = ({ transactions, categor
       return (
           <div id="printable-report" className="hidden print:flex flex-col items-center justify-center min-h-screen bg-white text-slate-400 p-20">
               <h1 className="text-2xl font-black mb-4 text-slate-900">تقرير خالي من البيانات</h1>
-              <p className="text-center font-bold">لا توجد عمليات مسجلة بالعملة المختارة حالياً للطباعة.</p>
+              <p className="text-center font-bold">لا توجد عمليات مسجلة حالياً.</p>
           </div>
       );
   }
@@ -84,15 +95,15 @@ const FinancialReport: React.FC<FinancialReportProps> = ({ transactions, categor
         <div className="grid grid-cols-3 gap-6 mb-12">
             <div className="p-8 rounded-3xl bg-emerald-50 border-2 border-emerald-100">
                 <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-2">إجمالي الواردات</p>
-                <p className="text-3xl font-black text-emerald-700">+{totals.income.toLocaleString()} <span className="text-sm opacity-50">{currency.symbol}</span></p>
+                <p className="text-3xl font-black text-emerald-700">+{totals.income.toLocaleString(undefined, {maximumFractionDigits: 0})} <span className="text-sm opacity-50">{currency.symbol}</span></p>
             </div>
             <div className="p-8 rounded-3xl bg-rose-50 border-2 border-rose-100">
                 <p className="text-[10px] font-black text-rose-600 uppercase tracking-widest mb-2">إجمالي المنصرفات</p>
-                <p className="text-3xl font-black text-rose-700">-{totals.expense.toLocaleString()} <span className="text-sm opacity-50">{currency.symbol}</span></p>
+                <p className="text-3xl font-black text-rose-700">-{totals.expense.toLocaleString(undefined, {maximumFractionDigits: 0})} <span className="text-sm opacity-50">{currency.symbol}</span></p>
             </div>
             <div className="p-8 rounded-3xl bg-slate-900 text-white shadow-xl">
                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">الرصيد الصافي</p>
-                <p className="text-3xl font-black">{netBalance.toLocaleString()} <span className="text-sm text-amber-500">{currency.symbol}</span></p>
+                <p className="text-3xl font-black">{netBalance.toLocaleString(undefined, {maximumFractionDigits: 0})} <span className="text-sm text-amber-500">{currency.symbol}</span></p>
             </div>
         </div>
 
@@ -100,16 +111,16 @@ const FinancialReport: React.FC<FinancialReportProps> = ({ transactions, categor
         <div className="mb-12">
             <div className="flex items-center gap-3 mb-6">
                 <div className="w-1.5 h-6 bg-amber-500 rounded-full" />
-                <h3 className="text-lg font-black text-slate-900">توزيع أرصدة المحافظ ({currency.code})</h3>
+                <h3 className="text-lg font-black text-slate-900">توزيع أرصدة المحافظ (مقيمة بـ {currency.code})</h3>
             </div>
             <div className="grid grid-cols-2 gap-x-12 gap-y-4 bg-slate-50 p-6 rounded-2xl border border-slate-100">
                 {walletBalances.map((w, i) => (
                     <div key={i} className="flex justify-between items-center py-2 border-b border-slate-200 last:border-0">
                         <div className="flex items-center gap-3">
                             <div className="w-4 h-4 rounded-md" style={{ backgroundColor: w.color }} />
-                            <span className="font-bold text-slate-700">{w.name}</span>
+                            <span className="font-bold text-slate-700">{w.name} <span className="text-xs opacity-50">({w.currencyCode})</span></span>
                         </div>
-                        <span className="font-black text-slate-900">{w.balance.toLocaleString()} {currency.symbol}</span>
+                        <span className="font-black text-slate-900">{w.balance.toLocaleString(undefined, {maximumFractionDigits: 0})} {currency.symbol}</span>
                     </div>
                 ))}
             </div>
@@ -132,7 +143,7 @@ const FinancialReport: React.FC<FinancialReportProps> = ({ transactions, categor
                                     <div className="h-full bg-slate-800 rounded-full" style={{ width: `${percent}%` }} />
                                 </div>
                                 <div className="w-40 text-left">
-                                    <span className="text-sm font-black text-slate-900">{c.amount.toLocaleString()} {currency.symbol}</span>
+                                    <span className="text-sm font-black text-slate-900">{c.amount.toLocaleString(undefined, {maximumFractionDigits: 0})} {currency.symbol}</span>
                                     <span className="text-[10px] font-bold text-slate-400 mr-2">({Math.round(percent)}%)</span>
                                 </div>
                             </div>
@@ -158,20 +169,25 @@ const FinancialReport: React.FC<FinancialReportProps> = ({ transactions, categor
                         <th className="py-4 px-4 text-right">المحفظة</th>
                         <th className="py-4 px-4 text-right">الملاحظة</th>
                         <th className="py-4 px-4 text-left rounded-tl-xl">المبلغ</th>
+                        <th className="py-4 px-4 text-left">المعادل ({currency.code})</th>
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 border border-slate-200">
                     {displayTransactions.map((t, i) => {
                         const cat = categories.find(c => c.id === t.categoryId);
                         const wallet = wallets.find(w => w.id === t.walletId);
+                        const convertedAmount = convertCurrency(t.amount, t.currency, currency.code);
                         return (
                             <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}>
                                 <td className="py-4 px-4 font-medium text-slate-500 text-xs">{t.date}</td>
                                 <td className="py-4 px-4 font-black text-slate-800">{cat?.name}</td>
                                 <td className="py-4 px-4 text-slate-600 text-xs">{wallet?.name}</td>
-                                <td className="py-4 px-4 text-slate-500 text-xs italic">{t.note || '-'}</td>
-                                <td className={`py-4 px-4 text-left font-black ${t.type === 'income' ? 'text-emerald-600' : 'text-slate-950'}`}>
-                                    {t.type === 'income' ? '+' : ''}{t.amount.toLocaleString()}
+                                <td className="py-4 px-4 text-slate-500 text-xs italic max-w-[150px] truncate">{t.note || '-'}</td>
+                                <td className={`py-4 px-4 text-left font-bold ${t.type === 'income' ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                    {t.type === 'income' ? '+' : ''}{t.amount.toLocaleString()} <span className="text-[9px] text-slate-400">{t.currency}</span>
+                                </td>
+                                <td className="py-4 px-4 text-left font-black text-slate-900">
+                                    {Math.round(convertedAmount).toLocaleString()}
                                 </td>
                             </tr>
                         );

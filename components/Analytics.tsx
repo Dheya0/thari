@@ -3,37 +3,53 @@ import React, { useMemo } from 'react';
 import { Download, Printer, FileText } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { Transaction, Category } from '../types';
+import { convertCurrency } from '../constants';
 
 interface AnalyticsProps {
   transactions: Transaction[];
   categories: Category[];
   currencySymbol: string;
   onPrint: (type: 'summary' | 'detailed') => void;
+  currentCurrencyCode?: string; // Add current currency code to convert stats
 }
 
-const Analytics: React.FC<AnalyticsProps> = ({ transactions, categories, currencySymbol, onPrint }) => {
+const Analytics: React.FC<AnalyticsProps> = ({ transactions, categories, currencySymbol, onPrint, currentCurrencyCode = 'SAR' }) => {
   const stats = useMemo(() => {
-    const totalIncome = transactions.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
-    const totalExpense = transactions.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
+    // Convert all amounts to the current selected currency
+    const totalIncome = transactions
+        .filter(t => t.type === 'income')
+        .reduce((s, t) => s + convertCurrency(t.amount, t.currency, currentCurrencyCode), 0);
+    
+    const totalExpense = transactions
+        .filter(t => t.type === 'expense')
+        .reduce((s, t) => s + convertCurrency(t.amount, t.currency, currentCurrencyCode), 0);
+        
     return { totalIncome, totalExpense };
-  }, [transactions]);
+  }, [transactions, currentCurrencyCode]);
 
   const expenseData = useMemo(() => {
     const expenses = transactions.filter(t => t.type === 'expense');
     const categoryTotals: Record<string, number> = {};
-    expenses.forEach(t => { categoryTotals[t.categoryId] = (categoryTotals[t.categoryId] || 0) + t.amount; });
+    
+    expenses.forEach(t => { 
+        // Convert amount before adding to total
+        const convertedAmount = convertCurrency(t.amount, t.currency, currentCurrencyCode);
+        categoryTotals[t.categoryId] = (categoryTotals[t.categoryId] || 0) + convertedAmount; 
+    });
+
     return Object.keys(categoryTotals).map(catId => {
       const cat = categories.find(c => c.id === catId);
-      return { name: cat?.name || 'أخرى', value: categoryTotals[catId], color: cat?.color || '#cbd5e1' };
+      return { name: cat?.name || 'أخرى', value: Math.round(categoryTotals[catId]), color: cat?.color || '#cbd5e1' };
     }).sort((a, b) => b.value - a.value);
-  }, [transactions, categories]);
+  }, [transactions, categories, currentCurrencyCode]);
 
   const handleExportCSV = () => {
-    const headers = "Date,Type,Amount,Category,Wallet,Note\n";
+    const headers = "Date,Type,Amount,Currency,ConvertedAmount,Category,Wallet,Note\n";
     const csvContent = transactions.map(t => {
       const cat = categories.find(c => c.id === t.categoryId)?.name || 'N/A';
       const typeLabel = t.type === 'income' ? 'Income' : 'Expense';
-      return `${t.date},${typeLabel},${t.amount},"${cat}","${t.walletId}","${t.note.replace(/"/g, '""')}"`;
+      const converted = convertCurrency(t.amount, t.currency, currentCurrencyCode).toFixed(2);
+      return `${t.date},${typeLabel},${t.amount},${t.currency},${converted},"${cat}","${t.walletId}","${t.note.replace(/"/g, '""')}"`;
     }).join("\n");
 
     const blob = new Blob(["\ufeff" + headers + csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -74,7 +90,7 @@ const Analytics: React.FC<AnalyticsProps> = ({ transactions, categories, currenc
 
       <div className="bg-slate-900/40 backdrop-blur-3xl border border-white/5 p-8 rounded-[3rem]">
         <h3 className="text-lg font-black text-white flex items-center gap-3 mb-8">
-           توزيع المصروفات
+           توزيع المصروفات (مقيمة بـ {currentCurrencyCode})
         </h3>
         <div className="h-64 relative">
           <ResponsiveContainer width="100%" height="100%">
@@ -89,7 +105,7 @@ const Analytics: React.FC<AnalyticsProps> = ({ transactions, categories, currenc
           </ResponsiveContainer>
           <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
             <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">المصروفات</span>
-            <span className="text-xl font-black text-white">{stats.totalExpense.toLocaleString()}</span>
+            <span className="text-xl font-black text-white">{Math.round(stats.totalExpense).toLocaleString()}</span>
           </div>
         </div>
       </div>

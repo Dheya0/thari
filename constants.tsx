@@ -8,8 +8,9 @@ import {
 import { Category, Currency } from './types';
 
 export const DEFAULT_CURRENCIES: Currency[] = [
-  { code: 'YER', symbol: 'ر.ي', name: 'ريال يمني' },
   { code: 'SAR', symbol: 'ر.س', name: 'ريال سعودي' },
+  { code: 'YER_SANAA', symbol: 'ر.ي (صنعاء)', name: 'ريال يمني - صنعاء' },
+  { code: 'YER', symbol: 'ر.ي (عدن)', name: 'ريال يمني - عدن' },
   { code: 'USD', symbol: '$', name: 'دولار أمريكي' },
   { code: 'EUR', symbol: '€', name: 'يورو' },
   { code: 'AED', symbol: 'د.إ', name: 'درهم إماراتي' },
@@ -18,25 +19,58 @@ export const DEFAULT_CURRENCIES: Currency[] = [
   { code: 'OMR', symbol: 'ر.ع', name: 'ريال عماني' },
   { code: 'QAR', symbol: 'ر.ق', name: 'ريال قطري' },
   { code: 'JOD', symbol: 'د.أ', name: 'دينار أردني' },
+  { code: 'BHD', symbol: 'د.ب', name: 'دينار بحريني' },
+  { code: 'GBP', symbol: '£', name: 'جنيه إسترليني' },
   { code: 'INR', symbol: '₹', name: 'روبية هندية' },
 ];
 
-// Exchange Rates relative to YER (Base)
-// 1 Unit of [KEY] = [VALUE] YER
-export const CURRENCY_RATES: Record<string, number> = {
-  YER: 1,        // Base
-  SAR: 428,      // 100 SAR = 42800 YER -> 1 SAR = 428 YER
-  USD: 1633,
-  EUR: 1479,
-  AED: 342,
-  EGP: 81,
-  OMR: 3253,
-  QAR: 345,
-  KWD: 4094,
-  JOD: 1767,
-  INR: 18,
-  BHD: 4330,     // Estimated based on USD peg if needed, but sticking to provided list mostly
-  GBP: 2050,     // Placeholder/Estimated
+// Exchange Rates Base: 1 Unit of Currency = X SAR (Saudi Riyal)
+// جدول التحويل: قيمة الوحدة الواحدة من العملة مقابل الريال السعودي
+export const CURRENCY_RATES_TO_SAR: Record<string, number> = {
+  SAR: 1.00,          // Base Currency
+
+  // Foreign Currencies (User Provided Rates against SAR)
+  USD: 3.750000,
+  AED: 1.020960,
+  BHD: 9.946940,
+  KWD: 12.203050,
+  OMR: 9.740250,
+  QAR: 1.029930,
+  GBP: 5.105250,
+  CHF: 4.837140,
+  EUR: 4.432310,
+  JOD: 5.290000,      // Approx standard
+  EGP: 0.121000,      // Approx
+  INR: 0.045000,      // Approx
+
+  // Yemeni Rial (Sanaa)
+  // User Data: 1 SAR = 140.10 YER_SANAA
+  // Logic: Value of 1 YER_SANAA in SAR = 1 / 140.10
+  YER_SANAA: 1 / 140.10, // ~ 0.0071377
+
+  // Yemeni Rial (Aden)
+  // Market Estimate: 1 SAR = ~440 YER (Aden) - distinct from Sanaa
+  // Logic: Value of 1 YER in SAR = 1 / 440
+  YER: 1 / 440.00,       // ~ 0.0022727
+};
+
+// Helper to convert amounts accurately
+export const convertCurrency = (amount: number, fromCode: string, toCode: string): number => {
+  if (fromCode === toCode) return amount;
+  
+  // Get rates relative to SAR
+  const fromRate = CURRENCY_RATES_TO_SAR[fromCode] || 0;
+  const toRate = CURRENCY_RATES_TO_SAR[toCode] || 0;
+
+  if (fromRate === 0 || toRate === 0) return amount;
+
+  // Step 1: Convert 'from' currency to SAR
+  const amountInSAR = amount * fromRate;
+
+  // Step 2: Convert SAR to 'to' currency
+  // If Target is SAR, we are done.
+  // If Target is Other, we divide by its rate to SAR.
+  return amountInSAR / toRate;
 };
 
 export const INITIAL_CATEGORIES: Category[] = [
