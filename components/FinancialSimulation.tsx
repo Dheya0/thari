@@ -7,23 +7,24 @@ import { getFinancialForecast } from '../services/geminiService';
 interface SimulationProps {
   transactions: Transaction[];
   currencySymbol: string;
+  apiKey?: string;
 }
 
-const FinancialSimulation: React.FC<SimulationProps> = ({ transactions, currencySymbol }) => {
+const FinancialSimulation: React.FC<SimulationProps> = ({ transactions, currencySymbol, apiKey }) => {
   const [forecast, setForecast] = useState<any>(null);
   const [loading, setLoading] = useState(false);
 
   const fetchForecast = async () => {
     if (transactions.length < 5) return;
     setLoading(true);
-    const data = await getFinancialForecast(transactions, currencySymbol);
+    const data = await getFinancialForecast(transactions, currencySymbol, apiKey);
     setForecast(data);
     setLoading(false);
   };
 
   useEffect(() => {
     fetchForecast();
-  }, []);
+  }, [transactions, currencySymbol, apiKey]);
 
   if (transactions.length < 5) {
     return (
@@ -105,3 +106,4 @@ const FinancialSimulation: React.FC<SimulationProps> = ({ transactions, currency
 };
 
 export default FinancialSimulation;
+    

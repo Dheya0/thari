@@ -2,7 +2,7 @@
 import React, { useState, useRef } from 'react';
 import { 
   Trash2, User, Wallet as WalletIcon, Lock, Upload, Edit2, Plus, Tag, Coins, X, Check, Printer, FileDown, ChevronDown, AlertCircle, AlertTriangle, FileSpreadsheet, Code, ChevronLeft, Palette, Type,
-  ChevronRight, TrendingUp, ShieldCheck, ShieldAlert, Key, Unlock
+  ChevronRight, TrendingUp, ShieldCheck, ShieldAlert, Key, Unlock, Smartphone
 } from 'lucide-react';
 import { Currency, Wallet, Category, Transaction } from '../types';
 import { encryptData, decryptData } from '../services/encryptionService';
@@ -101,6 +101,7 @@ interface SettingsProps {
   currencies: Currency[];
   wallets: Wallet[];
   categories: Category[];
+  apiKey?: string;
   appState: any; 
   onUpdateSettings: (updates: any) => void;
   onAddCurrency: (curr: Currency) => void;
@@ -118,13 +119,14 @@ interface SettingsProps {
 }
 
 const Settings: React.FC<SettingsProps> = ({ 
-  userName, pin, currency, currencies, wallets, categories, appState, onUpdateSettings, 
+  userName, pin, currency, currencies, wallets, categories, apiKey, appState, onUpdateSettings, 
   onAddCurrency, onRemoveCurrency, onAddWallet, onUpdateWallet, onRemoveWallet,
   onAddCategory, onUpdateCategory, onRemoveCategory,
   onRestore, onClearData, onShowPrivacyPolicy, onPrint
 }) => {
   const [localUserName, setLocalUserName] = useState(userName);
   const [localPin, setLocalPin] = useState(pin || '');
+  const [localApiKey, setLocalApiKey] = useState(apiKey || '');
   const [isSecurityEnabled, setIsSecurityEnabled] = useState(!!pin);
   const [isExporting, setIsExporting] = useState(false);
   const [activeSection, setActiveSection] = useState<'main' | 'wallets' | 'categories' | 'currencies'>('main');
@@ -279,7 +281,7 @@ const Settings: React.FC<SettingsProps> = ({
 
   const handleSaveProfile = () => {
     const finalPin = isSecurityEnabled ? (localPin.length === 4 ? localPin : pin) : null;
-    onUpdateSettings({ userName: localUserName, pin: finalPin });
+    onUpdateSettings({ userName: localUserName, pin: finalPin, apiKey: localApiKey });
     showToast("تم حفظ الإعدادات العامة");
   };
 
@@ -537,6 +539,23 @@ const Settings: React.FC<SettingsProps> = ({
           {isSecurityEnabled && (
             <input type="password" value={localPin} onChange={e => setLocalPin(e.target.value.replace(/\D/g, '').slice(0, 4))} className="w-full p-5 rounded-2xl bg-slate-800 text-white font-black text-center text-2xl tracking-[1em]" placeholder="****" />
           )}
+        </div>
+
+        {/* API Key Section */}
+        <div className="p-8 space-y-4">
+          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2 px-2">
+            <Smartphone size={14} /> مفتاح Gemini API (اختياري)
+          </label>
+          <input 
+            type="password" 
+            value={localApiKey} 
+            onChange={e => setLocalApiKey(e.target.value)} 
+            placeholder="AI Studio API Key" 
+            className="w-full p-5 rounded-2xl bg-slate-800 text-white font-bold border-none outline-none focus:ring-1 focus:ring-amber-500 shadow-inner text-center" 
+          />
+          <p className="text-[9px] text-slate-500 px-2 leading-relaxed">
+            للحصول على الميزات الذكية، يمكنك استخدام مفتاح API الخاص بك. هذا يضمن عمل الخدمة بشكل مستمر ومجاني ضمن حدود Google.
+          </p>
         </div>
 
         <div className="p-8">

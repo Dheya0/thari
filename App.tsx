@@ -42,6 +42,7 @@ const INITIAL_STATE: AppState = {
   pin: null,
   isLocked: false,
   hasAcceptedTerms: false,
+  apiKey: '', // Initialize empty
 };
 
 const App: React.FC = () => {
@@ -249,10 +250,10 @@ const App: React.FC = () => {
               </>
             )}
             
-            {activeTab === 'future' && <FinancialSimulation transactions={currentCurrencyTransactions} currencySymbol={state.currency.symbol} />}
-            {activeTab === 'goals' && <GoalTracker goals={state.goals} wallets={state.wallets} transactions={state.transactions} onAddGoal={(g) => setState(p => ({ ...p, goals: [...p.goals, { ...g, id: 'g-'+Date.now() }] }))} onUpdateGoalAmount={(id, amt) => setState(p => ({ ...p, goals: p.goals.map(g => g.id === id ? { ...g, currentAmount: g.currentAmount + amt } : g) }))} currencySymbol={state.currency.symbol} />}
+            {activeTab === 'future' && <FinancialSimulation transactions={currentCurrencyTransactions} currencySymbol={state.currency.symbol} apiKey={state.apiKey} />}
+            {activeTab === 'goals' && <GoalTracker goals={state.goals} wallets={state.wallets} transactions={state.transactions} onAddGoal={(g) => setState(p => ({ ...p, goals: [...p.goals, { ...g, id: 'g-'+Date.now() }] }))} onUpdateGoalAmount={(id, amt) => setState(p => ({ ...p, goals: p.goals.map(g => g.id === id ? { ...g, currentAmount: g.currentAmount + amt } : g) }))} currencySymbol={state.currency.symbol} apiKey={state.apiKey} />}
             {activeTab === 'budgets' && <BudgetManager budgets={state.budgets} categories={state.categories} transactions={state.transactions} onSetBudget={(catId, amount) => setState(p => ({ ...p, budgets: [...p.budgets.filter(b => b.categoryId !== catId), { categoryId: catId, amount }] }))} currencySymbol={state.currency.symbol} />}
-            {activeTab === 'chat' && <AIChat history={state.chatHistory} transactions={state.transactions} categories={state.categories} currency={state.currency.symbol} onSendMessage={(msg) => setState(p => ({ ...p, chatHistory: [...p.chatHistory, msg].slice(-30) }))} />}
+            {activeTab === 'chat' && <AIChat history={state.chatHistory} transactions={state.transactions} categories={state.categories} currency={state.currency.symbol} onSendMessage={(msg) => setState(p => ({ ...p, chatHistory: [...p.chatHistory, msg].slice(-30) }))} apiKey={state.apiKey} />}
             {activeTab === 'debts' && <DebtManager 
                 debts={state.debts} 
                 wallets={state.wallets} 

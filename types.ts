@@ -105,4 +105,5 @@ export interface AppState {
   pin: string | null;
   isLocked: boolean;
   hasAcceptedTerms: boolean;
+  apiKey?: string; // User provided API Key for better security
 }

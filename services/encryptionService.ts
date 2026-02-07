@@ -117,13 +117,7 @@ export const encryptData = async (data: string, password: string): Promise<strin
  */
 export const decryptData = async (encryptedData: string, password: string): Promise<string> => {
     try {
-        // --- دعم النسخ القديمة (Backward Compatibility) ---
         if (encryptedData.startsWith("{") || encryptedData.startsWith("[")) return encryptedData; // JSON عادي
-        
-        // دعم التشفير القديم (XOR) لضمان عدم فقدان البيانات القديمة
-        if (encryptedData.startsWith("THARI_V3:") || encryptedData.startsWith("THARI_SECURE_V2:")) {
-            return decryptLegacyXOR(encryptedData, password);
-        }
         
         if (encryptedData.startsWith("THARI_AES_GCM:")) {
             const rawBase64 = encryptedData.replace("THARI_AES_GCM:", "");
@@ -134,7 +128,7 @@ export const decryptData = async (encryptedData: string, password: string): Prom
             const iv = fullBuffer.slice(16, 28);
             const cipherText = fullBuffer.slice(28);
 
-            // اشتقاق المفتاح (يجب أن ينتج نفس المفتاح إذا كانت كلمة المرور صحيحة)
+            // اشتقاق المفتاح
             const key = await deriveKey(password, salt);
 
             // فك التشفير
@@ -150,29 +144,10 @@ export const decryptData = async (encryptedData: string, password: string): Prom
             return DECODING.decode(decryptedBuffer);
         }
 
-        throw new Error("تنسيق الملف غير مدعوم");
+        throw new Error("تنسيق الملف غير مدعوم أو قديم جداً");
 
     } catch (e) {
         console.error("Decryption Failed:", e);
         throw new Error("كلمة المرور غير صحيحة أو الملف تالف");
-    }
-};
-
-// --- Legacy Decryption Helper (للنسخ القديمة فقط) ---
-const decryptLegacyXOR = (encryptedData: string, password: string): string => {
-    // دوال مساعدة محلية للنسخة القديمة
-    const fromBase64 = (s: string) => decodeURIComponent(escape(window.atob(s)));
-    const xor = (txt: string, pass: string) => {
-        let r = ''; for(let i=0;i<txt.length;i++) r += String.fromCharCode(txt.charCodeAt(i) ^ pass.charCodeAt(i % pass.length)); return r;
-    };
-    
-    let payload = encryptedData.replace(/THARI_V\d+:/, "").replace("THARI_SECURE_V2:", "");
-    try {
-        const xored = fromBase64(payload);
-        const jsonStr = fromBase64(xor(xored, password));
-        const parsed = JSON.parse(jsonStr);
-        return parsed.content || parsed.d || jsonStr;
-    } catch {
-        throw new Error("كلمة المرور خاطئة (نظام قديم)");
     }
 };

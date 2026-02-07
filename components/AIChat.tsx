@@ -9,6 +9,7 @@ interface AIChatProps {
   categories: Category[];
   currency: string;
   onSendMessage: (msg: ChatMessage) => void;
+  apiKey?: string;
 }
 
 const AIChat: React.FC<AIChatProps> = () => {
@@ -48,3 +49,4 @@ const AIChat: React.FC<AIChatProps> = () => {
 };
 
 export default AIChat;
+    

@@ -2,10 +2,11 @@
 import { GoogleGenAI } from "@google/genai";
 import { Transaction, Category, ChatMessage, Goal } from "../types";
 
-const getAI = () => {
-  const apiKey = process.env.API_KEY;
+// Helper to get AI instance with user provided key or fallback (if available)
+const getAI = (userKey?: string) => {
+  const apiKey = userKey || process.env.API_KEY;
   if (!apiKey) {
-    console.error("Thari AI Error: API_KEY is missing.");
+    console.warn("Thari AI Warning: API_KEY is missing. Please add it in settings.");
     return null;
   }
   return new GoogleGenAI({ apiKey });
@@ -14,10 +15,11 @@ const getAI = () => {
 export const chatWithThari = async (
   userMessage: string, 
   history: ChatMessage[], 
-  context: { transactions: Transaction[], categories: Category[], currency: string }
+  context: { transactions: Transaction[], categories: Category[], currency: string },
+  apiKey?: string
 ) => {
-  const ai = getAI();
-  if (!ai) return "عذراً، خدمة الذكاء الاصطناعي غير مفعلة.";
+  const ai = getAI(apiKey);
+  if (!ai) return "يرجى إضافة مفتاح API الخاص بك في الإعدادات لتفعيل الذكاء الاصطناعي.";
 
   const summary = context.transactions.slice(0, 30).map(t => {
     const cat = context.categories.find(c => c.id === t.categoryId);
@@ -44,15 +46,15 @@ ${summary}
     });
     return response.text || "أنا هنا لدعم رحلتك المالية.";
   } catch (error) {
-    return "واجهت صعوبة في الاتصال بخوادم الحكمة المالية.";
+    return "واجهت صعوبة في الاتصال. تأكد من صحة مفتاح API.";
   }
 };
 
 /**
  * محاكاة المستقبل المالي بناءً على البيانات الحالية
  */
-export const getFinancialForecast = async (transactions: Transaction[], currency: string) => {
-  const ai = getAI();
+export const getFinancialForecast = async (transactions: Transaction[], currency: string, apiKey?: string) => {
+  const ai = getAI(apiKey);
   if (!ai) return null;
 
   const summary = transactions.slice(0, 50).map(t => `${t.type}: ${t.amount}`).join(', ');
@@ -78,8 +80,8 @@ export const getFinancialForecast = async (transactions: Transaction[], currency
 /**
  * تحسين الوصول للأهداف المالية
  */
-export const getGoalAdvice = async (goal: Goal, transactions: Transaction[], currency: string) => {
-  const ai = getAI();
+export const getGoalAdvice = async (goal: Goal, transactions: Transaction[], currency: string, apiKey?: string) => {
+  const ai = getAI(apiKey);
   if (!ai) return null;
 
   const monthlySavings = transactions

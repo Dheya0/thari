@@ -11,9 +11,10 @@ interface GoalTrackerProps {
   onAddGoal: (goal: Omit<Goal, 'id'>) => void;
   onUpdateGoalAmount: (id: string, amount: number) => void;
   currencySymbol: string;
+  apiKey?: string;
 }
 
-const GoalTracker: React.FC<GoalTrackerProps> = ({ goals, wallets, transactions, onAddGoal, onUpdateGoalAmount, currencySymbol }) => {
+const GoalTracker: React.FC<GoalTrackerProps> = ({ goals, wallets, transactions, onAddGoal, onUpdateGoalAmount, currencySymbol, apiKey }) => {
   const [showAdd, setShowAdd] = useState(false);
   const [name, setName] = useState('');
   const [target, setTarget] = useState('');
@@ -23,7 +24,7 @@ const GoalTracker: React.FC<GoalTrackerProps> = ({ goals, wallets, transactions,
 
   const fetchAdvice = async (goal: Goal) => {
     setGoalAdvices(prev => ({ ...prev, [goal.id]: { text: '', loading: true } }));
-    const advice = await getGoalAdvice(goal, transactions, currencySymbol);
+    const advice = await getGoalAdvice(goal, transactions, currencySymbol, apiKey);
     setGoalAdvices(prev => ({ ...prev, [goal.id]: { text: advice || '', loading: false } }));
   };
 
@@ -151,3 +152,4 @@ const GoalTracker: React.FC<GoalTrackerProps> = ({ goals, wallets, transactions,
 };
 
 export default GoalTracker;
+    
