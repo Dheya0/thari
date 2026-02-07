@@ -31,9 +31,13 @@
             margin: 0; 
             height: 100vh; 
             overflow: hidden;
+            /* Disable browser rubber-banding/bouncing */
+            overscroll-behavior-y: none;
+            /* Disable selection and tap highlights for app-like feel */
             user-select: none;
             -webkit-user-select: none;
             -webkit-tap-highlight-color: transparent;
+            -webkit-touch-callout: none;
         }
         
         #root { 
@@ -123,6 +127,7 @@
                 color: black !important;
                 height: auto !important;
                 overflow: visible !important;
+                overscroll-behavior-y: auto; /* Allow scroll on print */
             }
             .aurora-bg, header, nav, .glass-effect, .no-print, button, select, input, .fixed { 
                 display: none !important; 
@@ -177,4 +182,3 @@
     <script type="module" src="./index.tsx"></script>
 </body>
 </html>
-    

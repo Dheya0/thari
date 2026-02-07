@@ -2,12 +2,14 @@
 import { GoogleGenAI } from "@google/genai";
 import { Transaction, Category, ChatMessage, Goal } from "../types";
 
-// Helper to get AI instance with user provided key or fallback (if available)
+// Helper to get AI instance with user provided key
 const getAI = (userKey?: string) => {
+  // STRICT CHECK: Use ONLY the userKey if provided, or process.env as fallback if strictly available.
+  // In the context of the requested change, we prioritize the userKey.
   const apiKey = userKey || process.env.API_KEY;
-  if (!apiKey) {
-    console.warn("Thari AI Warning: API_KEY is missing. Please add it in settings.");
-    return null;
+  
+  if (!apiKey || apiKey.trim() === '') {
+    return null; 
   }
   return new GoogleGenAI({ apiKey });
 };
@@ -19,22 +21,34 @@ export const chatWithThari = async (
   apiKey?: string
 ) => {
   const ai = getAI(apiKey);
-  if (!ai) return "يرجى إضافة مفتاح API الخاص بك في الإعدادات لتفعيل الذكاء الاصطناعي.";
+  
+  if (!ai) {
+    return "عذراً، لا يمكنني العمل بدون مفتاح API. يرجى إضافته في الإعدادات.";
+  }
 
-  const summary = context.transactions.slice(0, 30).map(t => {
+  // Prepare context summary
+  const summary = context.transactions.slice(0, 40).map(t => {
     const cat = context.categories.find(c => c.id === t.categoryId);
-    return `${t.date}: ${t.type === 'income' ? '+' : '-'}${t.amount}${context.currency} (${cat?.name || 'Unknown'})`;
+    return `[${t.date}] ${t.type}: ${t.amount} (${cat?.name || 'عام'}) - ${t.note || ''}`;
   }).join('\n');
 
-  const systemInstruction = `أنت "ثري"، المستشار المالي الأكثر فخامة وحكمة. 
-مهمتك تقديم نصائح استراتيجية لتحقيق الوفرة.
-بيانات المستخدم الحالية:
-${summary}
-قواعدك: كن ملهماً، فخماً، وموجزاً. استخدم لغة عربية راقية.`;
+  const systemInstruction = `أنت "ثري"، المستشار المالي الشخصي. 
+  لديك سجل العمليات المالية للمستخدم أدناه.
+  استخدم هذه البيانات للإجابة بدقة وتحليل الوضع المالي.
+  
+  السجل المالي الأخير:
+  ${summary}
+  
+  العملة المستخدمة: ${context.currency}
+  
+  التعليمات:
+  1. كن مفيداً، مختصراً، واستخدم لغة عربية راقية وودودة.
+  2. إذا سأل المستخدم عن رصيده أو مصاريفه، احسبها بدقة من البيانات أعلاه.
+  3. قدم نصائح للادخار بناءً على نمط إنفاقه.`;
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-3-pro-preview',
+      model: 'gemini-2.5-flash-latest', // Using Flash for speed/cost effectiveness in chat
       contents: [
         ...history.slice(-10).map(msg => ({
           role: msg.role === 'model' ? 'model' : 'user' as const,
@@ -42,11 +56,20 @@ ${summary}
         })),
         { role: 'user', parts: [{ text: userMessage }] }
       ],
-      config: { systemInstruction, tools: [{ googleSearch: {} }] }
+      config: { 
+        systemInstruction,
+        temperature: 0.7,
+      }
     });
-    return response.text || "أنا هنا لدعم رحلتك المالية.";
-  } catch (error) {
-    return "واجهت صعوبة في الاتصال. تأكد من صحة مفتاح API.";
+    
+    return response.text || "لم أستطع تكوين إجابة، حاول صياغة السؤال بطريقة أخرى.";
+
+  } catch (error: any) {
+    console.error("Gemini Error:", error);
+    if (error.message?.includes('403') || error.message?.includes('API key')) {
+        return "حدث خطأ في المصادقة. تأكد من صحة مفتاح API في الإعدادات.";
+    }
+    return "واجهت مشكلة تقنية في الاتصال بالخدمة. يرجى المحاولة لاحقاً.";
   }
 };
 
@@ -61,7 +84,7 @@ export const getFinancialForecast = async (transactions: Transaction[], currency
   
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
+      model: 'gemini-2.5-flash-latest',
       contents: `بناءً على تاريخ العمليات المالي التالي: [${summary}]، قم بإنتاج توقع مالي لـ 6 أشهر القادمة.
 أجب بتنسيق JSON حصراً:
 {
@@ -84,20 +107,11 @@ export const getGoalAdvice = async (goal: Goal, transactions: Transaction[], cur
   const ai = getAI(apiKey);
   if (!ai) return null;
 
-  const monthlySavings = transactions
-    .filter(t => {
-      const date = new Date(t.date);
-      const oneMonthAgo = new Date();
-      oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
-      return date > oneMonthAgo;
-    })
-    .reduce((acc, t) => acc + (t.type === 'income' ? t.amount : -t.amount), 0);
-
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: `الهدف: ${goal.name}, المبلغ المطلوب: ${goal.targetAmount}, المبلغ الحالي: ${goal.currentAmount}, متوسط الادخار الشهري الحالي: ${monthlySavings} ${currency}.
-قدم نصيحة واحدة فخمة جداً (أقل من 15 كلمة) حول كيفية الوصول للهدف أسرع.`,
+      model: 'gemini-2.5-flash-latest',
+      contents: `الهدف: ${goal.name}, المبلغ المطلوب: ${goal.targetAmount}, المبلغ الحالي: ${goal.currentAmount}.
+قدم نصيحة واحدة فخمة جداً (أقل من 15 كلمة) للوصول للهدف.`,
     });
     return response.text;
   } catch {
