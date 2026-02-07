@@ -50,16 +50,26 @@ export interface Subscription {
   isActive: boolean;
 }
 
+export interface DebtInstallment {
+  id: string;
+  amount: number;
+  dueDate: string;
+  isPaid: boolean;
+  paidDate?: string;
+}
+
 export interface Debt {
   id: string;
   personName: string;
-  amount: number;
+  amount: number; // Total amount
+  paidAmount: number; // Amount paid so far
   type: 'to_me' | 'on_me';
   createdAt: string; // Date the debt was created
-  dueDate?: string;  // Expected repayment date
-  isPaid: boolean;
+  dueDate?: string;  // Expected repayment date (final)
+  isPaid: boolean; // True only if fully paid
   note: string;
   currency: string;
+  installments?: DebtInstallment[]; // Optional list of installments
 }
 
 export interface Budget {

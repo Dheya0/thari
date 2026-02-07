@@ -1,8 +1,7 @@
 
-import React, { useState, useRef, useEffect } from 'react';
-import { Send, Bot, User, Loader2, Sparkles, MessageSquareQuote } from 'lucide-react';
+import React from 'react';
+import { Bot, Lock, Sparkles, Construction } from 'lucide-react';
 import { ChatMessage, Transaction, Category } from '../types';
-import { chatWithThari } from '../services/geminiService';
 
 interface AIChatProps {
   history: ChatMessage[];
@@ -12,90 +11,37 @@ interface AIChatProps {
   onSendMessage: (msg: ChatMessage) => void;
 }
 
-const AIChat: React.FC<AIChatProps> = ({ history, transactions, categories, currency, onSendMessage }) => {
-  const [input, setInput] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const scrollRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    scrollRef.current?.scrollTo(0, scrollRef.current.scrollHeight);
-  }, [history, isLoading]);
-
-  const handleSend = async () => {
-    if (!input.trim() || isLoading) return;
-
-    const userMsg: ChatMessage = { role: 'user', text: input, timestamp: Date.now() };
-    onSendMessage(userMsg);
-    setInput('');
-    setIsLoading(true);
-
-    const responseText = await chatWithThari(input, history, { transactions, categories, currency });
-    const aiMsg: ChatMessage = { role: 'model', text: responseText, timestamp: Date.now() };
-    onSendMessage(aiMsg);
-    setIsLoading(false);
-  };
-
+const AIChat: React.FC<AIChatProps> = () => {
   return (
-    <div className="flex flex-col h-full min-h-[60vh] animate-fade">
-      {/* Header Info */}
-      <div className="flex items-center gap-3 mb-6 p-4 bg-amber-500/10 rounded-[2.5rem] border border-amber-500/20 shadow-lg shadow-amber-500/5">
-        <div className="w-12 h-12 bg-amber-500 rounded-2xl flex items-center justify-center text-slate-950 shadow-lg">
-          <Bot size={28} />
-        </div>
-        <div>
-          <h3 className="font-black text-white text-sm">ثري الذكي</h3>
-          <p className="text-[9px] font-bold text-amber-500 uppercase tracking-widest opacity-80">مستشارك المالي الشخصي</p>
-        </div>
+    <div className="flex flex-col items-center justify-center h-[60vh] text-center p-8 space-y-8 animate-fade">
+      <div className="relative group">
+         <div className="w-32 h-32 bg-slate-900 rounded-[3rem] flex items-center justify-center border border-slate-800 shadow-2xl transition-transform group-hover:scale-105">
+            <Bot size={64} className="text-slate-700 group-hover:text-slate-600 transition-colors" />
+         </div>
+         
+         {/* Lock Icon */}
+         <div className="absolute -bottom-2 -right-2 bg-amber-500 text-slate-950 p-3 rounded-2xl shadow-lg shadow-amber-500/20 animate-bounce">
+            <Lock size={20} strokeWidth={2.5} />
+         </div>
+         
+         {/* Decor icon */}
+         <div className="absolute -top-2 -left-2 bg-slate-800 text-slate-500 p-3 rounded-2xl border border-slate-700">
+            <Sparkles size={20} />
+         </div>
       </div>
 
-      {/* Messages List - Flexible Height */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto no-scrollbar space-y-6 px-1 pb-4">
-        {history.length === 0 && (
-          <div className="text-center py-16 space-y-4 opacity-40">
-            <MessageSquareQuote size={48} className="mx-auto text-slate-700" />
-            <p className="text-[11px] font-black text-slate-500 uppercase tracking-widest max-w-[200px] mx-auto">
-              أهلاً بك! أنا هنا لتحليل مصاريفك وتقديم نصائح لزيادة وفرتك. اسألني أي شيء.
+      <div className="space-y-4 max-w-xs mx-auto">
+         <h3 className="text-2xl font-black text-white">المساعد الذكي قيد التطوير</h3>
+         
+         <p className="text-sm font-bold text-slate-500 leading-relaxed">
+           نعمل حالياً على ترقية "ثري الذكي" لتقديم تحليلات مالية أكثر دقة وعمقاً باستخدام أحدث تقنيات الذكاء الاصطناعي.
+         </p>
+         
+         <div className="p-5 bg-amber-500/5 border border-amber-500/10 rounded-3xl mt-4">
+            <p className="text-[10px] font-black text-amber-600 uppercase tracking-widest flex items-center justify-center gap-2">
+               <Construction size={14} /> ستتوفر الخدمة قريباً
             </p>
-          </div>
-        )}
-        {history.map((msg, i) => (
-          <div key={i} className={`flex ${msg.role === 'user' ? 'justify-start' : 'justify-end'} animate-slide-up`}>
-            <div className={`max-w-[88%] p-5 rounded-[2.2rem] shadow-sm ${
-              msg.role === 'user' 
-                ? 'bg-slate-900 text-white rounded-br-none border border-slate-800' 
-                : 'bg-amber-500 text-slate-950 rounded-bl-none font-bold'
-            }`}>
-              <p className="text-sm leading-relaxed">{msg.text}</p>
-            </div>
-          </div>
-        ))}
-        {isLoading && (
-          <div className="flex justify-end animate-pulse">
-            <div className="bg-amber-500/20 p-5 rounded-[2.2rem] rounded-bl-none border border-amber-500/30 flex items-center gap-3">
-              <Loader2 className="animate-spin text-amber-500" size={18} />
-              <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest">ثري يحلل بياناتك...</span>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Input Area - Fixed at bottom of flex container */}
-      <div className="mt-4 pb-2 relative">
-        <input
-          type="text"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyPress={(e) => e.key === 'Enter' && handleSend()}
-          placeholder="كيف يمكنني مساعدتك مالياً اليوم؟"
-          className="w-full bg-slate-900 border border-white/5 p-5 rounded-[2.2rem] text-sm text-white placeholder:text-slate-600 outline-none focus:ring-2 focus:ring-amber-500/50 transition-all pr-16"
-        />
-        <button
-          onClick={handleSend}
-          disabled={isLoading}
-          className="absolute left-2 top-2 bottom-4 w-12 bg-amber-500 rounded-2xl flex items-center justify-center text-slate-950 active:scale-90 disabled:opacity-50 transition-all shadow-lg"
-        >
-          <Send size={20} />
-        </button>
+         </div>
       </div>
     </div>
   );

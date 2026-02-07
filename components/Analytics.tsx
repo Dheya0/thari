@@ -1,6 +1,6 @@
 
 import React, { useMemo } from 'react';
-import { Download, Printer, FileText } from 'lucide-react';
+import { Download, Printer, FileText, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { Transaction, Category } from '../types';
 import { convertCurrency } from '../constants';
@@ -25,6 +25,35 @@ const Analytics: React.FC<AnalyticsProps> = ({ transactions, categories, currenc
         .reduce((s, t) => s + convertCurrency(t.amount, t.currency, currentCurrencyCode), 0);
         
     return { totalIncome, totalExpense };
+  }, [transactions, currentCurrencyCode]);
+
+  // Month-over-Month Analysis
+  const momStats = useMemo(() => {
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+    const prevMonth = currentMonth === 0 ? 11 : currentMonth - 1;
+    const prevYear = currentMonth === 0 ? currentYear - 1 : currentYear;
+
+    const getMonthlyTotal = (month: number, year: number, type: 'income' | 'expense') => {
+        return transactions.filter(t => {
+            const d = new Date(t.date);
+            return d.getMonth() === month && d.getFullYear() === year && t.type === type;
+        }).reduce((s, t) => s + convertCurrency(t.amount, t.currency, currentCurrencyCode), 0);
+    };
+
+    const curInc = getMonthlyTotal(currentMonth, currentYear, 'income');
+    const curExp = getMonthlyTotal(currentMonth, currentYear, 'expense');
+    const prevInc = getMonthlyTotal(prevMonth, prevYear, 'income');
+    const prevExp = getMonthlyTotal(prevMonth, prevYear, 'expense');
+
+    const calcChange = (cur: number, prev: number) => prev === 0 ? 0 : ((cur - prev) / prev) * 100;
+
+    return {
+        incomeChange: calcChange(curInc, prevInc),
+        expenseChange: calcChange(curExp, prevExp),
+        curInc, curExp
+    };
   }, [transactions, currentCurrencyCode]);
 
   const expenseData = useMemo(() => {
@@ -65,6 +94,34 @@ const Analytics: React.FC<AnalyticsProps> = ({ transactions, categories, currenc
 
   return (
     <div className="space-y-8 pb-10 animate-fade">
+      
+      {/* Month Over Month Comparison */}
+      <div className="grid grid-cols-2 gap-4">
+         <div className="bg-slate-900/60 p-5 rounded-[2.5rem] border border-slate-800 backdrop-blur-md">
+            <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-2">مقارنة الدخل الشهري</p>
+            <div className="flex items-end justify-between">
+                <span className="text-xl font-black text-white">{momStats.curInc.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                <div className={`flex items-center text-[10px] font-black px-2 py-1 rounded-lg ${momStats.incomeChange >= 0 ? 'bg-emerald-500/10 text-emerald-500' : 'bg-rose-500/10 text-rose-500'}`}>
+                    {momStats.incomeChange > 0 ? <TrendingUp size={12} className="mr-1" /> : momStats.incomeChange < 0 ? <TrendingDown size={12} className="mr-1" /> : <Minus size={12} className="mr-1" />}
+                    {Math.abs(momStats.incomeChange).toFixed(1)}%
+                </div>
+            </div>
+         </div>
+         <div className="bg-slate-900/60 p-5 rounded-[2.5rem] border border-slate-800 backdrop-blur-md">
+            <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-2">مقارنة المصاريف</p>
+            <div className="flex items-end justify-between">
+                <span className="text-xl font-black text-white">{momStats.curExp.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                <div className={`flex items-center text-[10px] font-black px-2 py-1 rounded-lg ${momStats.expenseChange <= 0 ? 'bg-emerald-500/10 text-emerald-500' : 'bg-rose-500/10 text-rose-500'}`}>
+                    {momStats.expenseChange > 0 ? <TrendingUp size={12} className="mr-1" /> : momStats.expenseChange < 0 ? <TrendingDown size={12} className="mr-1" /> : <Minus size={12} className="mr-1" />}
+                    {Math.abs(momStats.expenseChange).toFixed(1)}%
+                </div>
+            </div>
+            <p className="text-[8px] text-slate-600 mt-2 font-bold">
+                {momStats.expenseChange > 0 ? 'زادت مصاريفك عن الشهر الماضي' : 'أداء ممتاز! مصاريفك أقل'}
+            </p>
+         </div>
+      </div>
+
       <div className="flex flex-col gap-4">
         <div className="grid grid-cols-2 gap-3">
           <button 
