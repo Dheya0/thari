@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Plus, LayoutDashboard, History, Settings as SettingsIcon, BrainCircuit, HandCoins, Repeat, Coins, ArrowRight, Sparkles } from 'lucide-react';
+import { Plus, LayoutDashboard, History, Settings as SettingsIcon, BrainCircuit, HandCoins, Repeat, Coins, ArrowRight, Sparkles, Scale } from 'lucide-react';
 import { AppState, Transaction, Category, Debt } from './types';
 import { INITIAL_CATEGORIES, DEFAULT_CURRENCIES, convertCurrency } from './constants';
 import BalanceCard from './components/BalanceCard';
@@ -20,6 +20,7 @@ import Logo from './components/Logo';
 import FinancialReport from './components/FinancialReport';
 import SmartAlerts from './components/SmartAlerts';
 import FinancialSimulation from './components/FinancialSimulation';
+import ZakatCalculator from './components/ZakatCalculator';
 
 const STORAGE_KEY = 'thari_app_v4';
 
@@ -53,7 +54,7 @@ const App: React.FC = () => {
     } catch { return INITIAL_STATE; }
   });
 
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'transactions' | 'debts' | 'chat' | 'subscriptions' | 'settings' | 'budgets' | 'goals' | 'future'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'transactions' | 'debts' | 'chat' | 'subscriptions' | 'settings' | 'budgets' | 'goals' | 'future' | 'zakat'>('dashboard');
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [showPrivacyPolicy, setShowPrivacyPolicy] = useState(false);
@@ -233,7 +234,6 @@ const App: React.FC = () => {
                     <h3 className="text-[9px] font-black text-slate-500 uppercase flex items-center gap-2 tracking-[0.2em]"><History size={12} /> أحدث العمليات (مفلترة)</h3>
                     <button onClick={() => setActiveTab('transactions')} className="text-amber-500 text-[9px] font-black uppercase flex items-center gap-1">عرض الكل <ArrowRight size={10} className="rotate-180" /></button>
                   </div>
-                  {/* Just showing the current currency transactions here for relevance, analytics handles global */}
                   <TransactionList transactions={currentCurrencyTransactions.slice(0, 5)} categories={state.categories} wallets={state.wallets} onDelete={(id) => setState(p => ({ ...p, transactions: p.transactions.filter(t => t.id !== id) }))} onEdit={handleEditTransaction} currencySymbol={state.currency.symbol} />
                 </section>
                 
@@ -254,17 +254,9 @@ const App: React.FC = () => {
             {activeTab === 'goals' && <GoalTracker goals={state.goals} wallets={state.wallets} transactions={state.transactions} onAddGoal={(g) => setState(p => ({ ...p, goals: [...p.goals, { ...g, id: 'g-'+Date.now() }] }))} onUpdateGoalAmount={(id, amt) => setState(p => ({ ...p, goals: p.goals.map(g => g.id === id ? { ...g, currentAmount: g.currentAmount + amt } : g) }))} currencySymbol={state.currency.symbol} apiKey={state.apiKey} />}
             {activeTab === 'budgets' && <BudgetManager budgets={state.budgets} categories={state.categories} transactions={state.transactions} onSetBudget={(catId, amount) => setState(p => ({ ...p, budgets: [...p.budgets.filter(b => b.categoryId !== catId), { categoryId: catId, amount }] }))} currencySymbol={state.currency.symbol} />}
             {activeTab === 'chat' && <AIChat history={state.chatHistory} transactions={state.transactions} categories={state.categories} currency={state.currency.symbol} onSendMessage={(msg) => setState(p => ({ ...p, chatHistory: [...p.chatHistory, msg].slice(-30) }))} apiKey={state.apiKey} />}
-            {activeTab === 'debts' && <DebtManager 
-                debts={state.debts} 
-                wallets={state.wallets} 
-                onAddDebt={handleAddDebt} 
-                onUpdateDebt={handleUpdateDebt} 
-                onSettleDebt={handleSettleDebt} 
-                onDeleteDebt={(id) => setState(p => ({ ...p, debts: p.debts.filter(d => d.id !== id) }))} 
-                currencySymbol={state.currency.symbol} 
-                currencyCode={state.currency.code} 
-            />}
+            {activeTab === 'debts' && <DebtManager debts={state.debts} wallets={state.wallets} onAddDebt={handleAddDebt} onUpdateDebt={handleUpdateDebt} onSettleDebt={handleSettleDebt} onDeleteDebt={(id) => setState(p => ({ ...p, debts: p.debts.filter(d => d.id !== id) }))} currencySymbol={state.currency.symbol} currencyCode={state.currency.code} />}
             {activeTab === 'subscriptions' && <SubscriptionManager subscriptions={state.subscriptions} categories={state.categories} onAdd={(sub) => setState(p => ({ ...p, subscriptions: [{...sub, id: 's-'+Date.now()}, ...p.subscriptions] }))} onRemove={(id) => setState(p => ({ ...p, subscriptions: p.subscriptions.filter(s => s.id !== id) }))} currencySymbol={state.currency.symbol} />}
+            {activeTab === 'zakat' && <ZakatCalculator totalBalance={totals.balance} currencySymbol={state.currency.symbol} />}
             
             {activeTab === 'transactions' && (
                 <div className="space-y-8 animate-luxury-pop">
@@ -304,9 +296,9 @@ const App: React.FC = () => {
 
         <nav className="fixed bottom-6 left-4 right-4 max-w-[calc(32rem-2rem)] mx-auto bg-slate-900/90 backdrop-blur-2xl border border-white/10 flex justify-around p-3 pb-3 z-40 rounded-[2.5rem] shadow-[0_20px_40px_rgba(0,0,0,0.5)]">
           <NavButton icon={<LayoutDashboard />} label="الرئيسية" active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} />
-          <NavButton icon={<HandCoins />} label="ديون" active={activeTab === 'debts'} onClick={() => setActiveTab('debts')} />
+          <NavButton icon={<Scale />} label="زكاتي" active={activeTab === 'zakat'} onClick={() => setActiveTab('zakat')} />
           <div className="w-12" />
-          <NavButton icon={<Repeat />} label="دوري" active={activeTab === 'subscriptions'} onClick={() => setActiveTab('subscriptions')} />
+          <NavButton icon={<HandCoins />} label="ديون" active={activeTab === 'debts'} onClick={() => setActiveTab('debts')} />
           <NavButton icon={<SettingsIcon />} label="المزيد" active={activeTab === 'settings'} onClick={() => setActiveTab('settings')} />
         </nav>
 
