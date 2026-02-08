@@ -10,18 +10,19 @@ interface FinancialReportProps {
   userName: string;
   wallets: Wallet[];
   type: 'summary' | 'detailed';
+  exchangeRates: Record<string, number>;
 }
 
-const FinancialReport: React.FC<FinancialReportProps> = ({ transactions, categories, currency, userName, wallets, type }) => {
+const FinancialReport: React.FC<FinancialReportProps> = ({ transactions, categories, currency, userName, wallets, type, exchangeRates }) => {
   // Use all provided transactions but CONVERT them to the selected currency
   const totals = {
     income: transactions
         .filter(t => t.type === 'income')
-        .reduce((s, t) => s + convertCurrency(t.amount, t.currency, currency.code), 0),
+        .reduce((s, t) => s + convertCurrency(t.amount, t.currency, currency.code, exchangeRates), 0),
     
     expense: transactions
         .filter(t => t.type === 'expense')
-        .reduce((s, t) => s + convertCurrency(t.amount, t.currency, currency.code), 0),
+        .reduce((s, t) => s + convertCurrency(t.amount, t.currency, currency.code, exchangeRates), 0),
   };
   const netBalance = totals.income - totals.expense;
 
@@ -32,7 +33,7 @@ const FinancialReport: React.FC<FinancialReportProps> = ({ transactions, categor
       .reduce((s, t) => s + (t.type === 'income' ? t.amount : -t.amount), 0);
     
     // Converted to Report Currency
-    const convertedBalance = convertCurrency(rawBalance, w.currencyCode, currency.code);
+    const convertedBalance = convertCurrency(rawBalance, w.currencyCode, currency.code, exchangeRates);
 
     return { ...w, balance: convertedBalance };
   });
@@ -42,7 +43,7 @@ const FinancialReport: React.FC<FinancialReportProps> = ({ transactions, categor
     .map(c => {
       const amount = transactions
         .filter(t => t.categoryId === c.id && t.type === 'expense')
-        .reduce((s, t) => s + convertCurrency(t.amount, t.currency, currency.code), 0);
+        .reduce((s, t) => s + convertCurrency(t.amount, t.currency, currency.code, exchangeRates), 0);
       return { ...c, amount };
     })
     .filter(c => c.amount > 0)
@@ -176,7 +177,7 @@ const FinancialReport: React.FC<FinancialReportProps> = ({ transactions, categor
                     {displayTransactions.map((t, i) => {
                         const cat = categories.find(c => c.id === t.categoryId);
                         const wallet = wallets.find(w => w.id === t.walletId);
-                        const convertedAmount = convertCurrency(t.amount, t.currency, currency.code);
+                        const convertedAmount = convertCurrency(t.amount, t.currency, currency.code, exchangeRates);
                         return (
                             <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}>
                                 <td className="py-4 px-4 font-medium text-slate-500 text-xs">{t.date}</td>

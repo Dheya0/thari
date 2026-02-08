@@ -10,9 +10,10 @@ interface TransactionFormProps {
   onSubmit: (transaction: Omit<Transaction, 'id'>) => void;
   onClose: () => void;
   initialData?: Transaction | null;
+  exchangeRates: Record<string, number>;
 }
 
-const TransactionForm: React.FC<TransactionFormProps> = ({ categories, wallets, onSubmit, onClose, initialData }) => {
+const TransactionForm: React.FC<TransactionFormProps> = ({ categories, wallets, onSubmit, onClose, initialData, exchangeRates }) => {
   const [type, setType] = useState<TransactionType>('expense');
   const [amount, setAmount] = useState('');
   const [categoryId, setCategoryId] = useState('');
@@ -20,13 +21,9 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, wallets, 
   const [note, setNote] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   
-  // Determine initial currency:
-  // 1. If editing, use transaction currency.
-  // 2. If new, use the first wallet's currency (or the one matching walletId).
   const initialWallet = wallets.find(w => w.id === (initialData?.walletId || wallets[0]?.id));
   const [inputCurrency, setInputCurrency] = useState(initialData?.currency || initialWallet?.currencyCode || 'SAR');
 
-  // Load Initial Data
   useEffect(() => {
     if (initialData) {
       setType(initialData.type);
@@ -39,9 +36,6 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, wallets, 
     }
   }, [initialData]);
 
-  // CRITICAL FIX: When User Changes Wallet -> Automatically update Input Currency to match Wallet
-  // This prevents the "defaulting to Aden" issue when you select a Sanaa wallet.
-  // Only update if not in edit mode (to preserve original transaction data structure if editing)
   useEffect(() => {
     if (!initialData) {
         const selectedW = wallets.find(w => w.id === walletId);
@@ -54,28 +48,25 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, wallets, 
   const selectedWallet = wallets.find(w => w.id === walletId);
   const walletCurrency = selectedWallet?.currencyCode || 'SAR';
 
-  // Live Conversion Calculation
-  // Only convert if the INPUT currency differs from the WALLET currency
+  // Live Conversion Calculation using Custom Rates
   const convertedData = useMemo(() => {
     if (!amount || inputCurrency === walletCurrency) return null;
     
-    // Use the helper from constants
-    const finalVal = convertCurrency(parseFloat(amount), inputCurrency, walletCurrency);
+    // Pass exchangeRates to the helper
+    const finalVal = convertCurrency(parseFloat(amount), inputCurrency, walletCurrency, exchangeRates);
 
     return {
         amount: finalVal,
         rate: finalVal / parseFloat(amount)
     };
-  }, [amount, inputCurrency, walletCurrency]);
+  }, [amount, inputCurrency, walletCurrency, exchangeRates]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!amount || !categoryId || !walletId) return;
 
-    // Use converted amount if currencies differ, otherwise raw amount
     const finalAmount = convertedData ? convertedData.amount : parseFloat(amount);
     
-    // If converted, append info to note for clarity
     const finalNote = convertedData 
         ? `${note} (تم التحويل: ${amount} ${inputCurrency})`.trim()
         : note;
@@ -87,7 +78,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, wallets, 
         walletId,
         note: finalNote, 
         date, 
-        currency: walletCurrency, // Transaction is always saved in the WALLET's currency to maintain balance integrity
+        currency: walletCurrency, 
         frequency: 'once' 
     });
   };
@@ -124,7 +115,6 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, wallets, 
                 autoFocus 
                 />
                 
-                {/* Currency Selector - Now Defaults to Wallet Currency */}
                 <div className="absolute right-0 top-1/2 -translate-y-1/2 flex flex-col items-center">
                     <select 
                         value={inputCurrency}
@@ -136,7 +126,6 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, wallets, 
                 </div>
             </div>
 
-            {/* Live Conversion Display */}
             {convertedData && (
                 <div className="flex items-center justify-center gap-2 text-emerald-500 bg-emerald-500/10 py-2 px-4 rounded-xl w-fit mx-auto animate-fade">
                     <ArrowRightLeft size={14} />

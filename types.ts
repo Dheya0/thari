@@ -101,6 +101,7 @@ export interface AppState {
   budgets: Budget[];
   currency: Currency;
   currencies: Currency[];
+  exchangeRates: Record<string, number>; // Custom Exchange Rates (Base: SAR)
   isDarkMode: boolean;
   pin: string | null;
   isLocked: boolean;

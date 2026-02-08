@@ -10,24 +10,23 @@ interface AnalyticsProps {
   categories: Category[];
   currencySymbol: string;
   onPrint: (type: 'summary' | 'detailed') => void;
-  currentCurrencyCode?: string; // Add current currency code to convert stats
+  currentCurrencyCode?: string; 
+  exchangeRates: Record<string, number>;
 }
 
-const Analytics: React.FC<AnalyticsProps> = ({ transactions, categories, currencySymbol, onPrint, currentCurrencyCode = 'SAR' }) => {
+const Analytics: React.FC<AnalyticsProps> = ({ transactions, categories, currencySymbol, onPrint, currentCurrencyCode = 'SAR', exchangeRates }) => {
   const stats = useMemo(() => {
-    // Convert all amounts to the current selected currency
     const totalIncome = transactions
         .filter(t => t.type === 'income')
-        .reduce((s, t) => s + convertCurrency(t.amount, t.currency, currentCurrencyCode), 0);
+        .reduce((s, t) => s + convertCurrency(t.amount, t.currency, currentCurrencyCode, exchangeRates), 0);
     
     const totalExpense = transactions
         .filter(t => t.type === 'expense')
-        .reduce((s, t) => s + convertCurrency(t.amount, t.currency, currentCurrencyCode), 0);
+        .reduce((s, t) => s + convertCurrency(t.amount, t.currency, currentCurrencyCode, exchangeRates), 0);
         
     return { totalIncome, totalExpense };
-  }, [transactions, currentCurrencyCode]);
+  }, [transactions, currentCurrencyCode, exchangeRates]);
 
-  // Month-over-Month Analysis
   const momStats = useMemo(() => {
     const now = new Date();
     const currentMonth = now.getMonth();
@@ -39,7 +38,7 @@ const Analytics: React.FC<AnalyticsProps> = ({ transactions, categories, currenc
         return transactions.filter(t => {
             const d = new Date(t.date);
             return d.getMonth() === month && d.getFullYear() === year && t.type === type;
-        }).reduce((s, t) => s + convertCurrency(t.amount, t.currency, currentCurrencyCode), 0);
+        }).reduce((s, t) => s + convertCurrency(t.amount, t.currency, currentCurrencyCode, exchangeRates), 0);
     };
 
     const curInc = getMonthlyTotal(currentMonth, currentYear, 'income');
@@ -54,15 +53,14 @@ const Analytics: React.FC<AnalyticsProps> = ({ transactions, categories, currenc
         expenseChange: calcChange(curExp, prevExp),
         curInc, curExp
     };
-  }, [transactions, currentCurrencyCode]);
+  }, [transactions, currentCurrencyCode, exchangeRates]);
 
   const expenseData = useMemo(() => {
     const expenses = transactions.filter(t => t.type === 'expense');
     const categoryTotals: Record<string, number> = {};
     
     expenses.forEach(t => { 
-        // Convert amount before adding to total
-        const convertedAmount = convertCurrency(t.amount, t.currency, currentCurrencyCode);
+        const convertedAmount = convertCurrency(t.amount, t.currency, currentCurrencyCode, exchangeRates);
         categoryTotals[t.categoryId] = (categoryTotals[t.categoryId] || 0) + convertedAmount; 
     });
 
@@ -70,14 +68,14 @@ const Analytics: React.FC<AnalyticsProps> = ({ transactions, categories, currenc
       const cat = categories.find(c => c.id === catId);
       return { name: cat?.name || 'أخرى', value: Math.round(categoryTotals[catId]), color: cat?.color || '#cbd5e1' };
     }).sort((a, b) => b.value - a.value);
-  }, [transactions, categories, currentCurrencyCode]);
+  }, [transactions, categories, currentCurrencyCode, exchangeRates]);
 
   const handleExportCSV = () => {
     const headers = "Date,Type,Amount,Currency,ConvertedAmount,Category,Wallet,Note\n";
     const csvContent = transactions.map(t => {
       const cat = categories.find(c => c.id === t.categoryId)?.name || 'N/A';
       const typeLabel = t.type === 'income' ? 'Income' : 'Expense';
-      const converted = convertCurrency(t.amount, t.currency, currentCurrencyCode).toFixed(2);
+      const converted = convertCurrency(t.amount, t.currency, currentCurrencyCode, exchangeRates).toFixed(2);
       return `${t.date},${typeLabel},${t.amount},${t.currency},${converted},"${cat}","${t.walletId}","${t.note.replace(/"/g, '""')}"`;
     }).join("\n");
 

@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Plus, LayoutDashboard, History, Settings as SettingsIcon, BrainCircuit, HandCoins, Repeat, Coins, ArrowRight, Sparkles, Scale } from 'lucide-react';
 import { AppState, Transaction, Category, Debt } from './types';
-import { INITIAL_CATEGORIES, DEFAULT_CURRENCIES, convertCurrency } from './constants';
+import { INITIAL_CATEGORIES, DEFAULT_CURRENCIES, DEFAULT_EXCHANGE_RATES, convertCurrency } from './constants';
 import BalanceCard from './components/BalanceCard';
 import TransactionForm from './components/TransactionForm';
 import TransactionList from './components/TransactionList';
@@ -39,6 +39,7 @@ const INITIAL_STATE: AppState = {
   budgets: [],
   currency: DEFAULT_CURRENCIES[0], // Default to SAR
   currencies: DEFAULT_CURRENCIES,
+  exchangeRates: DEFAULT_EXCHANGE_RATES,
   isDarkMode: true,
   pin: null,
   isLocked: false,
@@ -50,7 +51,12 @@ const App: React.FC = () => {
   const [state, setState] = useState<AppState>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
-      return saved ? { ...INITIAL_STATE, ...JSON.parse(saved), isLocked: !!JSON.parse(saved).pin } : INITIAL_STATE;
+      if (saved) {
+          const parsed = JSON.parse(saved);
+          // Merge with initial state to ensure new properties like exchangeRates exist
+          return { ...INITIAL_STATE, ...parsed, isLocked: !!parsed.pin };
+      }
+      return INITIAL_STATE;
     } catch { return INITIAL_STATE; }
   });
 
@@ -64,34 +70,30 @@ const App: React.FC = () => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   }, [state]);
 
-  // List View: Should show mixed currencies? Or filtered?
-  // User wants clear separation usually, but for global view we might want mixed.
-  // Let's keep the filter behavior for the list on dashboard to avoid confusion.
-  // BUT the totals must be global.
-  const currentCurrencyTransactions = useMemo(() => 
-    state.transactions.filter(t => t.currency === state.currency.code), 
-  [state.transactions, state.currency]);
-
   // Global Totals Calculation (Normalized to Selected Currency)
   const totals = useMemo(() => {
     // 1. Calculate Balance from Wallets (Sum of transactions in wallet -> converted to Global Currency)
     const balance = state.wallets.reduce((sum, w) => {
         const walletTx = state.transactions.filter(t => t.walletId === w.id);
         const walletBalance = walletTx.reduce((acc, t) => acc + (t.type === 'income' ? t.amount : -t.amount), 0);
-        return sum + convertCurrency(walletBalance, w.currencyCode, state.currency.code);
+        return sum + convertCurrency(walletBalance, w.currencyCode, state.currency.code, state.exchangeRates);
     }, 0);
 
     // 2. Calculate Total Income/Expense (Convert each transaction to Global Currency)
     const income = state.transactions
         .filter(t => t.type === 'income')
-        .reduce((sum, t) => sum + convertCurrency(t.amount, t.currency, state.currency.code), 0);
+        .reduce((sum, t) => sum + convertCurrency(t.amount, t.currency, state.currency.code, state.exchangeRates), 0);
 
     const expense = state.transactions
         .filter(t => t.type === 'expense')
-        .reduce((sum, t) => sum + convertCurrency(t.amount, t.currency, state.currency.code), 0);
+        .reduce((sum, t) => sum + convertCurrency(t.amount, t.currency, state.currency.code, state.exchangeRates), 0);
 
     return { income, expense, balance };
-  }, [state.wallets, state.transactions, state.currency]);
+  }, [state.wallets, state.transactions, state.currency, state.exchangeRates]);
+
+  const currentCurrencyTransactions = useMemo(() => 
+    state.transactions.filter(t => t.currency === state.currency.code), 
+  [state.transactions, state.currency]);
 
   const handlePrint = (type: 'summary' | 'detailed') => {
     setPrintType(type);
@@ -189,7 +191,15 @@ const App: React.FC = () => {
   return (
     <div className="w-full max-w-lg mx-auto h-full flex flex-col bg-transparent transition-all overflow-hidden relative border-x border-white/5 print:block print:bg-white print:max-w-none print:h-auto print:overflow-visible">
       
-      <FinancialReport transactions={state.transactions} categories={state.categories} currency={state.currency} userName={state.userName} wallets={state.wallets} type={printType} />
+      <FinancialReport 
+        transactions={state.transactions} 
+        categories={state.categories} 
+        currency={state.currency} 
+        userName={state.userName} 
+        wallets={state.wallets} 
+        type={printType} 
+        exchangeRates={state.exchangeRates}
+      />
       
       <div className="flex flex-col h-full print:hidden relative z-20">
         <header className="px-6 py-6 pt-[calc(var(--sat)+1.5rem)] space-y-4 glass-effect border-b border-white/5 z-30">
@@ -260,7 +270,7 @@ const App: React.FC = () => {
             
             {activeTab === 'transactions' && (
                 <div className="space-y-8 animate-luxury-pop">
-                    <Analytics transactions={state.transactions} categories={state.categories} currencySymbol={state.currency.symbol} onPrint={handlePrint} currentCurrencyCode={state.currency.code} />
+                    <Analytics transactions={state.transactions} categories={state.categories} currencySymbol={state.currency.symbol} onPrint={handlePrint} currentCurrencyCode={state.currency.code} exchangeRates={state.exchangeRates} />
                     <TransactionList transactions={state.transactions} categories={state.categories} wallets={state.wallets} onDelete={(id) => setState(p => ({...p, transactions: p.transactions.filter(t => t.id !== id)}))} onEdit={handleEditTransaction} currencySymbol={state.currency.symbol} showFilters />
                 </div>
             )}
@@ -303,7 +313,7 @@ const App: React.FC = () => {
         </nav>
 
         {showAddForm && (
-            <TransactionForm categories={state.categories} wallets={state.wallets} onSubmit={handleSubmitTransaction} onClose={() => { setShowAddForm(false); setEditingTransaction(null); }} initialData={editingTransaction} />
+            <TransactionForm categories={state.categories} wallets={state.wallets} onSubmit={handleSubmitTransaction} onClose={() => { setShowAddForm(false); setEditingTransaction(null); }} initialData={editingTransaction} exchangeRates={state.exchangeRates} />
         )}
         {showPrivacyPolicy && <PrivacyPolicy onBack={() => setShowPrivacyPolicy(false)} />}
       </div>
