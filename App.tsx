@@ -202,14 +202,14 @@ const App: React.FC = () => {
       
       {/* Hidden Print Report - Now receives filtered data if selected */}
       <FinancialReport 
-        transactions={state.transactions} // We pass ALL transactions, filtering happens inside based on prop
+        transactions={state.transactions} 
         categories={state.categories} 
         currency={state.currency} 
         userName={state.userName} 
         wallets={state.wallets} 
         type={printType} 
         exchangeRates={state.exchangeRates}
-        filterWalletId={selectedWalletId} // Pass the active filter
+        filterWalletId={selectedWalletId} 
       />
       
       <div className="flex flex-col h-full print:hidden relative z-20">
@@ -222,27 +222,25 @@ const App: React.FC = () => {
             </div>
           </div>
 
-          {/* Wallet Selector (Horizontal Scroll) */}
+          {/* RESTORED: Currency Marquee & Settings Button */}
           {activeTab === 'dashboard' && (
-            <div className="flex gap-3 overflow-x-auto no-scrollbar py-2 -mx-6 px-6">
-                <button 
-                    onClick={() => setSelectedWalletId(null)}
-                    className={`shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-2xl border transition-all ${!selectedWalletId ? 'bg-white text-slate-900 border-white' : 'bg-slate-800/50 border-slate-700 text-slate-400'}`}
-                >
-                    <LayoutDashboard size={16} />
-                    <span className="text-xs font-black">كل المحافظ</span>
-                </button>
-                {state.wallets.map(w => (
-                    <button 
-                        key={w.id}
-                        onClick={() => setSelectedWalletId(w.id)}
-                        className={`shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-2xl border transition-all ${selectedWalletId === w.id ? 'bg-amber-500 text-slate-900 border-amber-500 shadow-lg shadow-amber-500/20' : 'bg-slate-800/50 border-slate-700 text-slate-400'}`}
-                    >
-                        <div className="w-2 h-2 rounded-full" style={{backgroundColor: w.color}} />
-                        <span className="text-xs font-black">{w.name}</span>
-                        {selectedWalletId === w.id && <Check size={14} />}
-                    </button>
-                ))}
+            <div className="flex items-center gap-2">
+                <div className="flex-1 overflow-hidden mask-gradient-x py-2 -my-2">
+                    <div className="flex items-center gap-3 w-max animate-marquee-rtl pause px-6">
+                    {[...state.currencies, ...state.currencies].map((curr, index) => {
+                        const isActive = state.currency.code === curr.code;
+                        return (
+                        <button key={`${curr.code}-${index}`} onClick={() => setState(p => ({...p, currency: curr}))} className={`relative flex items-center gap-3 pl-5 pr-3 py-3 rounded-full border backdrop-blur-md transition-all duration-500 ${isActive ? 'bg-amber-500 border-amber-400 text-slate-950 shadow-[0_0_25px_rgba(245,158,11,0.5)] scale-105 z-10' : 'bg-slate-800/30 border-white/5 text-slate-400 hover:bg-slate-800 hover:border-white/20 hover:scale-105'}`}>
+                            {isActive && <div className="absolute inset-0 rounded-full bg-gradient-to-br from-white/30 to-transparent opacity-50 pointer-events-none" />}
+                            <span className={`text-[10px] font-black uppercase tracking-widest ${isActive ? 'text-slate-900/60' : 'text-slate-500'}`}>{curr.code}</span>
+                            <span className="font-bold text-sm whitespace-nowrap">{curr.name}</span>
+                            <div className={`w-2 h-2 rounded-full transition-colors ${isActive ? 'bg-slate-950' : 'bg-slate-600'}`} />
+                        </button>
+                        );
+                    })}
+                    </div>
+                </div>
+                <button onClick={() => setActiveTab('settings')} className="flex items-center justify-center w-12 h-12 rounded-full bg-slate-800/50 border border-slate-700 text-slate-500 hover:text-amber-500 hover:border-amber-500/50 transition-all shrink-0 active:scale-95 backdrop-blur-md shadow-lg z-20"><SettingsIcon size={18} /></button>
             </div>
           )}
         </header>
@@ -251,6 +249,28 @@ const App: React.FC = () => {
           <div className="py-6 space-y-8">
             {activeTab === 'dashboard' && (
               <>
+                {/* NEW LOCATION: Wallet Selector (Horizontal Scroll) below header */}
+                <div className="flex gap-3 overflow-x-auto no-scrollbar py-1">
+                    <button 
+                        onClick={() => setSelectedWalletId(null)}
+                        className={`shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-2xl border transition-all ${!selectedWalletId ? 'bg-white text-slate-900 border-white' : 'bg-slate-800/50 border-slate-700 text-slate-400'}`}
+                    >
+                        <LayoutDashboard size={16} />
+                        <span className="text-xs font-black">كل المحافظ</span>
+                    </button>
+                    {state.wallets.map(w => (
+                        <button 
+                            key={w.id}
+                            onClick={() => setSelectedWalletId(w.id)}
+                            className={`shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-2xl border transition-all ${selectedWalletId === w.id ? 'bg-amber-500 text-slate-900 border-amber-500 shadow-lg shadow-amber-500/20' : 'bg-slate-800/50 border-slate-700 text-slate-400'}`}
+                        >
+                            <div className="w-2 h-2 rounded-full" style={{backgroundColor: w.color}} />
+                            <span className="text-xs font-black">{w.name}</span>
+                            {selectedWalletId === w.id && <Check size={14} />}
+                        </button>
+                    ))}
+                </div>
+
                 <SmartAlerts budgets={state.budgets} transactions={filteredTransactions} debts={state.debts} subscriptions={state.subscriptions} categories={state.categories} />
                 <BalanceCard totalBalance={totals.balance} totalIncome={totals.income} totalExpense={totals.expense} symbol={state.currency.symbol} />
                 <section className="space-y-4">
