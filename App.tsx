@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Plus, LayoutDashboard, History, Settings as SettingsIcon, BrainCircuit, HandCoins, Repeat, Coins, ArrowRight, Sparkles, Scale } from 'lucide-react';
+import { Plus, LayoutDashboard, History, Settings as SettingsIcon, BrainCircuit, HandCoins, Repeat, Coins, ArrowRight, Sparkles, Scale, Wallet as WalletIcon, Check } from 'lucide-react';
 import { AppState, Transaction, Category, Debt } from './types';
 import { INITIAL_CATEGORIES, DEFAULT_CURRENCIES, DEFAULT_EXCHANGE_RATES, convertCurrency } from './constants';
 import BalanceCard from './components/BalanceCard';
@@ -53,7 +53,6 @@ const App: React.FC = () => {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
           const parsed = JSON.parse(saved);
-          // Merge with initial state to ensure new properties like exchangeRates exist
           return { ...INITIAL_STATE, ...parsed, isLocked: !!parsed.pin };
       }
       return INITIAL_STATE;
@@ -65,35 +64,54 @@ const App: React.FC = () => {
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [showPrivacyPolicy, setShowPrivacyPolicy] = useState(false);
   const [printType, setPrintType] = useState<'summary' | 'detailed'>('summary');
+  
+  // Wallet Filter State (null = All Wallets)
+  const [selectedWalletId, setSelectedWalletId] = useState<string | null>(null);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   }, [state]);
 
-  // Global Totals Calculation (Normalized to Selected Currency)
-  const totals = useMemo(() => {
-    // 1. Calculate Balance from Wallets (Sum of transactions in wallet -> converted to Global Currency)
-    const balance = state.wallets.reduce((sum, w) => {
-        const walletTx = state.transactions.filter(t => t.walletId === w.id);
-        const walletBalance = walletTx.reduce((acc, t) => acc + (t.type === 'income' ? t.amount : -t.amount), 0);
-        return sum + convertCurrency(walletBalance, w.currencyCode, state.currency.code, state.exchangeRates);
-    }, 0);
+  // --- Filtering Logic ---
+  
+  // 1. Get Transactions based on Selected Wallet
+  const filteredTransactions = useMemo(() => {
+      if (!selectedWalletId) return state.transactions;
+      return state.transactions.filter(t => t.walletId === selectedWalletId);
+  }, [state.transactions, selectedWalletId]);
 
-    // 2. Calculate Total Income/Expense (Convert each transaction to Global Currency)
-    const income = state.transactions
+  // 2. Calculate Totals (Income, Expense, Balance) based on Filter
+  const totals = useMemo(() => {
+    // If specific wallet selected, we only sum its transactions
+    const txSource = filteredTransactions;
+
+    const income = txSource
         .filter(t => t.type === 'income')
         .reduce((sum, t) => sum + convertCurrency(t.amount, t.currency, state.currency.code, state.exchangeRates), 0);
 
-    const expense = state.transactions
+    const expense = txSource
         .filter(t => t.type === 'expense')
         .reduce((sum, t) => sum + convertCurrency(t.amount, t.currency, state.currency.code, state.exchangeRates), 0);
+    
+    // Balance calculation
+    let balance = 0;
+    if (selectedWalletId) {
+        // Single wallet balance (converted to global display currency)
+        const rawBalance = txSource.reduce((acc, t) => acc + (t.type === 'income' ? t.amount : -t.amount), 0);
+        const wallet = state.wallets.find(w => w.id === selectedWalletId);
+        balance = convertCurrency(rawBalance, wallet?.currencyCode || 'SAR', state.currency.code, state.exchangeRates);
+    } else {
+        // Global balance (Sum of all wallets converted)
+        balance = state.wallets.reduce((sum, w) => {
+            const walletTx = state.transactions.filter(t => t.walletId === w.id);
+            const walletBalance = walletTx.reduce((acc, t) => acc + (t.type === 'income' ? t.amount : -t.amount), 0);
+            return sum + convertCurrency(walletBalance, w.currencyCode, state.currency.code, state.exchangeRates);
+        }, 0);
+    }
 
     return { income, expense, balance };
-  }, [state.wallets, state.transactions, state.currency, state.exchangeRates]);
+  }, [filteredTransactions, state.wallets, state.currency, state.exchangeRates, selectedWalletId]);
 
-  const currentCurrencyTransactions = useMemo(() => 
-    state.transactions.filter(t => t.currency === state.currency.code), 
-  [state.transactions, state.currency]);
 
   const handlePrint = (type: 'summary' | 'detailed') => {
     setPrintType(type);
@@ -121,18 +139,17 @@ const App: React.FC = () => {
     setEditingTransaction(null);
   };
 
+  // ... (Debt handlers remain the same) ...
   const handleUpdateDebt = (id: string, updates: Partial<Debt>) => {
     setState(p => ({
       ...p,
       debts: p.debts.map(d => d.id === id ? { ...d, ...updates } : d)
     }));
   };
-
   const handleAddDebt = (debtData: Omit<Debt, 'id'>, walletId?: string) => {
     const newDebtId = 'd-' + Date.now();
     const newTransactionId = 'tx-' + Date.now();
     const newDebt: Debt = { ...debtData, id: newDebtId };
-
     let newTransaction: Transaction | null = null;
     if (walletId) {
         newTransaction = {
@@ -141,26 +158,21 @@ const App: React.FC = () => {
             type: debtData.type === 'to_me' ? 'expense' : 'income',
             categoryId: debtData.type === 'to_me' ? '12' : '11', 
             walletId: walletId,
-            note: debtData.type === 'to_me' 
-                ? `إقراض مبلغ لـ: ${debtData.personName}` 
-                : `استلاف مبلغ من: ${debtData.personName}`,
+            note: debtData.type === 'to_me' ? `إقراض مبلغ لـ: ${debtData.personName}` : `استلاف مبلغ من: ${debtData.personName}`,
             date: debtData.createdAt,
             currency: debtData.currency,
             frequency: 'once'
         };
     }
-
     setState(p => ({
         ...p,
         debts: [newDebt, ...p.debts],
         transactions: newTransaction ? [newTransaction, ...p.transactions] : p.transactions
     }));
   };
-
   const handleSettleDebt = (id: string, walletId?: string) => {
     const debt = state.debts.find(d => d.id === id);
     if (!debt) return;
-
     let newTransaction: Transaction | null = null;
     if (walletId) {
         newTransaction = {
@@ -169,15 +181,12 @@ const App: React.FC = () => {
             type: debt.type === 'to_me' ? 'income' : 'expense',
             categoryId: debt.type === 'to_me' ? '11' : '4',
             walletId: walletId,
-            note: debt.type === 'to_me' 
-                ? `استرداد دين من: ${debt.personName}` 
-                : `سداد دين لـ: ${debt.personName}`,
+            note: debt.type === 'to_me' ? `استرداد دين من: ${debt.personName}` : `سداد دين لـ: ${debt.personName}`,
             date: new Date().toISOString().split('T')[0],
             currency: debt.currency,
             frequency: 'once'
         };
     }
-
     setState(p => ({
         ...p,
         transactions: newTransaction ? [newTransaction, ...p.transactions] : p.transactions,
@@ -191,14 +200,16 @@ const App: React.FC = () => {
   return (
     <div className="w-full max-w-lg mx-auto h-full flex flex-col bg-transparent transition-all overflow-hidden relative border-x border-white/5 print:block print:bg-white print:max-w-none print:h-auto print:overflow-visible">
       
+      {/* Hidden Print Report - Now receives filtered data if selected */}
       <FinancialReport 
-        transactions={state.transactions} 
+        transactions={state.transactions} // We pass ALL transactions, filtering happens inside based on prop
         categories={state.categories} 
         currency={state.currency} 
         userName={state.userName} 
         wallets={state.wallets} 
         type={printType} 
         exchangeRates={state.exchangeRates}
+        filterWalletId={selectedWalletId} // Pass the active filter
       />
       
       <div className="flex flex-col h-full print:hidden relative z-20">
@@ -211,24 +222,27 @@ const App: React.FC = () => {
             </div>
           </div>
 
+          {/* Wallet Selector (Horizontal Scroll) */}
           {activeTab === 'dashboard' && (
-            <div className="flex items-center gap-2">
-                <div className="flex-1 overflow-hidden mask-gradient-x py-2 -my-2">
-                    <div className="flex items-center gap-3 w-max animate-marquee-rtl pause px-6">
-                    {[...state.currencies, ...state.currencies].map((curr, index) => {
-                        const isActive = state.currency.code === curr.code;
-                        return (
-                        <button key={`${curr.code}-${index}`} onClick={() => setState(p => ({...p, currency: curr}))} className={`relative flex items-center gap-3 pl-5 pr-3 py-3 rounded-full border backdrop-blur-md transition-all duration-500 ${isActive ? 'bg-amber-500 border-amber-400 text-slate-950 shadow-[0_0_25px_rgba(245,158,11,0.5)] scale-105 z-10' : 'bg-slate-800/30 border-white/5 text-slate-400 hover:bg-slate-800 hover:border-white/20 hover:scale-105'}`}>
-                            {isActive && <div className="absolute inset-0 rounded-full bg-gradient-to-br from-white/30 to-transparent opacity-50 pointer-events-none" />}
-                            <span className={`text-[10px] font-black uppercase tracking-widest ${isActive ? 'text-slate-900/60' : 'text-slate-500'}`}>{curr.code}</span>
-                            <span className="font-bold text-sm whitespace-nowrap">{curr.name}</span>
-                            <div className={`w-2 h-2 rounded-full transition-colors ${isActive ? 'bg-slate-950' : 'bg-slate-600'}`} />
-                        </button>
-                        );
-                    })}
-                    </div>
-                </div>
-                <button onClick={() => setActiveTab('settings')} className="flex items-center justify-center w-12 h-12 rounded-full bg-slate-800/50 border border-slate-700 text-slate-500 hover:text-amber-500 hover:border-amber-500/50 transition-all shrink-0 active:scale-95 backdrop-blur-md shadow-lg z-20"><SettingsIcon size={18} /></button>
+            <div className="flex gap-3 overflow-x-auto no-scrollbar py-2 -mx-6 px-6">
+                <button 
+                    onClick={() => setSelectedWalletId(null)}
+                    className={`shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-2xl border transition-all ${!selectedWalletId ? 'bg-white text-slate-900 border-white' : 'bg-slate-800/50 border-slate-700 text-slate-400'}`}
+                >
+                    <LayoutDashboard size={16} />
+                    <span className="text-xs font-black">كل المحافظ</span>
+                </button>
+                {state.wallets.map(w => (
+                    <button 
+                        key={w.id}
+                        onClick={() => setSelectedWalletId(w.id)}
+                        className={`shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-2xl border transition-all ${selectedWalletId === w.id ? 'bg-amber-500 text-slate-900 border-amber-500 shadow-lg shadow-amber-500/20' : 'bg-slate-800/50 border-slate-700 text-slate-400'}`}
+                    >
+                        <div className="w-2 h-2 rounded-full" style={{backgroundColor: w.color}} />
+                        <span className="text-xs font-black">{w.name}</span>
+                        {selectedWalletId === w.id && <Check size={14} />}
+                    </button>
+                ))}
             </div>
           )}
         </header>
@@ -237,14 +251,14 @@ const App: React.FC = () => {
           <div className="py-6 space-y-8">
             {activeTab === 'dashboard' && (
               <>
-                <SmartAlerts budgets={state.budgets} transactions={state.transactions} debts={state.debts} subscriptions={state.subscriptions} categories={state.categories} />
+                <SmartAlerts budgets={state.budgets} transactions={filteredTransactions} debts={state.debts} subscriptions={state.subscriptions} categories={state.categories} />
                 <BalanceCard totalBalance={totals.balance} totalIncome={totals.income} totalExpense={totals.expense} symbol={state.currency.symbol} />
                 <section className="space-y-4">
                   <div className="flex justify-between items-center px-2">
-                    <h3 className="text-[9px] font-black text-slate-500 uppercase flex items-center gap-2 tracking-[0.2em]"><History size={12} /> أحدث العمليات (مفلترة)</h3>
+                    <h3 className="text-[9px] font-black text-slate-500 uppercase flex items-center gap-2 tracking-[0.2em]"><History size={12} /> {selectedWalletId ? 'سجل المحفظة المختارة' : 'أحدث العمليات (الكل)'}</h3>
                     <button onClick={() => setActiveTab('transactions')} className="text-amber-500 text-[9px] font-black uppercase flex items-center gap-1">عرض الكل <ArrowRight size={10} className="rotate-180" /></button>
                   </div>
-                  <TransactionList transactions={currentCurrencyTransactions.slice(0, 5)} categories={state.categories} wallets={state.wallets} onDelete={(id) => setState(p => ({ ...p, transactions: p.transactions.filter(t => t.id !== id) }))} onEdit={handleEditTransaction} currencySymbol={state.currency.symbol} />
+                  <TransactionList transactions={filteredTransactions.slice(0, 5)} categories={state.categories} wallets={state.wallets} onDelete={(id) => setState(p => ({ ...p, transactions: p.transactions.filter(t => t.id !== id) }))} onEdit={handleEditTransaction} currencySymbol={state.currency.symbol} />
                 </section>
                 
                 <div className="grid grid-cols-2 gap-3">
@@ -260,18 +274,30 @@ const App: React.FC = () => {
               </>
             )}
             
-            {activeTab === 'future' && <FinancialSimulation transactions={currentCurrencyTransactions} currencySymbol={state.currency.symbol} apiKey={state.apiKey} />}
+            {activeTab === 'future' && <FinancialSimulation transactions={filteredTransactions} currencySymbol={state.currency.symbol} apiKey={state.apiKey} />}
             {activeTab === 'goals' && <GoalTracker goals={state.goals} wallets={state.wallets} transactions={state.transactions} onAddGoal={(g) => setState(p => ({ ...p, goals: [...p.goals, { ...g, id: 'g-'+Date.now() }] }))} onUpdateGoalAmount={(id, amt) => setState(p => ({ ...p, goals: p.goals.map(g => g.id === id ? { ...g, currentAmount: g.currentAmount + amt } : g) }))} currencySymbol={state.currency.symbol} apiKey={state.apiKey} />}
-            {activeTab === 'budgets' && <BudgetManager budgets={state.budgets} categories={state.categories} transactions={state.transactions} onSetBudget={(catId, amount) => setState(p => ({ ...p, budgets: [...p.budgets.filter(b => b.categoryId !== catId), { categoryId: catId, amount }] }))} currencySymbol={state.currency.symbol} />}
-            {activeTab === 'chat' && <AIChat history={state.chatHistory} transactions={state.transactions} categories={state.categories} currency={state.currency.symbol} onSendMessage={(msg) => setState(p => ({ ...p, chatHistory: [...p.chatHistory, msg].slice(-30) }))} apiKey={state.apiKey} />}
+            {activeTab === 'budgets' && <BudgetManager budgets={state.budgets} categories={state.categories} transactions={filteredTransactions} onSetBudget={(catId, amount) => setState(p => ({ ...p, budgets: [...p.budgets.filter(b => b.categoryId !== catId), { categoryId: catId, amount }] }))} currencySymbol={state.currency.symbol} />}
+            {activeTab === 'chat' && <AIChat history={state.chatHistory} transactions={filteredTransactions} categories={state.categories} currency={state.currency.symbol} onSendMessage={(msg) => setState(p => ({ ...p, chatHistory: [...p.chatHistory, msg].slice(-30) }))} apiKey={state.apiKey} />}
             {activeTab === 'debts' && <DebtManager debts={state.debts} wallets={state.wallets} onAddDebt={handleAddDebt} onUpdateDebt={handleUpdateDebt} onSettleDebt={handleSettleDebt} onDeleteDebt={(id) => setState(p => ({ ...p, debts: p.debts.filter(d => d.id !== id) }))} currencySymbol={state.currency.symbol} currencyCode={state.currency.code} />}
             {activeTab === 'subscriptions' && <SubscriptionManager subscriptions={state.subscriptions} categories={state.categories} onAdd={(sub) => setState(p => ({ ...p, subscriptions: [{...sub, id: 's-'+Date.now()}, ...p.subscriptions] }))} onRemove={(id) => setState(p => ({ ...p, subscriptions: p.subscriptions.filter(s => s.id !== id) }))} currencySymbol={state.currency.symbol} />}
             {activeTab === 'zakat' && <ZakatCalculator totalBalance={totals.balance} currencySymbol={state.currency.symbol} />}
             
             {activeTab === 'transactions' && (
                 <div className="space-y-8 animate-luxury-pop">
-                    <Analytics transactions={state.transactions} categories={state.categories} currencySymbol={state.currency.symbol} onPrint={handlePrint} currentCurrencyCode={state.currency.code} exchangeRates={state.exchangeRates} />
-                    <TransactionList transactions={state.transactions} categories={state.categories} wallets={state.wallets} onDelete={(id) => setState(p => ({...p, transactions: p.transactions.filter(t => t.id !== id)}))} onEdit={handleEditTransaction} currencySymbol={state.currency.symbol} showFilters />
+                    {/* Analytics now controls the printing and can view filtered data */}
+                    <Analytics 
+                        transactions={state.transactions} // Pass full list, Analytics handles filtering options
+                        categories={state.categories} 
+                        wallets={state.wallets}
+                        currencySymbol={state.currency.symbol} 
+                        onPrint={handlePrint} 
+                        currentCurrencyCode={state.currency.code} 
+                        exchangeRates={state.exchangeRates} 
+                        initialWalletId={selectedWalletId} // Initialize dropdown with current dashboard selection
+                        onFilterChange={setSelectedWalletId} // Allow analytics to change app-wide filter
+                    />
+                    
+                    <TransactionList transactions={filteredTransactions} categories={state.categories} wallets={state.wallets} onDelete={(id) => setState(p => ({...p, transactions: p.transactions.filter(t => t.id !== id)}))} onEdit={handleEditTransaction} currencySymbol={state.currency.symbol} showFilters />
                 </div>
             )}
             

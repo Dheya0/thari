@@ -1,8 +1,8 @@
 
 import React, { useMemo } from 'react';
-import { Download, Printer, FileText, TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { Download, Printer, FileText, TrendingUp, TrendingDown, Minus, Filter } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
-import { Transaction, Category } from '../types';
+import { Transaction, Category, Wallet } from '../types';
 import { convertCurrency } from '../constants';
 
 interface AnalyticsProps {
@@ -12,9 +12,18 @@ interface AnalyticsProps {
   onPrint: (type: 'summary' | 'detailed') => void;
   currentCurrencyCode?: string; 
   exchangeRates: Record<string, number>;
+  wallets: Wallet[];
+  initialWalletId?: string | null;
+  onFilterChange: (walletId: string | null) => void;
 }
 
-const Analytics: React.FC<AnalyticsProps> = ({ transactions, categories, currencySymbol, onPrint, currentCurrencyCode = 'SAR', exchangeRates }) => {
+const Analytics: React.FC<AnalyticsProps> = ({ transactions, categories, currencySymbol, onPrint, currentCurrencyCode = 'SAR', exchangeRates, wallets, initialWalletId, onFilterChange }) => {
+  // We use transactions (which are already filtered by App.tsx if a filter is active), 
+  // but to allow changing the report scope FROM here, we use the onFilterChange prop.
+  
+  // Actually, to display stats correctly here, we should trust the props passed (transactions).
+  // But we add a UI control to change the parent filter.
+  
   const stats = useMemo(() => {
     const totalIncome = transactions
         .filter(t => t.type === 'income')
@@ -88,7 +97,24 @@ const Analytics: React.FC<AnalyticsProps> = ({ transactions, categories, currenc
     document.body.removeChild(link);
   };
 
-  if (transactions.length === 0) return null;
+  if (transactions.length === 0) {
+      return (
+        <div className="space-y-4 animate-fade">
+             <div className="bg-slate-900 p-4 rounded-[2rem] border border-slate-800 flex items-center justify-between">
+                <span className="text-xs font-black text-slate-500 uppercase tracking-widest px-2">نطاق التقرير</span>
+                <select 
+                    value={initialWalletId || ''} 
+                    onChange={(e) => onFilterChange(e.target.value || null)}
+                    className="bg-slate-950 text-white font-bold p-3 rounded-xl border border-slate-800 outline-none text-xs"
+                >
+                    <option value="">كل المحافظ (تقرير شامل)</option>
+                    {wallets.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+                </select>
+             </div>
+             <p className="text-center text-slate-500 text-xs font-bold py-10">لا توجد بيانات متاحة لهذا النطاق.</p>
+        </div>
+      );
+  }
 
   return (
     <div className="space-y-8 pb-10 animate-fade">
@@ -121,6 +147,24 @@ const Analytics: React.FC<AnalyticsProps> = ({ transactions, categories, currenc
       </div>
 
       <div className="flex flex-col gap-4">
+        {/* Report Scope Selector */}
+        <div className="bg-slate-900/80 p-4 rounded-[2rem] border border-slate-800 flex items-center gap-4">
+            <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-500">
+                <Filter size={20} />
+            </div>
+            <div className="flex-1">
+                <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">نطاق التقرير والطباعة</p>
+                <select 
+                    value={initialWalletId || ''} 
+                    onChange={(e) => onFilterChange(e.target.value || null)}
+                    className="w-full bg-transparent text-white font-bold outline-none text-xs"
+                >
+                    <option value="" className="bg-slate-900">كل المحافظ (تقرير شامل)</option>
+                    {wallets.map(w => <option key={w.id} value={w.id} className="bg-slate-900">محفظة: {w.name}</option>)}
+                </select>
+            </div>
+        </div>
+
         <div className="grid grid-cols-2 gap-3">
           <button 
             onClick={() => onPrint('summary')}

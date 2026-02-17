@@ -11,37 +11,43 @@ interface FinancialReportProps {
   wallets: Wallet[];
   type: 'summary' | 'detailed';
   exchangeRates: Record<string, number>;
+  filterWalletId?: string | null;
 }
 
-const FinancialReport: React.FC<FinancialReportProps> = ({ transactions, categories, currency, userName, wallets, type, exchangeRates }) => {
-  // Use all provided transactions but CONVERT them to the selected currency
+const FinancialReport: React.FC<FinancialReportProps> = ({ transactions, categories, currency, userName, wallets, type, exchangeRates, filterWalletId }) => {
+  // --- Filtering Logic inside Report ---
+  const activeTransactions = filterWalletId 
+    ? transactions.filter(t => t.walletId === filterWalletId) 
+    : transactions;
+
+  const activeWallet = filterWalletId ? wallets.find(w => w.id === filterWalletId) : null;
+
+  // Use activeTransactions but CONVERT them to the selected currency
   const totals = {
-    income: transactions
+    income: activeTransactions
         .filter(t => t.type === 'income')
         .reduce((s, t) => s + convertCurrency(t.amount, t.currency, currency.code, exchangeRates), 0),
     
-    expense: transactions
+    expense: activeTransactions
         .filter(t => t.type === 'expense')
         .reduce((s, t) => s + convertCurrency(t.amount, t.currency, currency.code, exchangeRates), 0),
   };
   const netBalance = totals.income - totals.expense;
 
-  const walletBalances = wallets.map(w => {
-    // Original balance in wallet's currency
+  // Only calculate breakdown if NO specific wallet is selected
+  const walletBalances = !filterWalletId ? wallets.map(w => {
     const rawBalance = transactions
       .filter(t => t.walletId === w.id)
       .reduce((s, t) => s + (t.type === 'income' ? t.amount : -t.amount), 0);
     
-    // Converted to Report Currency
     const convertedBalance = convertCurrency(rawBalance, w.currencyCode, currency.code, exchangeRates);
-
     return { ...w, balance: convertedBalance };
-  });
+  }) : [];
 
   const categoryBreakdown = categories
     .filter(c => c.type === 'expense')
     .map(c => {
-      const amount = transactions
+      const amount = activeTransactions
         .filter(t => t.categoryId === c.id && t.type === 'expense')
         .reduce((s, t) => s + convertCurrency(t.amount, t.currency, currency.code, exchangeRates), 0);
       return { ...c, amount };
@@ -49,13 +55,13 @@ const FinancialReport: React.FC<FinancialReportProps> = ({ transactions, categor
     .filter(c => c.amount > 0)
     .sort((a, b) => b.amount - a.amount);
 
-  const displayTransactions = type === 'detailed' ? transactions : transactions.slice(0, 20);
+  const displayTransactions = type === 'detailed' ? activeTransactions : activeTransactions.slice(0, 20);
 
-  if (transactions.length === 0) {
+  if (activeTransactions.length === 0) {
       return (
           <div id="printable-report" className="hidden print:flex flex-col items-center justify-center min-h-screen bg-white text-slate-400 p-20">
               <h1 className="text-2xl font-black mb-4 text-slate-900">تقرير خالي من البيانات</h1>
-              <p className="text-center font-bold">لا توجد عمليات مسجلة حالياً.</p>
+              <p className="text-center font-bold">لا توجد عمليات مسجلة {activeWallet ? `لمحفظة ${activeWallet.name}` : ''} حالياً.</p>
           </div>
       );
   }
@@ -78,7 +84,9 @@ const FinancialReport: React.FC<FinancialReportProps> = ({ transactions, categor
                     </svg>
                 </div>
                 <div>
-                    <h1 className="text-4xl font-black text-slate-950 tracking-tight">تقرير ثري المالي</h1>
+                    <h1 className="text-4xl font-black text-slate-950 tracking-tight">
+                        {activeWallet ? `كشف حساب: ${activeWallet.name}` : 'تقرير ثري المالي الشامل'}
+                    </h1>
                     <p className="text-xs font-black text-amber-600 uppercase tracking-[0.3em] mt-1">Professional Financial Statement</p>
                 </div>
             </div>
@@ -103,29 +111,31 @@ const FinancialReport: React.FC<FinancialReportProps> = ({ transactions, categor
                 <p className="text-3xl font-black text-rose-700">-{totals.expense.toLocaleString(undefined, {maximumFractionDigits: 0})} <span className="text-sm opacity-50">{currency.symbol}</span></p>
             </div>
             <div className="p-8 rounded-3xl bg-slate-900 text-white shadow-xl">
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">الرصيد الصافي</p>
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">صافي الحركة</p>
                 <p className="text-3xl font-black">{netBalance.toLocaleString(undefined, {maximumFractionDigits: 0})} <span className="text-sm text-amber-500">{currency.symbol}</span></p>
             </div>
         </div>
 
-        {/* Section: Wallets Breakdown */}
-        <div className="mb-12">
-            <div className="flex items-center gap-3 mb-6">
-                <div className="w-1.5 h-6 bg-amber-500 rounded-full" />
-                <h3 className="text-lg font-black text-slate-900">توزيع أرصدة المحافظ (مقيمة بـ {currency.code})</h3>
-            </div>
-            <div className="grid grid-cols-2 gap-x-12 gap-y-4 bg-slate-50 p-6 rounded-2xl border border-slate-100">
-                {walletBalances.map((w, i) => (
-                    <div key={i} className="flex justify-between items-center py-2 border-b border-slate-200 last:border-0">
-                        <div className="flex items-center gap-3">
-                            <div className="w-4 h-4 rounded-md" style={{ backgroundColor: w.color }} />
-                            <span className="font-bold text-slate-700">{w.name} <span className="text-xs opacity-50">({w.currencyCode})</span></span>
+        {/* Section: Wallets Breakdown (ONLY IF ALL WALLETS SELECTED) */}
+        {!filterWalletId && (
+            <div className="mb-12">
+                <div className="flex items-center gap-3 mb-6">
+                    <div className="w-1.5 h-6 bg-amber-500 rounded-full" />
+                    <h3 className="text-lg font-black text-slate-900">توزيع أرصدة المحافظ (مقيمة بـ {currency.code})</h3>
+                </div>
+                <div className="grid grid-cols-2 gap-x-12 gap-y-4 bg-slate-50 p-6 rounded-2xl border border-slate-100">
+                    {walletBalances.map((w, i) => (
+                        <div key={i} className="flex justify-between items-center py-2 border-b border-slate-200 last:border-0">
+                            <div className="flex items-center gap-3">
+                                <div className="w-4 h-4 rounded-md" style={{ backgroundColor: w.color }} />
+                                <span className="font-bold text-slate-700">{w.name} <span className="text-xs opacity-50">({w.currencyCode})</span></span>
+                            </div>
+                            <span className="font-black text-slate-900">{w.balance.toLocaleString(undefined, {maximumFractionDigits: 0})} {currency.symbol}</span>
                         </div>
-                        <span className="font-black text-slate-900">{w.balance.toLocaleString(undefined, {maximumFractionDigits: 0})} {currency.symbol}</span>
-                    </div>
-                ))}
+                    ))}
+                </div>
             </div>
-        </div>
+        )}
 
         {/* Section: Expenses Analysis */}
         {categoryBreakdown.length > 0 && (
@@ -195,9 +205,9 @@ const FinancialReport: React.FC<FinancialReportProps> = ({ transactions, categor
                     })}
                 </tbody>
             </table>
-            {type === 'summary' && transactions.length > 20 && (
+            {type === 'summary' && activeTransactions.length > 20 && (
                 <div className="mt-6 p-4 bg-slate-50 rounded-xl text-center border border-slate-100">
-                    <p className="text-xs text-slate-400 font-bold">... تم عرض 20 عملية فقط من إجمالي {transactions.length} عملية سجلها تطبيق ثري ...</p>
+                    <p className="text-xs text-slate-400 font-bold">... تم عرض 20 عملية فقط من إجمالي {activeTransactions.length} عملية ...</p>
                 </div>
             )}
         </div>
