@@ -1,8 +1,8 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
-import { X, Calendar, StickyNote, ArrowRightLeft } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, Calendar, StickyNote, RefreshCw, Wallet as WalletIcon } from 'lucide-react';
 import { Transaction, Category, TransactionType, Wallet } from '../types';
-import { getIcon, DEFAULT_CURRENCIES, convertCurrency } from '../constants';
+import { getIcon, DEFAULT_CURRENCIES } from '../constants';
 
 interface TransactionFormProps {
   categories: Category[];
@@ -13,7 +13,7 @@ interface TransactionFormProps {
   exchangeRates: Record<string, number>;
 }
 
-const TransactionForm: React.FC<TransactionFormProps> = ({ categories, wallets, onSubmit, onClose, initialData, exchangeRates }) => {
+const TransactionForm: React.FC<TransactionFormProps> = ({ categories, wallets, onSubmit, onClose, initialData }) => {
   const [type, setType] = useState<TransactionType>('expense');
   const [amount, setAmount] = useState('');
   const [categoryId, setCategoryId] = useState('');
@@ -22,6 +22,8 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, wallets, 
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   
   const initialWallet = wallets.find(w => w.id === (initialData?.walletId || wallets[0]?.id));
+  
+  // العملة المختارة للعملية (مستقلة تماماً عن عملة المحفظة)
   const [inputCurrency, setInputCurrency] = useState(initialData?.currency || initialWallet?.currencyCode || 'SAR');
 
   useEffect(() => {
@@ -36,6 +38,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, wallets, 
     }
   }, [initialData]);
 
+  // عند تغيير المحفظة، نضبط العملة الافتراضية لتكون عملة المحفظة، لكن يمكن للمستخدم تغييرها
   useEffect(() => {
     if (!initialData) {
         const selectedW = wallets.find(w => w.id === walletId);
@@ -45,40 +48,20 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, wallets, 
     }
   }, [walletId, wallets, initialData]);
 
-  const selectedWallet = wallets.find(w => w.id === walletId);
-  const walletCurrency = selectedWallet?.currencyCode || 'SAR';
-
-  // Live Conversion Calculation using Custom Rates
-  const convertedData = useMemo(() => {
-    if (!amount || inputCurrency === walletCurrency) return null;
-    
-    // Pass exchangeRates to the helper
-    const finalVal = convertCurrency(parseFloat(amount), inputCurrency, walletCurrency, exchangeRates);
-
-    return {
-        amount: finalVal,
-        rate: finalVal / parseFloat(amount)
-    };
-  }, [amount, inputCurrency, walletCurrency, exchangeRates]);
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!amount || !categoryId || !walletId) return;
 
-    const finalAmount = convertedData ? convertedData.amount : parseFloat(amount);
-    
-    const finalNote = convertedData 
-        ? `${note} (تم التحويل: ${amount} ${inputCurrency})`.trim()
-        : note;
-
+    // الحفظ يتم بنفس العملة المدخلة دون تحويل
+    // Multi-currency support: The transaction retains its original currency
     onSubmit({ 
-        amount: parseFloat(finalAmount.toFixed(2)), 
+        amount: parseFloat(amount), 
         type, 
         categoryId, 
         walletId,
-        note: finalNote, 
+        note, 
         date, 
-        currency: walletCurrency, 
+        currency: inputCurrency, // Save directly as USD, EUR, etc.
         frequency: 'once' 
     });
   };
@@ -103,15 +86,16 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, wallets, 
             <button type="button" onClick={() => setType('income')} className={`flex-1 py-4 rounded-[2rem] font-black text-[11px] uppercase tracking-widest transition-all ${type === 'income' ? 'bg-slate-800 text-emerald-500 shadow-xl' : 'text-slate-600'}`}>وارد</button>
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-4">
             <div className="relative group">
+                <label className="text-[10px] font-black text-slate-500 px-4 mb-2 block uppercase tracking-widest">المبلغ</label>
                 <input 
                 type="number" 
                 inputMode="decimal"
                 value={amount} 
                 onChange={(e) => setAmount(e.target.value)} 
                 placeholder="0.00" 
-                className="w-full text-6xl sm:text-7xl font-black text-center py-4 bg-transparent border-none outline-none text-white placeholder:opacity-5 transition-all focus:scale-105" 
+                className="w-full text-5xl font-black text-center py-4 bg-transparent border-none outline-none text-white placeholder:opacity-5 transition-all focus:scale-105" 
                 autoFocus 
                 />
                 
@@ -119,30 +103,23 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, wallets, 
                     <select 
                         value={inputCurrency}
                         onChange={(e) => setInputCurrency(e.target.value)}
-                        className="bg-slate-800 text-white text-[10px] font-black rounded-xl p-2 border border-slate-700 outline-none uppercase tracking-wider"
+                        className="bg-slate-800 text-white text-[10px] font-black rounded-xl p-2 border border-slate-700 outline-none uppercase tracking-wider shadow-lg"
                     >
                         {DEFAULT_CURRENCIES.map(c => <option key={c.code} value={c.code}>{c.code}</option>)}
                     </select>
                 </div>
             </div>
 
-            {convertedData && (
-                <div className="flex items-center justify-center gap-2 text-emerald-500 bg-emerald-500/10 py-2 px-4 rounded-xl w-fit mx-auto animate-fade">
-                    <ArrowRightLeft size={14} />
-                    <span className="text-xs font-black">
-                         = {convertedData.amount.toLocaleString(undefined, {maximumFractionDigits: 2})} {walletCurrency}
-                    </span>
-                </div>
-            )}
-            {!convertedData && selectedWallet && (
-                 <div className="text-center text-[10px] font-bold text-slate-500">
-                    سيتم الحفظ في محفظة {selectedWallet.name} بـ {walletCurrency}
-                 </div>
-            )}
+            {/* تم إزالة حقل التحويل - سيتم الحفظ بالعملة الأصلية لتبقى منفصلة */}
+            <div className="text-center">
+                 <p className="text-[10px] text-slate-500 font-bold bg-slate-950/50 py-2 rounded-xl border border-white/5">
+                    سيتم حفظ المبلغ بـ <span className="text-amber-500 mx-1">{inputCurrency}</span> بشكل مستقل داخل المحفظة
+                 </p>
+            </div>
           </div>
 
           <div className="space-y-4">
-            <label className="text-[10px] font-black text-slate-600 uppercase tracking-widest px-4">من أين / إلى أين؟</label>
+            <label className="text-[10px] font-black text-slate-600 uppercase tracking-widest px-4">المحفظة</label>
              <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2">
               {wallets.map(w => (
                  <button
@@ -151,7 +128,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, wallets, 
                   onClick={() => setWalletId(w.id)}
                   className={`shrink-0 px-6 py-3 rounded-2xl border transition-all text-xs font-bold ${walletId === w.id ? 'bg-amber-500 text-slate-900 border-amber-500' : 'bg-slate-950 text-slate-400 border-slate-800'}`}
                  >
-                   {w.name} ({w.currencyCode})
+                   {w.name}
                  </button>
               ))}
             </div>

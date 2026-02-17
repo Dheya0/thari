@@ -80,11 +80,26 @@ const App: React.FC = () => {
       return state.transactions.filter(t => t.walletId === selectedWalletId);
   }, [state.transactions, selectedWalletId]);
 
-  // 2. Calculate Totals (Income, Expense, Balance) based on Filter
+  // 2. Calculate Totals and Multi-Currency Breakdown
   const totals = useMemo(() => {
-    // If specific wallet selected, we only sum its transactions
     const txSource = filteredTransactions;
+    
+    // Calculate breakdowns per currency
+    const currencyBreakdown: Record<string, number> = {};
+    
+    txSource.forEach(t => {
+        const currentVal = currencyBreakdown[t.currency] || 0;
+        const change = t.type === 'income' ? t.amount : -t.amount;
+        currencyBreakdown[t.currency] = currentVal + change;
+    });
 
+    // Total estimated balance in Display Currency (for the big number)
+    // We sum up all different currencies converted to the main display currency
+    const balance = Object.entries(currencyBreakdown).reduce((sum, [code, amount]) => {
+        return sum + convertCurrency(amount, code, state.currency.code, state.exchangeRates);
+    }, 0);
+    
+    // Income/Expense for period (converted for summary view)
     const income = txSource
         .filter(t => t.type === 'income')
         .reduce((sum, t) => sum + convertCurrency(t.amount, t.currency, state.currency.code, state.exchangeRates), 0);
@@ -92,26 +107,23 @@ const App: React.FC = () => {
     const expense = txSource
         .filter(t => t.type === 'expense')
         .reduce((sum, t) => sum + convertCurrency(t.amount, t.currency, state.currency.code, state.exchangeRates), 0);
-    
-    // Balance calculation
-    let balance = 0;
-    if (selectedWalletId) {
-        // Single wallet balance (converted to global display currency)
-        const rawBalance = txSource.reduce((acc, t) => acc + (t.type === 'income' ? t.amount : -t.amount), 0);
-        const wallet = state.wallets.find(w => w.id === selectedWalletId);
-        balance = convertCurrency(rawBalance, wallet?.currencyCode || 'SAR', state.currency.code, state.exchangeRates);
-    } else {
-        // Global balance (Sum of all wallets converted)
-        balance = state.wallets.reduce((sum, w) => {
-            const walletTx = state.transactions.filter(t => t.walletId === w.id);
-            const walletBalance = walletTx.reduce((acc, t) => acc + (t.type === 'income' ? t.amount : -t.amount), 0);
-            return sum + convertCurrency(walletBalance, w.currencyCode, state.currency.code, state.exchangeRates);
-        }, 0);
-    }
 
-    return { income, expense, balance };
+    return { income, expense, balance, currencyBreakdown };
   }, [filteredTransactions, state.wallets, state.currency, state.exchangeRates, selectedWalletId]);
 
+  // Handle Wallet Selection & Currency Sync
+  const handleSelectWallet = (id: string | null) => {
+      setSelectedWalletId(id);
+      if (id) {
+          const wallet = state.wallets.find(w => w.id === id);
+          if (wallet) {
+              const walletCurrency = state.currencies.find(c => c.code === wallet.currencyCode);
+              if (walletCurrency) {
+                  setState(p => ({ ...p, currency: walletCurrency }));
+              }
+          }
+      }
+  };
 
   const handlePrint = (type: 'summary' | 'detailed') => {
     setPrintType(type);
@@ -200,7 +212,7 @@ const App: React.FC = () => {
   return (
     <div className="w-full max-w-lg mx-auto h-full flex flex-col bg-transparent transition-all overflow-hidden relative border-x border-white/5 print:block print:bg-white print:max-w-none print:h-auto print:overflow-visible">
       
-      {/* Hidden Print Report - Now receives filtered data if selected */}
+      {/* Hidden Print Report */}
       <FinancialReport 
         transactions={state.transactions} 
         categories={state.categories} 
@@ -222,7 +234,6 @@ const App: React.FC = () => {
             </div>
           </div>
 
-          {/* RESTORED: Currency Marquee & Settings Button */}
           {activeTab === 'dashboard' && (
             <div className="flex items-center gap-2">
                 <div className="flex-1 overflow-hidden mask-gradient-x py-2 -my-2">
@@ -249,10 +260,9 @@ const App: React.FC = () => {
           <div className="py-6 space-y-8">
             {activeTab === 'dashboard' && (
               <>
-                {/* NEW LOCATION: Wallet Selector (Horizontal Scroll) below header */}
                 <div className="flex gap-3 overflow-x-auto no-scrollbar py-1">
                     <button 
-                        onClick={() => setSelectedWalletId(null)}
+                        onClick={() => handleSelectWallet(null)}
                         className={`shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-2xl border transition-all ${!selectedWalletId ? 'bg-white text-slate-900 border-white' : 'bg-slate-800/50 border-slate-700 text-slate-400'}`}
                     >
                         <LayoutDashboard size={16} />
@@ -261,7 +271,7 @@ const App: React.FC = () => {
                     {state.wallets.map(w => (
                         <button 
                             key={w.id}
-                            onClick={() => setSelectedWalletId(w.id)}
+                            onClick={() => handleSelectWallet(w.id)}
                             className={`shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-2xl border transition-all ${selectedWalletId === w.id ? 'bg-amber-500 text-slate-900 border-amber-500 shadow-lg shadow-amber-500/20' : 'bg-slate-800/50 border-slate-700 text-slate-400'}`}
                         >
                             <div className="w-2 h-2 rounded-full" style={{backgroundColor: w.color}} />
@@ -272,7 +282,16 @@ const App: React.FC = () => {
                 </div>
 
                 <SmartAlerts budgets={state.budgets} transactions={filteredTransactions} debts={state.debts} subscriptions={state.subscriptions} categories={state.categories} />
-                <BalanceCard totalBalance={totals.balance} totalIncome={totals.income} totalExpense={totals.expense} symbol={state.currency.symbol} />
+                
+                {/* Updated Balance Card receiving currency breakdown */}
+                <BalanceCard 
+                    totalBalance={totals.balance} 
+                    totalIncome={totals.income} 
+                    totalExpense={totals.expense} 
+                    symbol={state.currency.symbol}
+                    balances={totals.currencyBreakdown}
+                />
+                
                 <section className="space-y-4">
                   <div className="flex justify-between items-center px-2">
                     <h3 className="text-[9px] font-black text-slate-500 uppercase flex items-center gap-2 tracking-[0.2em]"><History size={12} /> {selectedWalletId ? 'سجل المحفظة المختارة' : 'أحدث العمليات (الكل)'}</h3>
@@ -304,17 +323,16 @@ const App: React.FC = () => {
             
             {activeTab === 'transactions' && (
                 <div className="space-y-8 animate-luxury-pop">
-                    {/* Analytics now controls the printing and can view filtered data */}
                     <Analytics 
-                        transactions={state.transactions} // Pass full list, Analytics handles filtering options
+                        transactions={state.transactions} 
                         categories={state.categories} 
                         wallets={state.wallets}
                         currencySymbol={state.currency.symbol} 
                         onPrint={handlePrint} 
                         currentCurrencyCode={state.currency.code} 
                         exchangeRates={state.exchangeRates} 
-                        initialWalletId={selectedWalletId} // Initialize dropdown with current dashboard selection
-                        onFilterChange={setSelectedWalletId} // Allow analytics to change app-wide filter
+                        initialWalletId={selectedWalletId} 
+                        onFilterChange={handleSelectWallet} 
                     />
                     
                     <TransactionList transactions={filteredTransactions} categories={state.categories} wallets={state.wallets} onDelete={(id) => setState(p => ({...p, transactions: p.transactions.filter(t => t.id !== id)}))} onEdit={handleEditTransaction} currencySymbol={state.currency.symbol} showFilters />

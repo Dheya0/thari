@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Wallet, Sparkles, TrendingUp } from 'lucide-react';
 
@@ -7,9 +6,10 @@ interface BalanceCardProps {
   totalIncome: number;
   totalExpense: number;
   symbol: string;
+  balances?: Record<string, number>; // New prop for multi-currency
 }
 
-const BalanceCard: React.FC<BalanceCardProps> = ({ totalBalance, totalIncome, totalExpense, symbol }) => {
+const BalanceCard: React.FC<BalanceCardProps> = ({ totalBalance, totalIncome, totalExpense, symbol, balances }) => {
   return (
     <div className="relative overflow-hidden group perspective-1000">
       {/* Glossy Metal Card Design */}
@@ -22,14 +22,14 @@ const BalanceCard: React.FC<BalanceCardProps> = ({ totalBalance, totalIncome, to
         <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/10 blur-3xl rounded-full -mr-16 -mt-16"></div>
         <div className="absolute bottom-0 left-0 w-24 h-24 bg-blue-500/10 blur-3xl rounded-full -ml-12 -mb-12"></div>
 
-        <div className="flex justify-between items-start mb-10 relative z-10">
+        <div className="flex justify-between items-start mb-6 relative z-10">
           <div className="space-y-2">
             <div className="flex items-center gap-2">
                <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></div>
-               <p className="text-[10px] font-black text-amber-500/80 uppercase tracking-[0.3em]">رصيدك النخبوي</p>
+               <p className="text-[10px] font-black text-amber-500/80 uppercase tracking-[0.3em]">الرصيد التقديري</p>
             </div>
             <h2 className="text-4xl sm:text-5xl font-black text-white tracking-tighter flex items-baseline gap-2">
-              {totalBalance.toLocaleString()} 
+              {totalBalance.toLocaleString(undefined, { maximumFractionDigits: 0 })} 
               <span className="text-xl text-slate-500 font-bold">{symbol}</span>
             </h2>
           </div>
@@ -38,18 +38,37 @@ const BalanceCard: React.FC<BalanceCardProps> = ({ totalBalance, totalIncome, to
           </div>
         </div>
         
+        {/* Multi-Currency Breakdown Scroll */}
+        {balances && Object.keys(balances).length > 0 && (
+            <div className="mb-6 relative z-10">
+                <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-2 px-1">الأرصدة الفعلية (جيوب المحفظة)</p>
+                <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2">
+                    {Object.entries(balances).map(([code, amount]) => {
+                        const val = amount as number;
+                        return (
+                        <div key={code} className={`shrink-0 px-3 py-2 rounded-xl border flex flex-col items-start min-w-[80px] ${val < 0 ? 'bg-rose-500/10 border-rose-500/20' : 'bg-slate-900/50 border-white/10'}`}>
+                            <span className="text-[9px] font-black text-slate-400">{code}</span>
+                            <span className={`text-sm font-black ${val < 0 ? 'text-rose-400' : 'text-white'}`}>
+                                {val.toLocaleString(undefined, { maximumFractionDigits: 1 })}
+                            </span>
+                        </div>
+                    )})}
+                </div>
+            </div>
+        )}
+        
         <div className="grid grid-cols-2 gap-4 relative z-10">
           <div className="bg-white/5 backdrop-blur-md p-5 rounded-[2.2rem] border border-white/5 flex flex-col gap-1 transition-all hover:bg-white/10">
             <span className="text-[9px] font-black text-emerald-400 uppercase tracking-widest">التدفقات</span>
             <p className="text-xl font-black text-white">
-              {totalIncome.toLocaleString()} <span className="text-[10px] opacity-40">{symbol}</span>
+              {totalIncome.toLocaleString(undefined, { maximumFractionDigits: 0 })} <span className="text-[10px] opacity-40">{symbol}</span>
             </p>
           </div>
           
           <div className="bg-white/5 backdrop-blur-md p-5 rounded-[2.2rem] border border-white/5 flex flex-col gap-1 transition-all hover:bg-white/10">
             <span className="text-[9px] font-black text-rose-400 uppercase tracking-widest">الالتزامات</span>
             <p className="text-xl font-black text-white">
-              {totalExpense.toLocaleString()} <span className="text-[10px] opacity-40">{symbol}</span>
+              {totalExpense.toLocaleString(undefined, { maximumFractionDigits: 0 })} <span className="text-[10px] opacity-40">{symbol}</span>
             </p>
           </div>
         </div>
