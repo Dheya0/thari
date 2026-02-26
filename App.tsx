@@ -1,8 +1,11 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Plus, LayoutDashboard, History, Settings as SettingsIcon, BrainCircuit, HandCoins, Repeat, Coins, ArrowRight, Sparkles, Scale, Wallet as WalletIcon, Check } from 'lucide-react';
+import { Plus, LayoutDashboard, History, Settings as SettingsIcon, BrainCircuit, HandCoins, Repeat, Coins, ArrowRight, Sparkles, Scale, Wallet as WalletIcon, Check, Plane, FileText, Download } from 'lucide-react';
 import { AppState, Transaction, Category, Debt } from './types';
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
 import { INITIAL_CATEGORIES, DEFAULT_CURRENCIES, DEFAULT_EXCHANGE_RATES, convertCurrency } from './constants';
+import { generateAndSharePDF, generateAndShareCSV } from './utils/exportHelper';
 import BalanceCard from './components/BalanceCard';
 import TransactionForm from './components/TransactionForm';
 import TransactionList from './components/TransactionList';
@@ -43,6 +46,7 @@ const INITIAL_STATE: AppState = {
   isDarkMode: true,
   pin: null,
   isLocked: false,
+  isTravelMode: false,
   hasAcceptedTerms: false,
   apiKey: '', // Initialize empty
 };
@@ -86,11 +90,17 @@ const App: React.FC = () => {
     
     // Calculate breakdowns per currency
     const currencyBreakdown: Record<string, number> = {};
+    const expenseBreakdown: Record<string, number> = {};
     
     txSource.forEach(t => {
         const currentVal = currencyBreakdown[t.currency] || 0;
         const change = t.type === 'income' ? t.amount : -t.amount;
         currencyBreakdown[t.currency] = currentVal + change;
+
+        if (t.type === 'expense') {
+            const currentExp = expenseBreakdown[t.currency] || 0;
+            expenseBreakdown[t.currency] = currentExp + t.amount;
+        }
     });
 
     // Total estimated balance in Display Currency (for the big number)
@@ -108,7 +118,7 @@ const App: React.FC = () => {
         .filter(t => t.type === 'expense')
         .reduce((sum, t) => sum + convertCurrency(t.amount, t.currency, state.currency.code, state.exchangeRates), 0);
 
-    return { income, expense, balance, currencyBreakdown };
+    return { income, expense, balance, currencyBreakdown, expenseBreakdown };
   }, [filteredTransactions, state.wallets, state.currency, state.exchangeRates, selectedWalletId]);
 
   // Handle Wallet Selection & Currency Sync
@@ -128,6 +138,55 @@ const App: React.FC = () => {
   const handlePrint = (type: 'summary' | 'detailed') => {
     setPrintType(type);
     setTimeout(() => { window.print(); }, 800);
+  };
+
+  const handleShare = async (type: 'summary' | 'detailed') => {
+    setPrintType(type);
+    setTimeout(async () => {
+        try {
+            const original = document.getElementById('printable-report');
+            if (!original) return;
+            
+            const clone = original.cloneNode(true) as HTMLElement;
+            clone.classList.remove('hidden', 'print:block');
+            clone.classList.add('block', 'absolute', 'top-0', 'left-0', 'z-[-1]', 'bg-white');
+            clone.style.width = '210mm';
+            clone.style.height = 'auto';
+            clone.style.minHeight = '297mm';
+            document.body.appendChild(clone);
+            
+            const canvas = await html2canvas(clone, { 
+                scale: 2,
+                useCORS: true,
+                logging: false,
+                windowWidth: 794 
+            });
+            
+            const imgData = canvas.toDataURL('image/png');
+            const pdf = new jsPDF('p', 'mm', 'a4');
+            const pdfWidth = pdf.internal.pageSize.getWidth();
+            const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+            
+            pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+            const pdfBlob = pdf.output('blob');
+            
+            document.body.removeChild(clone);
+            
+            if (navigator.share) {
+                const file = new File([pdfBlob], `Thari_Report_${new Date().toISOString().split('T')[0]}.pdf`, { type: 'application/pdf' });
+                await navigator.share({
+                    files: [file],
+                    title: 'تقرير ثري المالي',
+                    text: 'تقرير مالي من تطبيق ثري'
+                });
+            } else {
+                pdf.save(`Thari_Report_${new Date().toISOString().split('T')[0]}.pdf`);
+            }
+        } catch (e) {
+            console.error("Share failed", e);
+            alert("فشل إنشاء ملف PDF. يرجى المحاولة مرة أخرى.");
+        }
+    }, 500);
   };
 
   const handleEditTransaction = (tx: Transaction) => {
@@ -290,6 +349,8 @@ const App: React.FC = () => {
                     totalExpense={totals.expense} 
                     symbol={state.currency.symbol}
                     balances={totals.currencyBreakdown}
+                    expenseBreakdown={totals.expenseBreakdown}
+                    showSeparateCurrencies={state.showSeparateCurrencies}
                 />
                 
                 <section className="space-y-4">
@@ -356,6 +417,7 @@ const App: React.FC = () => {
                     onClearData={() => { if(confirm('هل تريد مسح السجل المالي نهائياً؟')) setState(p => ({...p, transactions: [], debts: [], budgets: [], subscriptions: [], chatHistory: [], goals: []})) }} 
                     onShowPrivacyPolicy={() => setShowPrivacyPolicy(false)} 
                     onPrint={handlePrint}
+                    onShare={handleShare}
                 />
             )}
           </div>

@@ -105,6 +105,8 @@ export interface AppState {
   isDarkMode: boolean;
   pin: string | null;
   isLocked: boolean;
+  isTravelMode: boolean;
   hasAcceptedTerms: boolean;
+  showSeparateCurrencies: boolean; // Toggle for Travel Mode
   apiKey?: string; // User provided API Key for better security
 }

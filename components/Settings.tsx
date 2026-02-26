@@ -117,18 +117,20 @@ interface SettingsProps {
   onClearData: () => void;
   onShowPrivacyPolicy: () => void;
   onPrint?: (type: 'summary' | 'detailed') => void;
+  onShare?: (type: 'summary' | 'detailed') => void;
 }
 
 const Settings: React.FC<SettingsProps> = ({ 
   userName, pin, currency, currencies, wallets, categories, apiKey, exchangeRates, appState, onUpdateSettings, 
   onAddCurrency, onRemoveCurrency, onAddWallet, onUpdateWallet, onRemoveWallet,
   onAddCategory, onUpdateCategory, onRemoveCategory,
-  onRestore, onClearData, onShowPrivacyPolicy, onPrint
+  onRestore, onClearData, onShowPrivacyPolicy, onPrint, onShare
 }) => {
   const [localUserName, setLocalUserName] = useState(userName);
   const [localPin, setLocalPin] = useState(pin || '');
   const [localApiKey, setLocalApiKey] = useState(apiKey || '');
   const [isSecurityEnabled, setIsSecurityEnabled] = useState(!!pin);
+  const [isTravelMode, setIsTravelMode] = useState(appState.showSeparateCurrencies || false); // Local state for immediate feedback
   const [isExporting, setIsExporting] = useState(false);
   const [activeSection, setActiveSection] = useState<'main' | 'wallets' | 'categories' | 'currencies'>('main');
   const [showCurrencyModal, setShowCurrencyModal] = useState(false);
@@ -187,6 +189,27 @@ const Settings: React.FC<SettingsProps> = ({
           window.URL.revokeObjectURL(url);
       }, 200);
   };
+  const shareOrDownload = async (content: string, fileName: string, mimeType: string) => {
+      try {
+          const file = new File([content], fileName, { type: mimeType });
+          if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+              await navigator.share({
+                  files: [file],
+                  title: 'تصدير بيانات ثري',
+                  text: 'ملف بيانات من تطبيق ثري'
+              });
+              showToast("تمت المشاركة بنجاح");
+          } else {
+              downloadFile(content, fileName, mimeType);
+              showToast("تم التحميل");
+          }
+      } catch (e) {
+          console.error("Share failed", e);
+          downloadFile(content, fileName, mimeType);
+          showToast("تم التحميل (فشلت المشاركة)");
+      }
+  };
+
   const executeExport = async (password: string | null) => {
     setIsExporting(true);
     setShowBackupModal(false);
@@ -194,12 +217,10 @@ const Settings: React.FC<SettingsProps> = ({
         const dataStr = JSON.stringify(appState);
         const dateStr = new Date().toISOString().split('T')[0];
         if (!password) {
-            downloadFile(dataStr, `Thari_Backup_${dateStr}.json`, 'application/json');
-            showToast("تم حفظ النسخة بنجاح");
+            await shareOrDownload(dataStr, `Thari_Backup_${dateStr}.json`, 'application/json');
         } else {
             const encrypted = await encryptData(dataStr, password);
-            downloadFile(encrypted, `Thari_Backup_Secure_${dateStr}.thari`, 'text/plain');
-            showToast("تم حفظ النسخة المشفرة بنجاح");
+            await shareOrDownload(encrypted, `Thari_Backup_Secure_${dateStr}.thari`, 'text/plain');
         }
     } catch (e) {
         showToast("فشل النسخ الاحتياطي", 'error');
@@ -209,6 +230,7 @@ const Settings: React.FC<SettingsProps> = ({
     }
   };
   const handleExportBackup = () => setShowBackupModal(true);
+  
   const executeRestore = async () => {
     if (!pendingRestoreContent) return;
     try {
@@ -226,6 +248,7 @@ const Settings: React.FC<SettingsProps> = ({
         showToast("كلمة المرور خاطئة أو الملف تالف", 'error');
     }
   };
+
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -251,6 +274,7 @@ const Settings: React.FC<SettingsProps> = ({
     };
     reader.readAsText(file);
   };
+
   const handleExportCSV = () => {
     try {
         const transactions: Transaction[] = appState.transactions;
@@ -264,16 +288,14 @@ const Settings: React.FC<SettingsProps> = ({
             const row = [t.date, typeLabel, t.amount, t.currency, cat, wallet, note];
             csvContent += row.join(",") + "\n";
         });
-        downloadFile(csvContent, `Thari_Report_${new Date().toISOString().split('T')[0]}.csv`, 'text/csv;charset=utf-8;');
-        showToast("تم تصدير ملف Excel بنجاح");
+        shareOrDownload(csvContent, `Thari_Report_${new Date().toISOString().split('T')[0]}.csv`, 'text/csv;charset=utf-8;');
     } catch (e) {
         showToast("حدث خطأ أثناء التصدير", 'error');
     }
   };
   const handleExportJSON = () => {
       const dataStr = JSON.stringify(appState, null, 2);
-      downloadFile(dataStr, `Thari_Data_Raw_${new Date().toISOString().split('T')[0]}.json`, 'application/json');
-      showToast("تم تصدير البيانات الخام");
+      shareOrDownload(dataStr, `Thari_Data_Raw_${new Date().toISOString().split('T')[0]}.json`, 'application/json');
   };
 
   const handleSaveProfile = () => {
@@ -473,7 +495,23 @@ const Settings: React.FC<SettingsProps> = ({
           <input type="text" value={localUserName} onChange={e => setLocalUserName(e.target.value)} className="w-full p-5 rounded-2xl bg-slate-800 text-white font-bold border-none outline-none focus:ring-1 focus:ring-amber-500 shadow-inner" />
         </div>
 
-        <div className="p-8 space-y-6">
+        <div className="p-8 space-y-4 border-t border-slate-800">
+          <div className="flex justify-between items-center px-2">
+            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2"><Plane size={14} /> وضع السفر (فصل العملات)</label>
+            <div dir="ltr" className={`w-14 h-7 rounded-full p-1 cursor-pointer transition-all ${isTravelMode ? 'bg-amber-500 shadow-[0_0_15px_rgba(245,158,11,0.3)]' : 'bg-slate-700'}`} onClick={() => {
+                const newVal = !isTravelMode;
+                setIsTravelMode(newVal);
+                onUpdateSettings({ showSeparateCurrencies: newVal });
+            }}>
+              <div className={`w-5 h-5 bg-white rounded-full shadow-md transition-transform ${isTravelMode ? 'translate-x-7' : 'translate-x-0'}`} />
+            </div>
+          </div>
+          <p className="text-[10px] text-slate-500 px-2 leading-relaxed">
+            عند تفعيل هذا الوضع، سيتم عرض تفاصيل كل عملة بشكل منفصل في الصفحة الرئيسية، مما يساعدك على تتبع المصاريف أثناء السفر دون تحويل العملات.
+          </p>
+        </div>
+
+        <div className="p-8 space-y-6 border-t border-slate-800">
           <div className="flex justify-between items-center px-2">
             <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2"><Lock size={14} /> حماية الخصوصية (PIN)</label>
             <div dir="ltr" className={`w-14 h-7 rounded-full p-1 cursor-pointer transition-all ${isSecurityEnabled ? 'bg-amber-500 shadow-[0_0_15px_rgba(245,158,11,0.3)]' : 'bg-slate-700'}`} onClick={() => setIsSecurityEnabled(!isSecurityEnabled)}>
@@ -513,7 +551,11 @@ const Settings: React.FC<SettingsProps> = ({
                 </div>
                 <button onClick={() => onPrint?.('detailed')} className="w-full flex items-center justify-center gap-4 p-6 bg-slate-800/50 rounded-[2.5rem] active:scale-95 transition-all border-2 border-dashed border-slate-800 hover:border-amber-500/50 hover:bg-slate-800 group">
                   <Printer size={22} className="text-amber-500" />
-                  <span className="text-sm font-black text-white">طباعة كشف حساب (PDF)</span>
+                  <span className="text-sm font-black text-white">طباعة كشف حساب (Web)</span>
+                </button>
+                <button onClick={() => onShare?.('detailed')} className="w-full flex items-center justify-center gap-4 p-6 bg-slate-800/50 rounded-[2.5rem] active:scale-95 transition-all border-2 border-dashed border-slate-800 hover:border-emerald-500/50 hover:bg-slate-800 group mt-4">
+                  <FileDown size={22} className="text-emerald-500" />
+                  <span className="text-sm font-black text-white">مشاركة PDF (جوال)</span>
                 </button>
                 <div className="grid grid-cols-2 gap-4 pt-4">
                     <button onClick={handleExportBackup} disabled={isExporting} className="flex items-center justify-center gap-3 p-5 bg-slate-800 rounded-3xl active:scale-95 border border-slate-700/50">
