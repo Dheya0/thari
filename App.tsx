@@ -27,6 +27,10 @@ import ZakatCalculator from './components/ZakatCalculator';
 
 const STORAGE_KEY = 'thari_app_v4';
 
+import { Capacitor } from '@capacitor/core';
+import { Filesystem, Directory } from '@capacitor/filesystem';
+import { Share } from '@capacitor/share';
+
 const INITIAL_STATE: AppState = {
   userName: 'مستخدم ثري',
   transactions: [],
@@ -47,6 +51,7 @@ const INITIAL_STATE: AppState = {
   pin: null,
   isLocked: false,
   isTravelMode: false,
+  showSeparateCurrencies: false,
   hasAcceptedTerms: false,
   apiKey: '', // Initialize empty
 };
@@ -168,19 +173,40 @@ const App: React.FC = () => {
             const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
             
             pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-            const pdfBlob = pdf.output('blob');
             
             document.body.removeChild(clone);
             
-            if (navigator.share) {
-                const file = new File([pdfBlob], `Thari_Report_${new Date().toISOString().split('T')[0]}.pdf`, { type: 'application/pdf' });
-                await navigator.share({
-                    files: [file],
+            const fileName = `Thari_Report_${new Date().toISOString().split('T')[0]}.pdf`;
+
+            if (Capacitor.isNativePlatform()) {
+                const base64Data = pdf.output('datauristring').split(',')[1];
+                
+                const result = await Filesystem.writeFile({
+                    path: fileName,
+                    data: base64Data,
+                    directory: Directory.Cache
+                });
+                
+                await Share.share({
                     title: 'تقرير ثري المالي',
-                    text: 'تقرير مالي من تطبيق ثري'
+                    text: 'تقرير مالي من تطبيق ثري',
+                    url: result.uri,
+                    dialogTitle: 'مشاركة التقرير'
                 });
             } else {
-                pdf.save(`Thari_Report_${new Date().toISOString().split('T')[0]}.pdf`);
+                if (navigator.share) {
+                    const pdfBlob = pdf.output('blob');
+                    const file = new File([pdfBlob], fileName, { type: 'application/pdf' });
+                    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                        await navigator.share({
+                            files: [file],
+                            title: 'تقرير ثري المالي',
+                            text: 'تقرير مالي من تطبيق ثري'
+                        });
+                        return;
+                    }
+                }
+                pdf.save(fileName);
             }
         } catch (e) {
             console.error("Share failed", e);
