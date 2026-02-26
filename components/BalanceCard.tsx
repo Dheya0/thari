@@ -60,8 +60,7 @@ const BalanceCard: React.FC<BalanceCardProps> = ({ totalBalance, totalIncome, to
                             <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
                                 {Object.entries(balances).map(([code, amount]) => {
                                     const val = amount as number;
-                                    // if (val === 0) return null; // Show even zero if it exists in map? No, hide zero.
-                                    if (Math.abs(val) < 0.01) return null;
+                                    // Show all balances in Travel Mode, even zero
                                     return (
                                     <div key={code} className={`shrink-0 px-4 py-3 rounded-xl border flex flex-col items-start min-w-[100px] ${val < 0 ? 'bg-rose-500/10 border-rose-500/20' : 'bg-emerald-500/10 border-emerald-500/20'}`}>
                                         <span className="text-[10px] font-black text-slate-400 mb-1">{code}</span>

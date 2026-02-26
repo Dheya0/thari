@@ -73,6 +73,7 @@ const App: React.FC = () => {
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [showPrivacyPolicy, setShowPrivacyPolicy] = useState(false);
   const [printType, setPrintType] = useState<'summary' | 'detailed'>('summary');
+  const [printCurrencyFilter, setPrintCurrencyFilter] = useState<string | null>(null);
   
   // Wallet Filter State (null = All Wallets)
   const [selectedWalletId, setSelectedWalletId] = useState<string | null>(null);
@@ -97,6 +98,16 @@ const App: React.FC = () => {
     const currencyBreakdown: Record<string, number> = {};
     const expenseBreakdown: Record<string, number> = {};
     
+    // Initialize currencies from wallets to ensure they appear even if 0
+    if (selectedWalletId) {
+        const w = state.wallets.find(w => w.id === selectedWalletId);
+        if (w) currencyBreakdown[w.currencyCode] = 0;
+    } else {
+        state.wallets.forEach(w => {
+            currencyBreakdown[w.currencyCode] = 0;
+        });
+    }
+
     txSource.forEach(t => {
         const currentVal = currencyBreakdown[t.currency] || 0;
         const change = t.type === 'income' ? t.amount : -t.amount;
@@ -140,13 +151,15 @@ const App: React.FC = () => {
       }
   };
 
-  const handlePrint = (type: 'summary' | 'detailed') => {
+  const handlePrint = (type: 'summary' | 'detailed', currencyFilter?: string | null) => {
     setPrintType(type);
+    setPrintCurrencyFilter(currencyFilter || null);
     setTimeout(() => { window.print(); }, 800);
   };
 
-  const handleShare = async (type: 'summary' | 'detailed') => {
+  const handleShare = async (type: 'summary' | 'detailed', currencyFilter?: string | null) => {
     setPrintType(type);
+    setPrintCurrencyFilter(currencyFilter || null);
     setTimeout(async () => {
         try {
             const original = document.getElementById('printable-report');
@@ -307,6 +320,7 @@ const App: React.FC = () => {
         type={printType} 
         exchangeRates={state.exchangeRates}
         filterWalletId={selectedWalletId} 
+        filterCurrency={printCurrencyFilter}
       />
       
       <div className="flex flex-col h-full print:hidden relative z-20">

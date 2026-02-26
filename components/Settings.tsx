@@ -5,7 +5,7 @@ import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
 import { 
   Trash2, User, Wallet as WalletIcon, Lock, Upload, Edit2, Plus, Tag, Coins, X, Check, Printer, FileDown, ChevronDown, AlertCircle, AlertTriangle, FileSpreadsheet, Code, ChevronLeft, Palette, Type,
-  ChevronRight, TrendingUp, ShieldCheck, ShieldAlert, Key, Unlock, Smartphone, RefreshCw
+  ChevronRight, TrendingUp, ShieldCheck, ShieldAlert, Key, Unlock, Smartphone, RefreshCw, Plane
 } from 'lucide-react';
 import { Currency, Wallet, Category, Transaction } from '../types';
 import { encryptData, decryptData } from '../services/encryptionService';
@@ -119,8 +119,8 @@ interface SettingsProps {
   onRestore: (data: any) => void;
   onClearData: () => void;
   onShowPrivacyPolicy: () => void;
-  onPrint?: (type: 'summary' | 'detailed') => void;
-  onShare?: (type: 'summary' | 'detailed') => void;
+  onPrint?: (type: 'summary' | 'detailed', currencyFilter?: string | null) => void;
+  onShare?: (type: 'summary' | 'detailed', currencyFilter?: string | null) => void;
 }
 
 const Settings: React.FC<SettingsProps> = ({ 
@@ -138,6 +138,14 @@ const Settings: React.FC<SettingsProps> = ({
   const [activeSection, setActiveSection] = useState<'main' | 'wallets' | 'categories' | 'currencies'>('main');
   const [showCurrencyModal, setShowCurrencyModal] = useState(false);
   
+  // Report Configuration State
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [reportConfig, setReportConfig] = useState<{
+      type: 'summary' | 'detailed';
+      currencyFilter: string | null; // null = All Currencies
+      action: 'print' | 'share' | null;
+  }>({ type: 'detailed', currencyFilter: null, action: null });
+
   // Exchange Rate Editing
   const [editingRateCode, setEditingRateCode] = useState<string | null>(null);
   const [rateInputValue, setRateInputValue] = useState('');
@@ -449,6 +457,118 @@ const Settings: React.FC<SettingsProps> = ({
     );
   }
 
+  if (activeSection === 'wallets') {
+    return (
+      <div className="space-y-6 pb-24 animate-fade">
+        <div className="flex items-center gap-4 mb-4">
+           <button onClick={() => setActiveSection('main')} className="p-3 bg-slate-900 rounded-2xl border border-slate-800 text-slate-400 active:scale-90 transition-all"><ChevronRight size={20} /></button>
+           <h3 className="font-black text-white text-lg">إدارة المحافظ</h3>
+        </div>
+        <div className="space-y-4">
+           {wallets.map(w => (
+             <div key={w.id} className="bg-slate-900 p-5 rounded-[2rem] flex items-center justify-between border border-slate-800">
+                <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-slate-950 shadow-lg" style={{ backgroundColor: w.color }}>
+                        <WalletIcon size={24} />
+                    </div>
+                    <div className="flex flex-col">
+                        <span className="font-bold text-white text-base">{w.name}</span>
+                        <span className="text-[10px] text-slate-500 font-black uppercase tracking-widest">{w.currencyCode}</span>
+                    </div>
+                </div>
+                <div className="flex gap-2">
+                    <button onClick={() => openWalletEdit(w)} className="p-3 bg-slate-800 text-slate-400 rounded-xl hover:text-white border border-slate-700 active:scale-95"><Edit2 size={18} /></button>
+                    <button onClick={() => triggerConfirm(`حذف محفظة ${w.name}؟`, () => onRemoveWallet(w.id), "حذف المحفظة", "danger")} className="p-3 bg-slate-800 text-rose-500 rounded-xl hover:bg-rose-500/10 border border-slate-700 active:scale-95"><Trash2 size={18} /></button>
+                </div>
+             </div>
+           ))}
+           <button onClick={() => { setEditingWallet(null); setWalletData({ name: '', currencyCode: currency.code, color: COLORS[0] }); setShowWalletForm(true); }} className="w-full py-5 bg-amber-500/10 text-amber-500 font-black rounded-2xl border border-amber-500/20 flex items-center justify-center gap-2 active:scale-95">
+              <Plus size={20} /> إضافة محفظة جديدة
+           </button>
+        </div>
+        
+        {showWalletForm && (
+            <Modal title={editingWallet ? "تعديل محفظة" : "إضافة محفظة"} onClose={() => setShowWalletForm(false)}>
+                <div className="space-y-6">
+                    <InputField label="اسم المحفظة" value={walletData.name} onChange={(v: string) => setWalletData({...walletData, name: v})} placeholder="كاش، راتب..." />
+                    <div className="space-y-2">
+                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2">العملة</label>
+                        <select value={walletData.currencyCode} onChange={e => setWalletData({...walletData, currencyCode: e.target.value})} className="w-full p-4 rounded-2xl bg-slate-950 border border-slate-800 text-white font-bold outline-none">
+                            {currencies.map(c => <option key={c.code} value={c.code}>{c.name} ({c.code})</option>)}
+                        </select>
+                    </div>
+                    <ColorPicker selected={walletData.color} onSelect={c => setWalletData({...walletData, color: c})} />
+                    <ActionButton label="حفظ المحفظة" onClick={saveWallet} />
+                </div>
+            </Modal>
+        )}
+        <ToastNotification toast={toast} />
+        <ConfirmDialog confirmData={confirmData} onCancel={() => setConfirmData(null)} />
+      </div>
+    );
+  }
+
+  if (activeSection === 'categories') {
+    return (
+      <div className="space-y-6 pb-24 animate-fade">
+        <div className="flex items-center gap-4 mb-4">
+           <button onClick={() => setActiveSection('main')} className="p-3 bg-slate-900 rounded-2xl border border-slate-800 text-slate-400 active:scale-90 transition-all"><ChevronRight size={20} /></button>
+           <h3 className="font-black text-white text-lg">إدارة التصنيفات</h3>
+        </div>
+        <div className="space-y-4">
+           {categories.map(c => (
+             <div key={c.id} className="bg-slate-900 p-4 rounded-[2rem] flex items-center justify-between border border-slate-800">
+                <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-white shadow-lg" style={{ backgroundColor: c.color }}>
+                        {getIcon(c.icon, 20)}
+                    </div>
+                    <div className="flex flex-col">
+                        <span className="font-bold text-white text-base">{c.name}</span>
+                        <span className={`text-[10px] font-black uppercase tracking-widest ${c.type === 'income' ? 'text-emerald-500' : 'text-rose-500'}`}>{c.type === 'income' ? 'دخل' : 'صرف'}</span>
+                    </div>
+                </div>
+                <button onClick={() => openCategoryEdit(c)} className="p-3 bg-slate-800 text-slate-400 rounded-xl hover:text-white border border-slate-700 active:scale-95"><Edit2 size={18} /></button>
+             </div>
+           ))}
+           <button onClick={() => { setEditingCategory(null); setCategoryData({ name: '', icon: ICONS[0], color: COLORS[0], type: 'expense' }); setShowCategoryForm(true); }} className="w-full py-5 bg-amber-500/10 text-amber-500 font-black rounded-2xl border border-amber-500/20 flex items-center justify-center gap-2 active:scale-95">
+              <Plus size={20} /> إضافة تصنيف جديد
+           </button>
+        </div>
+
+        {showCategoryForm && (
+            <Modal title={editingCategory ? "تعديل تصنيف" : "إضافة تصنيف"} onClose={() => setShowCategoryForm(false)}>
+                <div className="space-y-6">
+                    <div className="flex bg-slate-950 p-1 rounded-2xl border border-slate-800">
+                        <button onClick={() => setCategoryData({...categoryData, type: 'expense'})} className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase transition-all ${categoryData.type === 'expense' ? 'bg-rose-500 text-white' : 'text-slate-600'}`}>صرف</button>
+                        <button onClick={() => setCategoryData({...categoryData, type: 'income'})} className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase transition-all ${categoryData.type === 'income' ? 'bg-emerald-500 text-white' : 'text-slate-600'}`}>دخل</button>
+                    </div>
+                    <InputField label="اسم التصنيف" value={categoryData.name} onChange={(v: string) => setCategoryData({...categoryData, name: v})} placeholder="طعام، مواصلات..." />
+                    <div className="space-y-3">
+                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2">الأيقونة</label>
+                        <div className="grid grid-cols-5 gap-3 max-h-40 overflow-y-auto no-scrollbar p-1">
+                            {ICONS.map(icon => (
+                                <button key={icon} onClick={() => setCategoryData({...categoryData, icon})} className={`w-12 h-12 rounded-xl flex items-center justify-center border transition-all ${categoryData.icon === icon ? 'border-amber-500 bg-amber-500/10 text-amber-500' : 'border-slate-800 text-slate-500'}`}>
+                                    {getIcon(icon, 20)}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                    <ColorPicker selected={categoryData.color} onSelect={c => setCategoryData({...categoryData, color: c})} />
+                    <div className="flex gap-3">
+                        {editingCategory && (
+                            <button onClick={() => triggerConfirm(`حذف تصنيف ${editingCategory.name}؟`, () => { onRemoveCategory(editingCategory.id); setShowCategoryForm(false); }, "حذف التصنيف", "danger")} className="p-4 bg-rose-500/10 text-rose-500 border border-rose-500/20 rounded-2xl active:scale-95"><Trash2 size={24} /></button>
+                        )}
+                        <button onClick={saveCategory} className="flex-1 py-5 bg-amber-500 text-slate-950 font-black rounded-2xl shadow-xl active:scale-95">حفظ التصنيف</button>
+                    </div>
+                </div>
+            </Modal>
+        )}
+        <ToastNotification toast={toast} />
+        <ConfirmDialog confirmData={confirmData} onCancel={() => setConfirmData(null)} />
+      </div>
+    );
+  }
+
   // (Return Main View unchanged, just ensuring it renders correctly)
   return (
     <div className="space-y-6 pb-24 animate-fade">
@@ -552,11 +672,11 @@ const Settings: React.FC<SettingsProps> = ({
                         <span className="text-[10px] font-black text-white uppercase tracking-widest">تصدير JSON</span>
                     </button>
                 </div>
-                <button onClick={() => onPrint?.('detailed')} className="w-full flex items-center justify-center gap-4 p-6 bg-slate-800/50 rounded-[2.5rem] active:scale-95 transition-all border-2 border-dashed border-slate-800 hover:border-amber-500/50 hover:bg-slate-800 group">
+                <button onClick={() => { setReportConfig({ type: 'detailed', currencyFilter: null, action: 'print' }); setShowReportModal(true); }} className="w-full flex items-center justify-center gap-4 p-6 bg-slate-800/50 rounded-[2.5rem] active:scale-95 transition-all border-2 border-dashed border-slate-800 hover:border-amber-500/50 hover:bg-slate-800 group">
                   <Printer size={22} className="text-amber-500" />
                   <span className="text-sm font-black text-white">طباعة كشف حساب (Web)</span>
                 </button>
-                <button onClick={() => onShare?.('detailed')} className="w-full flex items-center justify-center gap-4 p-6 bg-slate-800/50 rounded-[2.5rem] active:scale-95 transition-all border-2 border-dashed border-slate-800 hover:border-emerald-500/50 hover:bg-slate-800 group mt-4">
+                <button onClick={() => { setReportConfig({ type: 'detailed', currencyFilter: null, action: 'share' }); setShowReportModal(true); }} className="w-full flex items-center justify-center gap-4 p-6 bg-slate-800/50 rounded-[2.5rem] active:scale-95 transition-all border-2 border-dashed border-slate-800 hover:border-emerald-500/50 hover:bg-slate-800 group mt-4">
                   <FileDown size={22} className="text-emerald-500" />
                   <span className="text-sm font-black text-white">مشاركة PDF (جوال)</span>
                 </button>
@@ -580,6 +700,54 @@ const Settings: React.FC<SettingsProps> = ({
              <Trash2 size={20} /> مسح السجل المالي نهائياً
            </button>
        </div>
+
+      {/* Report Configuration Modal */}
+      {showReportModal && (
+        <Modal title={reportConfig.action === 'print' ? "إعدادات الطباعة" : "إعدادات المشاركة"} onClose={() => setShowReportModal(false)}>
+            <div className="space-y-6">
+                <div className="space-y-3">
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2">نوع التقرير</label>
+                    <div className="flex bg-slate-950 p-1 rounded-2xl border border-slate-800">
+                        <button onClick={() => setReportConfig({...reportConfig, type: 'summary'})} className={`flex-1 py-4 rounded-xl text-xs font-black transition-all ${reportConfig.type === 'summary' ? 'bg-amber-500 text-slate-950 shadow-lg' : 'text-slate-500'}`}>ملخص (مختصر)</button>
+                        <button onClick={() => setReportConfig({...reportConfig, type: 'detailed'})} className={`flex-1 py-4 rounded-xl text-xs font-black transition-all ${reportConfig.type === 'detailed' ? 'bg-amber-500 text-slate-950 shadow-lg' : 'text-slate-500'}`}>تفصيلي (كامل)</button>
+                    </div>
+                </div>
+
+                <div className="space-y-3">
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2">تصفية حسب العملة</label>
+                    <div className="grid grid-cols-2 gap-3">
+                        <button 
+                            onClick={() => setReportConfig({...reportConfig, currencyFilter: null})}
+                            className={`p-4 rounded-2xl border text-xs font-black transition-all ${reportConfig.currencyFilter === null ? 'bg-slate-800 border-amber-500 text-amber-500' : 'bg-slate-950 border-slate-800 text-slate-500'}`}
+                        >
+                            الكل (عملة العرض)
+                        </button>
+                        {currencies.map(c => (
+                            <button 
+                                key={c.code}
+                                onClick={() => setReportConfig({...reportConfig, currencyFilter: c.code})}
+                                className={`p-4 rounded-2xl border text-xs font-black transition-all ${reportConfig.currencyFilter === c.code ? 'bg-slate-800 border-amber-500 text-amber-500' : 'bg-slate-950 border-slate-800 text-slate-500'}`}
+                            >
+                                {c.name} ({c.code})
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
+                <ActionButton 
+                    label={reportConfig.action === 'print' ? "طباعة التقرير" : "إنشاء ومشاركة PDF"} 
+                    onClick={() => {
+                        if (reportConfig.action === 'print') {
+                            onPrint?.(reportConfig.type, reportConfig.currencyFilter);
+                        } else {
+                            onShare?.(reportConfig.type, reportConfig.currencyFilter);
+                        }
+                        setShowReportModal(false);
+                    }} 
+                />
+            </div>
+        </Modal>
+      )}
 
       {/* Modals for Backup, Restore, Wallet Editing etc (from previous code) */}
       {/* Backup Secure Password Modal */}

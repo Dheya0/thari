@@ -12,13 +12,18 @@ interface FinancialReportProps {
   type: 'summary' | 'detailed';
   exchangeRates: Record<string, number>;
   filterWalletId?: string | null;
+  filterCurrency?: string | null;
 }
 
-const FinancialReport: React.FC<FinancialReportProps> = ({ transactions, categories, currency, userName, wallets, type, exchangeRates, filterWalletId }) => {
+const FinancialReport: React.FC<FinancialReportProps> = ({ transactions, categories, currency, userName, wallets, type, exchangeRates, filterWalletId, filterCurrency }) => {
   // --- Filtering Logic inside Report ---
-  const activeTransactions = filterWalletId 
+  let activeTransactions = filterWalletId 
     ? transactions.filter(t => t.walletId === filterWalletId) 
     : transactions;
+
+  if (filterCurrency) {
+      activeTransactions = activeTransactions.filter(t => t.currency === filterCurrency);
+  }
 
   const activeWallet = filterWalletId ? wallets.find(w => w.id === filterWalletId) : null;
 
