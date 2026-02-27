@@ -191,36 +191,43 @@ const App: React.FC = () => {
             
             const fileName = `Thari_Report_${new Date().toISOString().split('T')[0]}.pdf`;
 
-            if (Capacitor.isNativePlatform()) {
-                const base64Data = pdf.output('datauristring').split(',')[1];
-                
-                const result = await Filesystem.writeFile({
-                    path: fileName,
-                    data: base64Data,
-                    directory: Directory.Cache
-                });
-                
-                await Share.share({
-                    title: 'تقرير ثري المالي',
-                    text: 'تقرير مالي من تطبيق ثري',
-                    url: result.uri,
-                    dialogTitle: 'مشاركة التقرير'
-                });
-            } else {
-                if (navigator.share) {
-                    const pdfBlob = pdf.output('blob');
-                    const file = new File([pdfBlob], fileName, { type: 'application/pdf' });
-                    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+            // WebView-friendly approach: Open Blob URL in new window
+            // This forces Android to handle the PDF intent (View/Download)
+            const blob = pdf.output('blob');
+            const blobUrl = URL.createObjectURL(blob);
+            
+            // Try to share using Web Share API first if supported
+            let shared = false;
+            if (navigator.share && navigator.canShare) {
+                try {
+                    const file = new File([blob], fileName, { type: 'application/pdf' });
+                    if (navigator.canShare({ files: [file] })) {
                         await navigator.share({
                             files: [file],
                             title: 'تقرير ثري المالي',
                             text: 'تقرير مالي من تطبيق ثري'
                         });
-                        return;
+                        shared = true;
                     }
+                } catch (e) {
+                    console.log("Web Share API failed, falling back to open/download");
                 }
-                pdf.save(fileName);
             }
+
+            if (!shared) {
+                // If share didn't work, try opening in new window (Standard Android WebView behavior)
+                const newWindow = window.open(blobUrl, '_blank');
+                
+                // If popup blocked or failed, try direct save
+                if (!newWindow) {
+                    pdf.save(fileName);
+                    alert("تم حفظ التقرير. إذا لم يظهر، يرجى التحقق من إعدادات التنزيل في المتصفح.");
+                } else {
+                    // Revoke URL after a delay to allow loading
+                    setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+                }
+            }
+
         } catch (e) {
             console.error("Share failed", e);
             alert("فشل إنشاء ملف PDF. يرجى المحاولة مرة أخرى.");
