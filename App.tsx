@@ -62,6 +62,17 @@ const App: React.FC = () => {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
           const parsed = JSON.parse(saved);
+          
+          // Migration: if currency is a string, convert it to an object
+          if (typeof parsed.currency === 'string') {
+              const matchedCurrency = DEFAULT_CURRENCIES.find(c => c.code === parsed.currency) || DEFAULT_CURRENCIES[0];
+              parsed.currency = matchedCurrency;
+          }
+          
+          if (!parsed.currencies || !Array.isArray(parsed.currencies)) {
+              parsed.currencies = DEFAULT_CURRENCIES;
+          }
+          
           return { ...INITIAL_STATE, ...parsed, isLocked: !!parsed.pin };
       }
       return INITIAL_STATE;
@@ -220,8 +231,13 @@ const App: React.FC = () => {
                 
                 // If popup blocked or failed, try direct save
                 if (!newWindow) {
-                    pdf.save(fileName);
-                    alert("تم حفظ التقرير. إذا لم يظهر، يرجى التحقق من إعدادات التنزيل في المتصفح.");
+                    // Try data URI navigation (sometimes works in WebViews where blob fails)
+                    try {
+                        window.location.href = pdf.output('datauristring');
+                    } catch (e) {
+                        pdf.save(fileName);
+                        alert("تم حفظ التقرير. إذا لم يظهر، يرجى التحقق من إعدادات التنزيل في المتصفح.");
+                    }
                 } else {
                     // Revoke URL after a delay to allow loading
                     setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);

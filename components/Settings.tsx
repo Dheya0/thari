@@ -124,16 +124,20 @@ interface SettingsProps {
 }
 
 const Settings: React.FC<SettingsProps> = ({ 
-  userName, pin, currency, currencies, wallets, categories, apiKey, exchangeRates, appState, onUpdateSettings, 
+  userName = '', pin = '', currency, currencies, wallets, categories, apiKey = '', exchangeRates = {}, appState = {}, onUpdateSettings, 
   onAddCurrency, onRemoveCurrency, onAddWallet, onUpdateWallet, onRemoveWallet,
   onAddCategory, onUpdateCategory, onRemoveCategory,
   onRestore, onClearData, onShowPrivacyPolicy, onPrint, onShare
 }) => {
-  const [localUserName, setLocalUserName] = useState(userName);
+  const safeCurrencies = currencies || [];
+  const safeWallets = wallets || [];
+  const safeCategories = categories || [];
+
+  const [localUserName, setLocalUserName] = useState(userName || '');
   const [localPin, setLocalPin] = useState(pin || '');
   const [localApiKey, setLocalApiKey] = useState(apiKey || '');
   const [isSecurityEnabled, setIsSecurityEnabled] = useState(!!pin);
-  const [isTravelMode, setIsTravelMode] = useState(appState.showSeparateCurrencies || false); // Local state for immediate feedback
+  const [isTravelMode, setIsTravelMode] = useState(appState?.showSeparateCurrencies || false); // Local state for immediate feedback
   const [isExporting, setIsExporting] = useState(false);
   const [activeSection, setActiveSection] = useState<'main' | 'wallets' | 'categories' | 'currencies'>('main');
   const [showCurrencyModal, setShowCurrencyModal] = useState(false);
@@ -149,6 +153,10 @@ const Settings: React.FC<SettingsProps> = ({
   // Exchange Rate Editing
   const [editingRateCode, setEditingRateCode] = useState<string | null>(null);
   const [rateInputValue, setRateInputValue] = useState('');
+
+  // Data Display Modal State
+  const [showDataModal, setShowDataModal] = useState(false);
+  const [dataModalContent, setDataModalContent] = useState<{title: string, content: string}>({title: '', content: ''});
 
   // Backup/Restore Modals State
   const [showBackupModal, setShowBackupModal] = useState(false);
@@ -166,7 +174,7 @@ const Settings: React.FC<SettingsProps> = ({
   // Wallet Form State
   const [showWalletForm, setShowWalletForm] = useState(false);
   const [editingWallet, setEditingWallet] = useState<Wallet | null>(null);
-  const [walletData, setWalletData] = useState({ name: '', currencyCode: currency.code, color: COLORS[0] });
+  const [walletData, setWalletData] = useState({ name: '', currencyCode: currency?.code || 'SAR', color: COLORS[0] });
 
   // Category Form State
   const [showCategoryForm, setShowCategoryForm] = useState(false);
@@ -185,20 +193,10 @@ const Settings: React.FC<SettingsProps> = ({
   };
 
   // ... (Export/Import Functions unchanged) ...
-  const copyToClipboard = async (text: string) => {
-      try {
-          await navigator.clipboard.writeText(text);
-          showToast("تم نسخ البيانات إلى الحافظة");
-      } catch (err) {
-          // Fallback for older browsers/WebViews
-          const textArea = document.createElement("textarea");
-          textArea.value = text;
-          document.body.appendChild(textArea);
-          textArea.select();
-          document.execCommand("copy");
-          document.body.removeChild(textArea);
-          showToast("تم نسخ البيانات إلى الحافظة");
-      }
+  const copyToClipboard = async (text: string, title: string = "البيانات") => {
+      // For this specific Android WebView issue, always show the modal first as it's 100% reliable
+      setDataModalContent({ title, content: text });
+      setShowDataModal(true);
   };
 
   const downloadFile = (content: string, fileName: string, mimeType: string) => {
@@ -222,7 +220,7 @@ const Settings: React.FC<SettingsProps> = ({
               window.URL.revokeObjectURL(url);
           }, 200);
       }
-      showToast("جاري التنزيل... إذا لم يبدأ، جرب النسخ");
+      showToast("جاري التنزيل... إذا لم يبدأ، استخدم زر النسخ");
   };
 
   const shareOrDownload = async (content: string, fileName: string, mimeType: string) => {
@@ -255,15 +253,15 @@ const Settings: React.FC<SettingsProps> = ({
         const dateStr = new Date().toISOString().split('T')[0];
         if (!password) {
             // Offer Copy option for unencrypted JSON
-            if (confirm("هل تريد نسخ البيانات للنص بدلاً من التنزيل؟ (أفضل للأندرويد)")) {
-                copyToClipboard(dataStr);
+            if (confirm("هل تريد عرض البيانات للنسخ اليدوي؟ (أفضل للأندرويد)")) {
+                copyToClipboard(dataStr, "نسخة احتياطية (JSON)");
             } else {
                 await shareOrDownload(dataStr, `Thari_Backup_${dateStr}.json`, 'application/json');
             }
         } else {
             const encrypted = await encryptData(dataStr, password);
-            if (confirm("هل تريد نسخ البيانات المشفرة؟")) {
-                copyToClipboard(encrypted);
+            if (confirm("هل تريد عرض البيانات المشفرة للنسخ؟")) {
+                copyToClipboard(encrypted, "نسخة مشفرة");
             } else {
                 await shareOrDownload(encrypted, `Thari_Backup_Secure_${dateStr}.thari`, 'text/plain');
             }
@@ -277,24 +275,60 @@ const Settings: React.FC<SettingsProps> = ({
   };
   const handleExportBackup = () => setShowBackupModal(true);
   
-  // ... (Rest of file) ...
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      const content = event.target?.result as string;
+      if (file.name.endsWith('.thari')) {
+          setPendingRestoreContent(content);
+          setShowRestoreModal(true);
+      } else {
+          try {
+              const parsed = JSON.parse(content);
+              onRestore(parsed);
+              showToast("تمت الاستعادة بنجاح");
+          } catch (err) {
+              showToast("ملف غير صالح", 'error');
+          }
+      }
+    };
+    reader.readAsText(file);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const executeRestore = async () => {
+      if (!pendingRestoreContent) return;
+      try {
+          const decrypted = await decryptData(pendingRestoreContent, restorePassword);
+          const parsed = JSON.parse(decrypted);
+          onRestore(parsed);
+          setShowRestoreModal(false);
+          setPendingRestoreContent(null);
+          setRestorePassword('');
+          showToast("تمت الاستعادة بنجاح");
+      } catch (e) {
+          showToast("كلمة المرور غير صحيحة أو الملف تالف", 'error');
+      }
+  };
 
   const handleExportCSV = () => {
     try {
-        const transactions: Transaction[] = appState.transactions;
+        const transactions: Transaction[] = appState?.transactions || [];
         const headers = ["التاريخ", "النوع", "المبلغ", "العملة", "التصنيف", "المحفظة", "ملاحظات"];
         let csvContent = "\uFEFF" + headers.join(",") + "\n";
         transactions.forEach(t => {
-            const cat = categories.find(c => c.id === t.categoryId)?.name || 'غير مصنف';
-            const wallet = wallets.find(w => w.id === t.walletId)?.name || 'محفظة محذوفة';
+            const cat = safeCategories.find(c => c.id === t.categoryId)?.name || 'غير مصنف';
+            const wallet = safeWallets.find(w => w.id === t.walletId)?.name || 'محفظة محذوفة';
             const typeLabel = t.type === 'income' ? 'دخل' : 'صرف';
             const note = t.note ? `"${t.note.replace(/"/g, '""')}"` : "";
             const row = [t.date, typeLabel, t.amount, t.currency, cat, wallet, note];
             csvContent += row.join(",") + "\n";
         });
         
-        if (confirm("هل تريد نسخ ملف Excel (CSV) للحافظة؟ هذا الخيار أضمن في بعض الأجهزة.")) {
-            copyToClipboard(csvContent);
+        if (confirm("هل تريد عرض ملف Excel (CSV) للنسخ؟ هذا الخيار أضمن.")) {
+            copyToClipboard(csvContent, "ملف Excel (CSV)");
         } else {
             shareOrDownload(csvContent, `Thari_Report_${new Date().toISOString().split('T')[0]}.csv`, 'text/csv;charset=utf-8;');
         }
@@ -304,8 +338,8 @@ const Settings: React.FC<SettingsProps> = ({
   };
   const handleExportJSON = () => {
       const dataStr = JSON.stringify(appState, null, 2);
-      if (confirm("هل تريد نسخ بيانات JSON للحافظة؟")) {
-          copyToClipboard(dataStr);
+      if (confirm("هل تريد عرض بيانات JSON للنسخ؟")) {
+          copyToClipboard(dataStr, "بيانات JSON");
       } else {
           shareOrDownload(dataStr, `Thari_Data_Raw_${new Date().toISOString().split('T')[0]}.json`, 'application/json');
       }
@@ -384,7 +418,7 @@ const Settings: React.FC<SettingsProps> = ({
         </div>
 
         <div className="space-y-4">
-           {currencies.map(c => {
+           {safeCurrencies.map(c => {
              const isSAR = c.code === 'SAR';
              const currentRate = exchangeRates?.[c.code] || DEFAULT_EXCHANGE_RATES[c.code] || 0;
              const displayRate = currentRate > 0 ? (1 / currentRate).toLocaleString(undefined, {maximumFractionDigits: 2}) : '0';
@@ -467,7 +501,7 @@ const Settings: React.FC<SettingsProps> = ({
            <h3 className="font-black text-white text-lg">إدارة المحافظ</h3>
         </div>
         <div className="space-y-4">
-           {wallets.map(w => (
+           {safeWallets.map(w => (
              <div key={w.id} className="bg-slate-900 p-5 rounded-[2rem] flex items-center justify-between border border-slate-800">
                 <div className="flex items-center gap-4">
                     <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-slate-950 shadow-lg" style={{ backgroundColor: w.color }}>
@@ -496,7 +530,7 @@ const Settings: React.FC<SettingsProps> = ({
                     <div className="space-y-2">
                         <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2">العملة</label>
                         <select value={walletData.currencyCode} onChange={e => setWalletData({...walletData, currencyCode: e.target.value})} className="w-full p-4 rounded-2xl bg-slate-950 border border-slate-800 text-white font-bold outline-none">
-                            {currencies.map(c => <option key={c.code} value={c.code}>{c.name} ({c.code})</option>)}
+                            {safeCurrencies.map(c => <option key={c.code} value={c.code}>{c.name} ({c.code})</option>)}
                         </select>
                     </div>
                     <ColorPicker selected={walletData.color} onSelect={c => setWalletData({...walletData, color: c})} />
@@ -518,7 +552,7 @@ const Settings: React.FC<SettingsProps> = ({
            <h3 className="font-black text-white text-lg">إدارة التصنيفات</h3>
         </div>
         <div className="space-y-4">
-           {categories.map(c => (
+           {safeCategories.map(c => (
              <div key={c.id} className="bg-slate-900 p-4 rounded-[2rem] flex items-center justify-between border border-slate-800">
                 <div className="flex items-center gap-4">
                     <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-white shadow-lg" style={{ backgroundColor: c.color }}>
@@ -603,11 +637,11 @@ const Settings: React.FC<SettingsProps> = ({
       >
         <div className="flex items-center gap-5">
              <div className="w-14 h-14 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-center text-amber-500 shadow-xl">
-                 <span className="text-xl font-black">{currency.symbol}</span>
+                 <span className="text-xl font-black">{currency?.symbol || (typeof currency === 'string' ? currency : '')}</span>
              </div>
              <div className="text-right">
                  <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">العملة الأساسية للنظام</p>
-                 <p className="text-white font-black text-lg">{currency.name}</p>
+                 <p className="text-white font-black text-lg">{currency?.name || (typeof currency === 'string' ? currency : '')}</p>
              </div>
         </div>
         <ChevronDown size={20} className="text-slate-500" />
@@ -724,7 +758,7 @@ const Settings: React.FC<SettingsProps> = ({
                         >
                             الكل (عملة العرض)
                         </button>
-                        {currencies.map(c => (
+                        {safeCurrencies.map(c => (
                             <button 
                                 key={c.code}
                                 onClick={() => setReportConfig({...reportConfig, currencyFilter: c.code})}
@@ -752,6 +786,27 @@ const Settings: React.FC<SettingsProps> = ({
       )}
 
       {/* Modals for Backup, Restore, Wallet Editing etc (from previous code) */}
+      {/* Data Display Modal for Manual Copy */}
+      {showDataModal && (
+        <Modal title={dataModalContent.title} onClose={() => setShowDataModal(false)}>
+            <div className="space-y-6">
+                <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800">
+                    <textarea 
+                        readOnly 
+                        value={dataModalContent.content} 
+                        className="w-full h-64 bg-transparent text-slate-300 font-mono text-xs outline-none resize-none"
+                        onClick={(e) => (e.target as HTMLTextAreaElement).select()}
+                    />
+                </div>
+                <div className="bg-amber-500/10 p-4 rounded-2xl border border-amber-500/20 flex gap-3 items-center">
+                    <AlertCircle size={20} className="text-amber-500 shrink-0" />
+                    <p className="text-[10px] text-slate-400 font-bold">اضغط على النص أعلاه لتحديده بالكامل، ثم اختر "نسخ" من قائمة الهاتف.</p>
+                </div>
+                <ActionButton label="إغلاق" onClick={() => setShowDataModal(false)} variant="secondary" />
+            </div>
+        </Modal>
+      )}
+
       {/* Backup Secure Password Modal */}
       {showBackupModal && (
         <Modal title="تأمين النسخة الاحتياطية" onClose={() => { setShowBackupModal(false); setBackupPassword(''); }}>
@@ -819,7 +874,7 @@ const Settings: React.FC<SettingsProps> = ({
       {showCurrencyModal && (
         <Modal title="اختر العملة" onClose={() => setShowCurrencyModal(false)}>
             <div className="space-y-3 max-h-[60vh] overflow-y-auto no-scrollbar pr-1">
-                {currencies.map(c => (
+                {safeCurrencies.map(c => (
                     <button key={c.code} onClick={() => { onUpdateSettings({ currency: c }); setShowCurrencyModal(false); showToast(`العملة الحالية: ${c.name}`); }} className="w-full p-5 rounded-3xl flex items-center justify-between border border-slate-800 bg-slate-950 text-white transition-all active:scale-95">
                         <div className="flex items-center gap-4">
                             <span className="text-lg font-black text-amber-500">{c.symbol}</span>
@@ -840,7 +895,7 @@ const Settings: React.FC<SettingsProps> = ({
                     <div className="space-y-2">
                         <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2">العملة</label>
                         <select value={walletData.currencyCode} onChange={e => setWalletData({...walletData, currencyCode: e.target.value})} className="w-full p-4 rounded-2xl bg-slate-950 border border-slate-800 text-white font-bold outline-none">
-                            {currencies.map(c => <option key={c.code} value={c.code}>{c.name} ({c.code})</option>)}
+                            {safeCurrencies.map(c => <option key={c.code} value={c.code}>{c.name} ({c.code})</option>)}
                         </select>
                     </div>
                     <ColorPicker selected={walletData.color} onSelect={c => setWalletData({...walletData, color: c})} />
