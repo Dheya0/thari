@@ -1,11 +1,11 @@
-const CACHE_NAME = 'thari-cache-v3';
+const CACHE_NAME = 'thari-cache-v4';
 const ASSETS_TO_CACHE = [
-  './',
-  './index.html',
-  './manifest.json',
-  './logo.svg',
+  '/',
+  '/index.html',
+  '/manifest.json',
+  '/logo.svg',
   'https://cdn.tailwindcss.com',
-  'https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800;900&display=swap'
+  'https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800;900&display=swap'
 ];
 
 // Install Event - cache core shell assets
@@ -89,4 +89,11 @@ self.addEventListener('fetch', (event) => {
         });
     })
   );
+});
+
+// Update the service worker immediately on message
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });

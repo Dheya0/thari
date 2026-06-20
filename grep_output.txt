@@ -1,0 +1,80 @@
+./components/FinancialReport.tsx:158:                                <div className="flex-1 h-4 bg-slate-100 rounded-full overflow-hidden">
+./components/SubscriptionManager.tsx:29:      <div className="bg-gradient-to-br from-indigo-600 to-blue-700 p-8 rounded-[3rem] text-white shadow-2xl relative overflow-hidden group">
+./components/SubscriptionManager.tsx:30:        <Zap className="absolute -right-4 -top-4 text-white/10 group-hover:scale-150 transition-transform duration-1000" size={120} />
+./components/SubscriptionManager.tsx:82:        <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-xl z-[200] flex items-end justify-center animate-fade">
+./components/PrivacyPolicy.tsx:11:    <div className="fixed inset-0 bg-slate-50 dark:bg-slate-950 z-[60] flex flex-col animate-in slide-in-from-left duration-300">
+./components/Analytics.tsx:205:          <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+./components/DebtManager.tsx:182:        <div className="bg-rose-500/10 border border-rose-500/20 p-6 rounded-[2.5rem] relative overflow-hidden group shadow-xl shadow-rose-500/5">
+./components/DebtManager.tsx:183:          <div className="absolute -right-4 -top-4 opacity-5 group-hover:scale-125 transition-transform duration-700">
+./components/DebtManager.tsx:189:        <div className="bg-emerald-500/10 border border-emerald-500/20 p-6 rounded-[2.5rem] relative overflow-hidden group shadow-xl shadow-emerald-500/5">
+./components/DebtManager.tsx:190:          <div className="absolute -right-4 -top-4 opacity-5 group-hover:scale-125 transition-transform duration-700">
+./components/DebtManager.tsx:222:              className={`p-6 rounded-[3rem] border transition-all relative overflow-hidden group ${debt.isPaid ? 'bg-slate-900/20 border-slate-900 grayscale opacity-40' : 'bg-slate-900/60 border-slate-800 hover:border-amber-500/30 shadow-lg'}`}
+./components/DebtManager.tsx:250:                 <div className="h-2 bg-slate-950 rounded-full overflow-hidden">
+./components/DebtManager.tsx:354:        <div className="fixed inset-0 bg-slate-950/95 backdrop-blur-2xl z-[300] flex items-end justify-center animate-fade no-print">
+./components/DebtManager.tsx:355:          <div className="bg-slate-900 w-full max-w-lg rounded-t-[4rem] p-10 pb-16 shadow-2xl border-t border-white/5 animate-slide-up overflow-y-auto no-scrollbar max-h-[90vh]">
+./components/DebtManager.tsx:385:                            <div className={`w-4 h-4 bg-white rounded-full shadow-md transition-transform ${enableInstallments ? 'translate-x-6' : 'translate-x-0'}`} />
+./components/DebtManager.tsx:430:                            <div className={`w-6 h-6 bg-white rounded-full shadow-md transition-transform ${includeWalletTransaction ? 'translate-x-6' : 'translate-x-0'}`} />
+./components/DebtManager.tsx:458:                <textarea value={note} onChange={e => setNote(e.target.value)} placeholder="أي تفاصيل أخرى حول هذا الدين..." className="w-full p-5 rounded-2xl bg-slate-950 border border-white/5 outline-none text-white font-bold text-xs min-h-[100px] resize-none" />
+./components/DebtManager.tsx:471:        <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-xl z-[400] flex items-end justify-center animate-fade no-print">
+./components/Settings.tsx:20:    <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-2xl z-[400] flex items-end justify-center animate-fade">
+./components/Settings.tsx:21:        <div className="bg-slate-900 w-full max-w-lg rounded-t-[3.5rem] p-8 pb-12 shadow-2xl border-t border-slate-800 animate-slide-up overflow-y-auto no-scrollbar max-h-[95vh]">
+./components/Settings.tsx:70:    <div className={`fixed top-6 left-1/2 -translate-x-1/2 px-6 py-3 rounded-2xl shadow-2xl z-[500] flex items-center gap-3 animate-fade ${toast.type === 'success' ? 'bg-emerald-500 text-white' : 'bg-rose-500 text-white'}`}>
+./components/Settings.tsx:82:    <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[500] flex items-center justify-center p-4 animate-fade">
+./components/Settings.tsx:703:      <div className="bg-slate-900 rounded-[3rem] border border-slate-800 divide-y divide-slate-800 overflow-hidden">
+./components/Settings.tsx:717:              <div className={`w-5 h-5 bg-white rounded-full shadow-md transition-transform ${isTravelMode ? 'translate-x-7' : 'translate-x-0'}`} />
+./components/Settings.tsx:729:              <div className={`w-5 h-5 bg-white rounded-full shadow-md transition-transform ${isSecurityEnabled ? 'translate-x-7' : 'translate-x-0'}`} />
+./components/Settings.tsx:928:            <div className="space-y-3 max-h-[60vh] overflow-y-auto no-scrollbar pr-1">
+./components/BalanceCard.tsx:16:    <div className="relative overflow-hidden group perspective-1000">
+./components/BalanceCard.tsx:18:      <div className="relative bg-gradient-to-br from-slate-800 to-slate-950 rounded-[3rem] p-8 shadow-[0_20px_50px_rgba(0,0,0,0.5)] border border-white/10 overflow-hidden transition-all duration-700 hover:scale-[1.02] hover:-rotate-1 active:scale-95 group">
+./components/BalanceCard.tsx:21:        <div className="shimmer absolute inset-0 pointer-events-none opacity-20"></div>
+./components/BalanceCard.tsx:24:        <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/10 blur-3xl rounded-full -mr-16 -mt-16"></div>
+./components/BalanceCard.tsx:25:        <div className="absolute bottom-0 left-0 w-24 h-24 bg-blue-500/10 blur-3xl rounded-full -ml-12 -mb-12"></div>
+./components/GoalTracker.tsx:83:                <div className="h-3 bg-slate-950 rounded-full overflow-hidden p-[2px]">
+./components/GoalTracker.tsx:102:                  <p className="text-[11px] font-bold text-slate-300 leading-relaxed min-h-[1.5em]">
+./components/GoalTracker.tsx:113:        <div className="fixed inset-0 bg-slate-950/95 backdrop-blur-2xl z-[150] flex items-end justify-center p-0 sm:p-4 animate-fade">
+./components/TransactionList.tsx:50:        <div className="flex bg-slate-50/80 dark:bg-slate-900/80 p-1.5 rounded-[2rem] border border-slate-100 dark:border-slate-800 shadow-sm sticky top-0 z-10 backdrop-blur-xl transition-all">
+./components/LockScreen.tsx:34:    <div className="fixed inset-0 bg-slate-950 z-[1000] flex flex-col items-center justify-center p-8 animate-fade">
+./components/LockScreen.tsx:35:      <div className="absolute inset-0 bg-gradient-to-b from-amber-500/5 to-transparent pointer-events-none" />
+./components/WealthScore.tsx:48:    <div className="relative group p-[2px] rounded-[3rem] bg-gradient-to-br from-amber-500/20 to-transparent overflow-hidden">
+./components/WealthScore.tsx:67:             <span className="absolute text-xl font-black text-white">{scoreData.score}</span>
+./components/WelcomeScreen.tsx:13:    <div className="fixed inset-0 bg-white dark:bg-slate-950 z-[200] flex flex-col p-8 overflow-y-auto animate-in fade-in duration-700">
+./components/WelcomeScreen.tsx:14:      <div className="absolute top-[-10%] right-[-10%] w-[70%] h-[40%] bg-amber-500/10 blur-[100px] rounded-full" />
+./components/WelcomeScreen.tsx:15:      <div className="absolute bottom-[-5%] left-[-10%] w-[60%] h-[30%] bg-blue-500/5 blur-[80px] rounded-full" />
+./components/FinancialSimulation.tsx:40:      <div className="relative overflow-hidden bg-gradient-to-br from-purple-900/40 to-slate-950 p-8 rounded-[3rem] border border-purple-500/20 shadow-2xl group">
+./components/FinancialSimulation.tsx:41:        <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:scale-150 transition-transform duration-1000">
+./components/BudgetManager.tsx:54:              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-bold opacity-60">{currencySymbol}</span>
+./components/BudgetManager.tsx:117:                <div className="overflow-hidden h-3 text-xs flex rounded-full bg-slate-100 dark:bg-slate-800">
+./components/TransactionForm.tsx:70:    <div className="fixed inset-0 bg-slate-950/98 backdrop-blur-3xl flex items-end justify-center z-[100] p-0 sm:p-4 animate-fade no-print">
+./components/TransactionForm.tsx:71:      <div className="bg-slate-900 w-full max-w-lg rounded-t-[3.5rem] sm:rounded-[4rem] p-6 sm:p-10 shadow-2xl relative max-h-[96vh] overflow-y-auto no-scrollbar border-t border-white/5">
+./components/TransactionForm.tsx:73:        <div className="absolute top-4 left-1/2 -translate-x-1/2 w-14 h-1.5 bg-slate-800 rounded-full" />
+./components/TransactionForm.tsx:102:                <div className="absolute right-0 top-1/2 -translate-y-1/2 flex flex-col items-center">
+./components/ZakatCalculator.tsx:60:      <div className="relative overflow-hidden bg-gradient-to-br from-amber-600 to-amber-800 p-8 rounded-[3rem] shadow-2xl text-center group">
+./components/ZakatCalculator.tsx:61:         <div className="absolute top-[-50%] left-[-20%] w-[150%] h-[150%] bg-[url('https://www.transparenttextures.com/patterns/arabesque.png')] opacity-10 animate-spin-slow pointer-events-none"></div>
+./components/AIChat.tsx:34:      <div className="flex flex-col items-center justify-center h-[70vh] text-center p-8 space-y-8 animate-fade">
+./components/AIChat.tsx:37:           <div className="absolute -bottom-2 -right-2 bg-amber-500 text-slate-950 p-3 rounded-2xl shadow-lg animate-bounce">
+./components/AIChat.tsx:91:    <div className="flex flex-col h-[calc(100vh-180px)] relative animate-fade">
+./components/AIChat.tsx:145:      <div className="absolute bottom-0 left-0 right-0 bg-slate-950/80 backdrop-blur-xl p-4 border-t border-white/5">
+./components/AIChat.tsx:157:            className="w-full bg-slate-900 text-white text-sm font-bold p-4 pl-12 rounded-3xl border border-slate-800 focus:border-amber-500/50 outline-none resize-none max-h-32 min-h-[56px] shadow-xl"
+./components/AIChat.tsx:163:            className={`absolute left-2 bottom-2 p-3 rounded-full transition-all ${
+./App.tsx:210:            clone.classList.add('block', 'absolute', 'top-0', 'left-0', 'z-[-1]', 'bg-white');
+./App.tsx:363:    <div className="w-full flex-1 min-h-0 flex flex-col max-w-lg md:max-w-3xl lg:max-w-4xl xl:max-w-5xl mx-auto bg-slate-950/20 md:bg-slate-950/45 md:h-[calc(100vh-3rem)] md:flex-none md:my-6 md:rounded-[3rem] md:border md:border-white/10 md:shadow-[0_25px_60px_rgba(0,0,0,0.8)] backdrop-blur-3xl transition-all overflow-hidden relative border-x border-white/5 print:block print:bg-white print:max-w-none print:h-auto print:overflow-visible">
+./App.tsx:390:                <div className="flex-1 overflow-hidden mask-gradient-x py-2 -my-2">
+./App.tsx:396:                            {isActive && <div className="absolute inset-0 rounded-full bg-gradient-to-br from-white/30 to-transparent opacity-50 pointer-events-none" />}
+./App.tsx:533:                className="absolute top-0 -translate-y-[20%] left-1/2 -translate-x-1/2 w-16 h-16 bg-amber-500 text-slate-950 rounded-[2rem] shadow-[0_15px_40px_rgba(245,158,11,0.5)] flex items-center justify-center z-50 border-[6px] border-slate-950 active:scale-90 transition-all hover:scale-110 pointer-events-auto"
+./App.tsx:557:    <div className={`p-2.5 rounded-2xl transition-all duration-300 ${active ? 'bg-amber-500 text-slate-900 translate-y-[-12px] shadow-[0_10px_20px_rgba(245,158,11,0.3)] scale-110' : 'group-hover:bg-white/5'}`}>
+./App.tsx:560:    <span className={`text-[9px] font-bold transition-all duration-300 ${active ? 'opacity-100 translate-y-[-8px]' : 'opacity-0 scale-0 h-0'}`}>{label}</span>
+./index.html:35:            height: 100dvh; 
+./index.html:67:            position: fixed;
+./index.html:74:            position: absolute;
+./index.html:96:        .bottom-nav-safe {
+./index.html:145:            .aurora-bg, header, nav, .glass-effect, .no-print, button, select, input, .fixed { 
+./index.html:160:                position: absolute !important;
+./public/logo.svg:5:      <stop offset="0%" stop-color="#fbbf24" />
+./public/logo.svg:6:      <stop offset="50%" stop-color="#d97706" />
+./public/logo.svg:7:      <stop offset="100%" stop-color="#b45309" />
+./public/logo.svg:10:      <stop offset="0%" stop-color="#0f172a" />
+./public/logo.svg:11:      <stop offset="100%" stop-color="#020617" />
+./utils/exportHelper.ts:26:    clone.style.position = 'absolute';
+./package-lock.json:2749:      "deprecated": "Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me",
+./package-lock.json:2833:      "deprecated": "Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me",
+./package-lock.json:3986:      "deprecated": "Old versions of tar are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me",

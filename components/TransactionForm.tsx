@@ -67,43 +67,43 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, wallets, 
   };
 
   return (
-    <div className="fixed inset-0 bg-slate-950/98 backdrop-blur-3xl flex items-end justify-center z-[100] p-0 sm:p-4 animate-fade no-print">
-      <div className="bg-slate-900 w-full max-w-lg rounded-t-[3.5rem] sm:rounded-[4rem] p-6 sm:p-10 shadow-2xl relative max-h-[96vh] overflow-y-auto no-scrollbar border-t border-white/5">
+    <div className="fixed inset-0 bg-slate-950/98 backdrop-blur-3xl flex flex-col justify-end z-[100] sm:p-4 animate-fade no-print">
+      <div className="bg-slate-900 w-full max-w-lg mx-auto sm:rounded-[4rem] rounded-t-[2.5rem] p-6 sm:p-10 shadow-2xl relative max-h-[96vh] flex flex-col min-h-0 border-t border-white/5">
         
-        <div className="absolute top-4 left-1/2 -translate-x-1/2 w-14 h-1.5 bg-slate-800 rounded-full" />
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 w-14 h-1.5 bg-slate-800 rounded-full shrink-0" />
 
-        <div className="flex justify-between items-center mb-8 pt-4">
-          <h3 className="text-2xl font-black text-white">{initialData ? 'تعديل العملية' : 'إضافة عملية'}</h3>
-          <button onClick={onClose} className="p-3.5 bg-slate-800 rounded-2xl text-slate-500 border border-white/5 active:scale-90 transition-transform">
+        <div className="flex justify-between items-center mb-6 pt-4 shrink-0">
+          <h3 className="text-xl sm:text-2xl font-black text-white">{initialData ? 'تعديل العملية' : 'إضافة عملية'}</h3>
+          <button onClick={onClose} className="p-3 bg-slate-800 rounded-2xl text-slate-500 border border-white/5 active:scale-90 transition-transform">
             <X size={20} />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-8">
+        <form onSubmit={handleSubmit} className="flex flex-col gap-6 overflow-y-auto no-scrollbar pb-[env(safe-area-inset-bottom)]">
           
-          <div className="flex bg-slate-950 p-2 rounded-[2.5rem] border border-white/5">
-            <button type="button" onClick={() => setType('expense')} className={`flex-1 py-4 rounded-[2rem] font-black text-[11px] uppercase tracking-widest transition-all ${type === 'expense' ? 'bg-slate-800 text-rose-500 shadow-xl' : 'text-slate-600'}`}>مصروف</button>
-            <button type="button" onClick={() => setType('income')} className={`flex-1 py-4 rounded-[2rem] font-black text-[11px] uppercase tracking-widest transition-all ${type === 'income' ? 'bg-slate-800 text-emerald-500 shadow-xl' : 'text-slate-600'}`}>وارد</button>
+          <div className="flex bg-slate-950 p-2 rounded-[2rem] border border-white/5 shrink-0">
+            <button type="button" onClick={() => setType('expense')} className={`flex-1 py-3 rounded-[1.5rem] font-black text-[10px] uppercase tracking-widest transition-all ${type === 'expense' ? 'bg-slate-800 text-rose-500 shadow-xl' : 'text-slate-600'}`}>مصروف</button>
+            <button type="button" onClick={() => setType('income')} className={`flex-1 py-3 rounded-[1.5rem] font-black text-[10px] uppercase tracking-widest transition-all ${type === 'income' ? 'bg-slate-800 text-emerald-500 shadow-xl' : 'text-slate-600'}`}>وارد</button>
           </div>
 
-          <div className="space-y-4">
-            <div className="relative group">
-                <label className="text-[10px] font-black text-slate-500 px-4 mb-2 block uppercase tracking-widest">المبلغ</label>
-                <input 
-                type="number" 
-                inputMode="decimal"
-                value={amount} 
-                onChange={(e) => setAmount(e.target.value)} 
-                placeholder="0.00" 
-                className="w-full text-5xl font-black text-center py-4 bg-transparent border-none outline-none text-white placeholder:opacity-5 transition-all focus:scale-105" 
-                autoFocus 
-                />
-                
-                <div className="absolute right-0 top-1/2 -translate-y-1/2 flex flex-col items-center">
+          <div className="space-y-4 shrink-0">
+            <div className="flex flex-col items-center gap-2 group">
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest content-center">المبلغ</label>
+                <div className="flex items-center justify-center gap-3 w-full">
+                    <input 
+                    type="number" 
+                    inputMode="decimal"
+                    value={amount} 
+                    onChange={(e) => setAmount(e.target.value)} 
+                    placeholder="0.00" 
+                    className="w-1/2 text-4xl sm:text-5xl font-black text-center py-2 bg-transparent border-none outline-none text-white placeholder:opacity-5 transition-all focus:scale-105" 
+                    autoFocus 
+                    />
+                    
                     <select 
                         value={inputCurrency}
                         onChange={(e) => setInputCurrency(e.target.value)}
-                        className="bg-slate-800 text-white text-[10px] font-black rounded-xl p-2 border border-slate-700 outline-none uppercase tracking-wider shadow-lg"
+                        className="bg-slate-800 text-white text-[10px] font-black rounded-xl p-3 border border-slate-700 outline-none uppercase tracking-wider shadow-lg shrink-0"
                     >
                         {DEFAULT_CURRENCIES.map(c => <option key={c.code} value={c.code}>{c.code}</option>)}
                     </select>
@@ -112,21 +112,21 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, wallets, 
 
             {/* تم إزالة حقل التحويل - سيتم الحفظ بالعملة الأصلية لتبقى منفصلة */}
             <div className="text-center">
-                 <p className="text-[10px] text-slate-500 font-bold bg-slate-950/50 py-2 rounded-xl border border-white/5">
+                 <p className="text-[9px] text-slate-500 font-bold bg-slate-950/50 py-2 rounded-xl border border-white/5 inline-block px-4">
                     سيتم حفظ المبلغ بـ <span className="text-amber-500 mx-1">{inputCurrency}</span> بشكل مستقل داخل المحفظة
                  </p>
             </div>
           </div>
 
-          <div className="space-y-4">
-            <label className="text-[10px] font-black text-slate-600 uppercase tracking-widest px-4">المحفظة</label>
-             <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2">
+          <div className="space-y-3 shrink-0">
+            <label className="text-[10px] font-black text-slate-600 uppercase tracking-widest px-2">المحفظة</label>
+             <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2 px-1">
               {wallets.map(w => (
                  <button
                   key={w.id}
                   type="button"
                   onClick={() => setWalletId(w.id)}
-                  className={`shrink-0 px-6 py-3 rounded-2xl border transition-all text-xs font-bold ${walletId === w.id ? 'bg-amber-500 text-slate-900 border-amber-500' : 'bg-slate-950 text-slate-400 border-slate-800'}`}
+                  className={`shrink-0 px-5 py-2.5 rounded-xl border transition-all text-[11px] font-bold ${walletId === w.id ? 'bg-amber-500 text-slate-900 border-amber-500' : 'bg-slate-950 text-slate-400 border-slate-800'}`}
                  >
                    {w.name}
                  </button>
@@ -134,9 +134,9 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, wallets, 
             </div>
           </div>
 
-          <div className="space-y-4">
-            <label className="text-[10px] font-black text-slate-600 uppercase tracking-widest px-4">التصنيف</label>
-            <div className="grid grid-cols-4 gap-4 max-h-56 overflow-y-auto no-scrollbar p-1">
+          <div className="space-y-3 shrink-0">
+            <label className="text-[10px] font-black text-slate-600 uppercase tracking-widest px-2">التصنيف</label>
+            <div className="grid grid-cols-3 sm:grid-cols-4 gap-3 max-h-48 overflow-y-auto no-scrollbar p-1">
               {categories.filter(c => c.type === (type === 'transfer_to_goal' ? 'expense' : type)).map(cat => (
                 <button
                   key={cat.id}

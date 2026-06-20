@@ -47,7 +47,7 @@ const TransactionList: React.FC<TransactionListProps> = ({
   return (
     <div className="space-y-5">
       {showFilters && (
-        <div className="flex bg-slate-50/80 dark:bg-slate-900/80 p-1.5 rounded-[2rem] border border-slate-100 dark:border-slate-800 shadow-sm sticky top-0 z-10 backdrop-blur-xl transition-all">
+        <div className="flex bg-slate-50/80 dark:bg-slate-900/80 p-1.5 rounded-[2rem] border border-slate-100 dark:border-slate-800 shadow-sm z-10 backdrop-blur-xl transition-all">
           {['all', 'expense', 'income'].map((type) => (
             <button
               key={type}

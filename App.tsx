@@ -91,12 +91,16 @@ const App: React.FC = () => {
 
   // PWA states
   const [isUpdateAvailable, setIsUpdateAvailable] = useState(false);
+  const [swRegistration, setSwRegistration] = useState<ServiceWorkerRegistration | null>(null);
   const [installPrompt, setInstallPrompt] = useState<any>(null);
 
   useEffect(() => {
-    const handleUpdate = () => {
+    const handleUpdate = (e: Event) => {
       console.log("Thari App: PWA update detected on client!");
       setIsUpdateAvailable(true);
+      if (e instanceof CustomEvent && e.detail) {
+        setSwRegistration(e.detail);
+      }
     };
     const handleInstallPrompt = (e: any) => {
       e.preventDefault();
@@ -356,7 +360,7 @@ const App: React.FC = () => {
   if (state.pin && state.isLocked) return <LockScreen savedPin={state.pin} onUnlock={() => setState(p => ({ ...p, isLocked: false }))} />;
 
   return (
-    <div className="w-full max-w-lg md:max-w-3xl lg:max-w-4xl xl:max-w-5xl mx-auto h-full md:h-[calc(100vh-3rem)] md:my-6 md:rounded-[3rem] md:border md:border-white/10 md:shadow-[0_25px_60px_rgba(0,0,0,0.8)] backdrop-blur-3xl flex flex-col bg-slate-950/20 md:bg-slate-950/45 transition-all overflow-hidden relative border-x border-white/5 print:block print:bg-white print:max-w-none print:h-auto print:overflow-visible">
+    <div className="w-full flex-1 flex flex-col min-h-[100dvh] md:min-h-[calc(100vh-3rem)] max-w-lg md:max-w-3xl lg:max-w-4xl xl:max-w-5xl mx-auto bg-slate-950/20 md:bg-slate-950/45 md:my-6 md:rounded-[3rem] md:border md:border-white/10 md:shadow-[0_25px_60px_rgba(0,0,0,0.8)] backdrop-blur-3xl transition-all relative border-x border-white/5 print:block print:bg-white print:max-w-none print:min-h-0">
       
       {/* Hidden Print Report */}
       <FinancialReport 
@@ -371,24 +375,24 @@ const App: React.FC = () => {
         filterCurrency={printCurrencyFilter}
       />
       
-      <div className="flex flex-col h-full print:hidden relative z-20">
-        <header className="px-6 py-6 pt-[calc(var(--sat)+1.5rem)] space-y-4 glass-effect border-b border-white/5 z-30">
+      <div className="flex flex-col flex-1 print:hidden relative z-20 min-h-[100dvh] md:min-h-0">
+        <header className="shrink-0 sticky top-0 px-4 py-4 md:px-6 md:py-6 pt-[calc(var(--sat)+1rem)] space-y-4 glass-effect border-b border-white/5 z-30 backdrop-blur-xl bg-slate-950/80">
           <div className="flex justify-between items-center">
-            <Logo size={42} showText />
-            <div className="flex gap-3">
-              <button onClick={() => setActiveTab('future')} className={`p-3 rounded-2xl border border-white/10 transition-all ${activeTab === 'future' ? 'bg-purple-500 text-slate-950 shadow-[0_0_20px_rgba(168,85,247,0.4)]' : 'text-slate-400 bg-white/5 hover:bg-white/10'}`}><Sparkles size={20} /></button>
-              <button onClick={() => setActiveTab('chat')} className={`p-3 rounded-2xl border border-white/10 transition-all ${activeTab === 'chat' ? 'bg-amber-500 text-slate-950 shadow-[0_0_20px_rgba(245,158,11,0.4)]' : 'text-slate-400 bg-white/5 hover:bg-white/10'}`}><BrainCircuit size={20} /></button>
+            <Logo size={36} showText />
+            <div className="flex gap-2">
+              <button onClick={() => setActiveTab('future')} className={`p-2.5 rounded-2xl border border-white/10 transition-all ${activeTab === 'future' ? 'bg-purple-500 text-slate-950 shadow-[0_0_20px_rgba(168,85,247,0.4)]' : 'text-slate-400 bg-white/5 hover:bg-white/10'}`}><Sparkles size={18} /></button>
+              <button onClick={() => setActiveTab('chat')} className={`p-2.5 rounded-2xl border border-white/10 transition-all ${activeTab === 'chat' ? 'bg-amber-500 text-slate-950 shadow-[0_0_20px_rgba(245,158,11,0.4)]' : 'text-slate-400 bg-white/5 hover:bg-white/10'}`}><BrainCircuit size={18} /></button>
             </div>
           </div>
 
           {activeTab === 'dashboard' && (
             <div className="flex items-center gap-2">
                 <div className="flex-1 overflow-hidden mask-gradient-x py-2 -my-2">
-                    <div className="flex items-center gap-3 w-max animate-marquee-rtl pause px-6">
-                    {[...state.currencies, ...state.currencies].map((curr, index) => {
+                    <div className="flex items-center gap-3 w-max animate-marquee-rtl pause px-6 relative z-10 w-full overflow-x-auto no-scrollbar">
+                    {state.currencies.map((curr, index) => {
                         const isActive = state.currency.code === curr.code;
                         return (
-                        <button key={`${curr.code}-${index}`} onClick={() => setState(p => ({...p, currency: curr}))} className={`relative flex items-center gap-3 pl-5 pr-3 py-3 rounded-full border backdrop-blur-md transition-all duration-500 ${isActive ? 'bg-amber-500 border-amber-400 text-slate-950 shadow-[0_0_25px_rgba(245,158,11,0.5)] scale-105 z-10' : 'bg-slate-800/30 border-white/5 text-slate-400 hover:bg-slate-800 hover:border-white/20 hover:scale-105'}`}>
+                        <button key={`${curr.code}-${index}`} onClick={() => setState(p => ({...p, currency: curr}))} className={`shrink-0 relative flex items-center gap-3 pl-5 pr-3 py-3 rounded-full border backdrop-blur-md transition-all duration-500 ${isActive ? 'bg-amber-500 border-amber-400 text-slate-950 shadow-[0_0_25px_rgba(245,158,11,0.5)] scale-105 z-20' : 'bg-slate-800/30 border-white/5 text-slate-400 hover:bg-slate-800 hover:border-white/20 hover:scale-105'}`}>
                             {isActive && <div className="absolute inset-0 rounded-full bg-gradient-to-br from-white/30 to-transparent opacity-50 pointer-events-none" />}
                             <span className={`text-[10px] font-black uppercase tracking-widest ${isActive ? 'text-slate-900/60' : 'text-slate-500'}`}>{curr.code}</span>
                             <span className="font-bold text-sm whitespace-nowrap">{curr.name}</span>
@@ -398,12 +402,12 @@ const App: React.FC = () => {
                     })}
                     </div>
                 </div>
-                <button onClick={() => setActiveTab('settings')} className="flex items-center justify-center w-12 h-12 rounded-full bg-slate-800/50 border border-slate-700 text-slate-500 hover:text-amber-500 hover:border-amber-500/50 transition-all shrink-0 active:scale-95 backdrop-blur-md shadow-lg z-20"><SettingsIcon size={18} /></button>
+                <button onClick={() => setActiveTab('settings')} className="flex items-center justify-center w-10 h-10 md:w-12 md:h-12 rounded-full bg-slate-800/50 border border-slate-700 text-slate-500 hover:text-amber-500 hover:border-amber-500/50 transition-all shrink-0 active:scale-95 backdrop-blur-md shadow-lg z-20"><SettingsIcon size={18} /></button>
             </div>
           )}
         </header>
 
-        <main className="flex-1 overflow-y-auto no-scrollbar px-6 pb-40 relative">
+        <main className="flex-1 px-4 md:px-5 relative pb-8">
           <div className="py-6 space-y-8">
             {activeTab === 'dashboard' && (
               <div className="space-y-8 md:space-y-0 md:grid md:grid-cols-12 md:gap-6 md:items-start animate-luxury-pop">
@@ -517,25 +521,28 @@ const App: React.FC = () => {
                     onShare={handleShare}
                     installPrompt={installPrompt}
                     isUpdateAvailable={isUpdateAvailable}
+                    swRegistration={swRegistration}
                 />
             )}
           </div>
         </main>
 
-        <button 
-          onClick={() => { setEditingTransaction(null); setShowAddForm(true); }}
-          className="absolute bottom-24 left-1/2 -translate-x-1/2 w-16 h-16 bg-amber-500 text-slate-950 rounded-[2rem] shadow-[0_15px_40px_rgba(245,158,11,0.5)] flex items-center justify-center z-50 border-[6px] border-slate-950 active:scale-90 transition-all hover:scale-110"
-        >
-          <Plus size={32} strokeWidth={4} />
-        </button>
+        <div className="shrink-0 w-full pt-4 pb-[calc(1rem+env(safe-area-inset-bottom))] px-4 md:px-0 flex justify-center mt-auto pointer-events-none sticky bottom-0 z-40 bg-gradient-to-t from-slate-950/80 via-slate-950/40 to-transparent">
+            <nav className="pointer-events-auto w-full md:max-w-xl bg-slate-900/95 backdrop-blur-2xl border border-white/10 flex items-center justify-between px-2 py-2 rounded-[2rem] shadow-[0_20px_40px_rgba(0,0,0,0.5)]">
+                <NavButton icon={<LayoutDashboard />} label="الرئيسية" active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} />
+                <NavButton icon={<Scale />} label="زكاتي" active={activeTab === 'zakat'} onClick={() => setActiveTab('zakat')} />
+                
+                <button 
+                  onClick={() => { setEditingTransaction(null); setShowAddForm(true); }}
+                  className="w-14 h-14 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-[1.5rem] shadow-[0_10px_20px_rgba(245,158,11,0.4)] flex items-center justify-center z-50 border-[4px] border-slate-900 active:scale-95 transition-all mx-1 shrink-0"
+                >
+                  <Plus size={28} strokeWidth={4} />
+                </button>
 
-        <nav className="absolute bottom-6 left-6 right-6 md:left-1/2 md:right-auto md:-translate-x-1/2 md:w-full md:max-w-md bg-slate-900/90 backdrop-blur-2xl border border-white/10 flex justify-around p-3 pb-3 z-40 rounded-[2.5rem] shadow-[0_20px_40px_rgba(0,0,0,0.5)]">
-          <NavButton icon={<LayoutDashboard />} label="الرئيسية" active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} />
-          <NavButton icon={<Scale />} label="زكاتي" active={activeTab === 'zakat'} onClick={() => setActiveTab('zakat')} />
-          <div className="w-12" />
-          <NavButton icon={<HandCoins />} label="ديون" active={activeTab === 'debts'} onClick={() => setActiveTab('debts')} />
-          <NavButton icon={<SettingsIcon />} label="المزيد" active={activeTab === 'settings'} onClick={() => setActiveTab('settings')} />
-        </nav>
+                <NavButton icon={<HandCoins />} label="ديون" active={activeTab === 'debts'} onClick={() => setActiveTab('debts')} />
+                <NavButton icon={<SettingsIcon />} label="المزيد" active={activeTab === 'settings'} onClick={() => setActiveTab('settings')} />
+            </nav>
+        </div>
 
         {showAddForm && (
             <TransactionForm categories={state.categories} wallets={state.wallets} onSubmit={handleSubmitTransaction} onClose={() => { setShowAddForm(false); setEditingTransaction(null); }} initialData={editingTransaction} exchangeRates={state.exchangeRates} />
@@ -547,11 +554,11 @@ const App: React.FC = () => {
 };
 
 const NavButton = ({ icon, label, active, onClick }: { icon: any, label: string, active: boolean, onClick: () => void }) => (
-  <button onClick={onClick} className={`flex flex-col items-center gap-1 transition-all flex-1 group ${active ? 'text-amber-500' : 'text-slate-500'}`}>
-    <div className={`p-2.5 rounded-2xl transition-all duration-300 ${active ? 'bg-amber-500 text-slate-900 translate-y-[-12px] shadow-[0_10px_20px_rgba(245,158,11,0.3)] scale-110' : 'group-hover:bg-white/5'}`}>
-        {React.cloneElement(icon, { size: active ? 24 : 22, strokeWidth: active ? 2.5 : 2 })}
+  <button onClick={onClick} className={`flex flex-col items-center justify-center gap-1 transition-all flex-1 min-w-[60px] group ${active ? 'text-amber-500' : 'text-slate-500'}`}>
+    <div className={`p-2 rounded-xl transition-all duration-300 ${active ? 'bg-amber-500/10 text-amber-500' : 'group-hover:bg-white/5'}`}>
+        {React.cloneElement(icon, { size: 24, strokeWidth: active ? 2.5 : 2 })}
     </div>
-    <span className={`text-[9px] font-bold transition-all duration-300 ${active ? 'opacity-100 translate-y-[-8px]' : 'opacity-0 scale-0 h-0'}`}>{label}</span>
+    <span className={`text-[10px] font-bold transition-all duration-300 ${active ? 'opacity-100' : 'opacity-70'}`}>{label}</span>
   </button>
 );
 

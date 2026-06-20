@@ -17,7 +17,15 @@ const startApp = () => {
 
   // Progressive Web App (PWA) Service Worker Registration
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js')
+    let refreshing = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (!refreshing) {
+        refreshing = true;
+        window.location.reload();
+      }
+    });
+
+    navigator.serviceWorker.register('/sw.js')
       .then((reg) => {
         console.info('Thari SW: Service Worker registered, scope:', reg.scope);
         
@@ -28,7 +36,7 @@ const startApp = () => {
               if (installingWorker.state === 'installed') {
                 if (navigator.serviceWorker.controller) {
                   console.info('Thari SW: New update found. Will display notice.');
-                  window.dispatchEvent(new CustomEvent('pwa-update-available'));
+                  window.dispatchEvent(new CustomEvent('pwa-update-available', { detail: reg }));
                 } else {
                   console.info('Thari SW: Offline caching complete!');
                 }

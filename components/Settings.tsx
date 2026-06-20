@@ -125,6 +125,7 @@ interface SettingsProps {
   // PWA optional props
   installPrompt?: any;
   isUpdateAvailable?: boolean;
+  swRegistration?: ServiceWorkerRegistration | null;
 }
 
 const Settings: React.FC<SettingsProps> = ({ 
@@ -132,7 +133,7 @@ const Settings: React.FC<SettingsProps> = ({
   onAddCurrency, onRemoveCurrency, onAddWallet, onUpdateWallet, onRemoveWallet,
   onAddCategory, onUpdateCategory, onRemoveCategory,
   onRestore, onClearData, onShowPrivacyPolicy, onPrint, onShare,
-  installPrompt = null, isUpdateAvailable = false
+  installPrompt = null, isUpdateAvailable = false, swRegistration = null
 }) => {
   const safeCurrencies = currencies || [];
   const safeWallets = wallets || [];
@@ -187,6 +188,14 @@ const Settings: React.FC<SettingsProps> = ({
   const [categoryData, setCategoryData] = useState({ name: '', icon: ICONS[0], color: COLORS[0], type: 'expense' as 'income' | 'expense' });
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleUpdateClick = () => {
+    if (swRegistration && swRegistration.waiting) {
+      swRegistration.waiting.postMessage({ type: 'SKIP_WAITING' });
+    } else {
+      window.location.reload();
+    }
+  };
 
   const handleInstallClick = async () => {
     if (!installPrompt) return;
@@ -639,7 +648,7 @@ const Settings: React.FC<SettingsProps> = ({
                  <p className="text-[10px] text-slate-400 font-bold leading-relaxed">يتوفر إصدار فوري حديث لتطبيق ثري مع ميزات أفضل.</p>
               </div>
            </div>
-           <button onClick={() => window.location.reload()} className="px-5 py-2.5 bg-amber-500 text-slate-950 font-black text-xs rounded-xl active:scale-95 transition-all shrink-0 shadow-lg shadow-amber-500/10">تحديث الآن</button>
+           <button onClick={handleUpdateClick} className="px-5 py-2.5 bg-amber-500 text-slate-950 font-black text-xs rounded-xl active:scale-95 transition-all shrink-0 shadow-lg shadow-amber-500/10">تحديث الآن</button>
         </div>
       )}
 
