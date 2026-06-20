@@ -89,6 +89,31 @@ const App: React.FC = () => {
   // Wallet Filter State (null = All Wallets)
   const [selectedWalletId, setSelectedWalletId] = useState<string | null>(null);
 
+  // PWA states
+  const [isUpdateAvailable, setIsUpdateAvailable] = useState(false);
+  const [installPrompt, setInstallPrompt] = useState<any>(null);
+
+  useEffect(() => {
+    const handleUpdate = () => {
+      console.log("Thari App: PWA update detected on client!");
+      setIsUpdateAvailable(true);
+    };
+    const handleInstallPrompt = (e: any) => {
+      e.preventDefault();
+      setInstallPrompt(e);
+    };
+
+    window.dispatchEvent(new CustomEvent('pwa-check-status'));
+
+    window.addEventListener('pwa-update-available', handleUpdate);
+    window.addEventListener('beforeinstallprompt', handleInstallPrompt);
+
+    return () => {
+      window.removeEventListener('pwa-update-available', handleUpdate);
+      window.removeEventListener('beforeinstallprompt', handleInstallPrompt);
+    };
+  }, []);
+
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   }, [state]);
@@ -331,7 +356,7 @@ const App: React.FC = () => {
   if (state.pin && state.isLocked) return <LockScreen savedPin={state.pin} onUnlock={() => setState(p => ({ ...p, isLocked: false }))} />;
 
   return (
-    <div className="w-full max-w-lg mx-auto h-full flex flex-col bg-transparent transition-all overflow-hidden relative border-x border-white/5 print:block print:bg-white print:max-w-none print:h-auto print:overflow-visible">
+    <div className="w-full max-w-lg md:max-w-3xl lg:max-w-4xl xl:max-w-5xl mx-auto h-full md:h-[calc(100vh-3rem)] md:my-6 md:rounded-[3rem] md:border md:border-white/10 md:shadow-[0_25px_60px_rgba(0,0,0,0.8)] backdrop-blur-3xl flex flex-col bg-slate-950/20 md:bg-slate-950/45 transition-all overflow-hidden relative border-x border-white/5 print:block print:bg-white print:max-w-none print:h-auto print:overflow-visible">
       
       {/* Hidden Print Report */}
       <FinancialReport 
@@ -381,60 +406,69 @@ const App: React.FC = () => {
         <main className="flex-1 overflow-y-auto no-scrollbar px-6 pb-40 relative">
           <div className="py-6 space-y-8">
             {activeTab === 'dashboard' && (
-              <>
-                <div className="flex gap-3 overflow-x-auto no-scrollbar py-1">
-                    <button 
-                        onClick={() => handleSelectWallet(null)}
-                        className={`shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-2xl border transition-all ${!selectedWalletId ? 'bg-white text-slate-900 border-white' : 'bg-slate-800/50 border-slate-700 text-slate-400'}`}
-                    >
-                        <LayoutDashboard size={16} />
-                        <span className="text-xs font-black">كل المحافظ</span>
-                    </button>
-                    {state.wallets.map(w => (
-                        <button 
-                            key={w.id}
-                            onClick={() => handleSelectWallet(w.id)}
-                            className={`shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-2xl border transition-all ${selectedWalletId === w.id ? 'bg-amber-500 text-slate-900 border-amber-500 shadow-lg shadow-amber-500/20' : 'bg-slate-800/50 border-slate-700 text-slate-400'}`}
-                        >
-                            <div className="w-2 h-2 rounded-full" style={{backgroundColor: w.color}} />
-                            <span className="text-xs font-black">{w.name}</span>
-                            {selectedWalletId === w.id && <Check size={14} />}
-                        </button>
-                    ))}
+              <div className="space-y-8 md:space-y-0 md:grid md:grid-cols-12 md:gap-6 md:items-start animate-luxury-pop">
+                {/* Wallets scroll stays top wide */}
+                <div className="md:col-span-12 flex gap-3 overflow-x-auto no-scrollbar py-1">
+                     <button 
+                         onClick={() => handleSelectWallet(null)}
+                         className={`shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-2xl border transition-all ${!selectedWalletId ? 'bg-white text-slate-900 border-white' : 'bg-slate-800/50 border-slate-700 text-slate-400'}`}
+                     >
+                         <LayoutDashboard size={16} />
+                         <span className="text-xs font-black">كل المحافظ</span>
+                     </button>
+                     {state.wallets.map(w => (
+                         <button 
+                             key={w.id}
+                             onClick={() => handleSelectWallet(w.id)}
+                             className={`shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-2xl border transition-all ${selectedWalletId === w.id ? 'bg-amber-500 text-slate-900 border-amber-500 shadow-lg shadow-amber-500/20' : 'bg-slate-800/50 border-slate-700 text-slate-400'}`}
+                         >
+                             <div className="w-2 h-2 rounded-full" style={{backgroundColor: w.color}} />
+                             <span className="text-xs font-black">{w.name}</span>
+                             {selectedWalletId === w.id && <Check size={14} />}
+                         </button>
+                     ))}
                 </div>
 
-                <SmartAlerts budgets={state.budgets} transactions={filteredTransactions} debts={state.debts} subscriptions={state.subscriptions} categories={state.categories} />
-                
-                {/* Updated Balance Card receiving currency breakdown */}
-                <BalanceCard 
-                    totalBalance={totals.balance} 
-                    totalIncome={totals.income} 
-                    totalExpense={totals.expense} 
-                    symbol={state.currency.symbol}
-                    balances={totals.currencyBreakdown}
-                    expenseBreakdown={totals.expenseBreakdown}
-                    showSeparateCurrencies={state.showSeparateCurrencies}
-                />
-                
-                <section className="space-y-4">
-                  <div className="flex justify-between items-center px-2">
-                    <h3 className="text-[9px] font-black text-slate-500 uppercase flex items-center gap-2 tracking-[0.2em]"><History size={12} /> {selectedWalletId ? 'سجل المحفظة المختارة' : 'أحدث العمليات (الكل)'}</h3>
-                    <button onClick={() => setActiveTab('transactions')} className="text-amber-500 text-[9px] font-black uppercase flex items-center gap-1">عرض الكل <ArrowRight size={10} className="rotate-180" /></button>
-                  </div>
-                  <TransactionList transactions={filteredTransactions.slice(0, 5)} categories={state.categories} wallets={state.wallets} onDelete={(id) => setState(p => ({ ...p, transactions: p.transactions.filter(t => t.id !== id) }))} onEdit={handleEditTransaction} currencySymbol={state.currency.symbol} />
-                </section>
-                
-                <div className="grid grid-cols-2 gap-3">
-                    <button onClick={() => setActiveTab('goals')} className="p-6 bg-slate-900 border border-slate-800 rounded-[2.5rem] flex flex-col items-center gap-3 hover:bg-slate-800 transition-colors shadow-xl">
-                        <div className="w-12 h-12 bg-amber-500/10 rounded-2xl flex items-center justify-center text-amber-500"><Coins size={24} /></div>
-                        <span className="text-[10px] font-black text-white uppercase tracking-widest">الأهداف المالية</span>
-                    </button>
-                     <button onClick={() => setActiveTab('budgets')} className="p-6 bg-slate-900 border border-slate-800 rounded-[2.5rem] flex flex-col items-center gap-3 hover:bg-slate-800 transition-colors shadow-xl">
-                        <div className="w-12 h-12 bg-blue-500/10 rounded-2xl flex items-center justify-center text-blue-500"><LayoutDashboard size={24} /></div>
-                        <span className="text-[10px] font-black text-white uppercase tracking-widest">إدارة الميزانية</span>
-                    </button>
+                <div className="md:col-span-12">
+                   <SmartAlerts budgets={state.budgets} transactions={filteredTransactions} debts={state.debts} subscriptions={state.subscriptions} categories={state.categories} />
                 </div>
-              </>
+
+                {/* Left Column on Widescreen */}
+                <div className="col-span-12 md:col-span-6 space-y-6">
+                    {/* Updated Balance Card receiving currency breakdown */}
+                    <BalanceCard 
+                        totalBalance={totals.balance} 
+                        totalIncome={totals.income} 
+                        totalExpense={totals.expense} 
+                        symbol={state.currency.symbol}
+                        balances={totals.currencyBreakdown}
+                        expenseBreakdown={totals.expenseBreakdown}
+                        showSeparateCurrencies={state.showSeparateCurrencies}
+                    />
+                    
+                    <div className="grid grid-cols-2 gap-3">
+                        <button onClick={() => setActiveTab('goals')} className="p-6 bg-slate-900 border border-slate-800 rounded-[2.5rem] flex flex-col items-center gap-3 hover:bg-slate-800 transition-colors shadow-xl">
+                            <div className="w-12 h-12 bg-amber-500/10 rounded-2xl flex items-center justify-center text-amber-500"><Coins size={24} /></div>
+                            <span className="text-[10px] font-black text-white uppercase tracking-widest text-center">الأهداف المالية</span>
+                        </button>
+                         <button onClick={() => setActiveTab('budgets')} className="p-6 bg-slate-900 border border-slate-800 rounded-[2.5rem] flex flex-col items-center gap-3 hover:bg-slate-800 transition-colors shadow-xl">
+                            <div className="w-12 h-12 bg-blue-500/10 rounded-2xl flex items-center justify-center text-blue-500"><LayoutDashboard size={24} /></div>
+                            <span className="text-[10px] font-black text-white uppercase tracking-widest text-center">إدارة الميزانية</span>
+                        </button>
+                    </div>
+                </div>
+
+                {/* Right Column on Widescreen */}
+                <div className="col-span-12 md:col-span-6 space-y-6">
+                    <section className="space-y-4">
+                      <div className="flex justify-between items-center px-2">
+                        <h3 className="text-[9px] font-black text-slate-500 uppercase flex items-center gap-2 tracking-[0.2em]"><History size={12} /> {selectedWalletId ? 'سجل المحفظة المختارة' : 'أحدث العمليات'}</h3>
+                        <button onClick={() => setActiveTab('transactions')} className="text-amber-500 text-[9px] font-black uppercase flex items-center gap-1">عرض الكل <ArrowRight size={10} className="rotate-180" /></button>
+                      </div>
+                      <TransactionList transactions={filteredTransactions.slice(0, 5)} categories={state.categories} wallets={state.wallets} onDelete={(id) => setState(p => ({ ...p, transactions: p.transactions.filter(t => t.id !== id) }))} onEdit={handleEditTransaction} currencySymbol={state.currency.symbol} />
+                    </section>
+                </div>
+              </div>
             )}
             
             {activeTab === 'future' && <FinancialSimulation transactions={filteredTransactions} currencySymbol={state.currency.symbol} apiKey={state.apiKey} />}
@@ -481,6 +515,8 @@ const App: React.FC = () => {
                     onShowPrivacyPolicy={() => setShowPrivacyPolicy(false)} 
                     onPrint={handlePrint}
                     onShare={handleShare}
+                    installPrompt={installPrompt}
+                    isUpdateAvailable={isUpdateAvailable}
                 />
             )}
           </div>
@@ -488,12 +524,12 @@ const App: React.FC = () => {
 
         <button 
           onClick={() => { setEditingTransaction(null); setShowAddForm(true); }}
-          className="fixed bottom-[calc(var(--sab)+6rem)] left-1/2 -translate-x-1/2 w-16 h-16 bg-amber-500 text-slate-950 rounded-[2rem] shadow-[0_15px_40px_rgba(245,158,11,0.5)] flex items-center justify-center z-50 border-[6px] border-slate-950 active:scale-90 transition-all hover:scale-110"
+          className="absolute bottom-24 left-1/2 -translate-x-1/2 w-16 h-16 bg-amber-500 text-slate-950 rounded-[2rem] shadow-[0_15px_40px_rgba(245,158,11,0.5)] flex items-center justify-center z-50 border-[6px] border-slate-950 active:scale-90 transition-all hover:scale-110"
         >
           <Plus size={32} strokeWidth={4} />
         </button>
 
-        <nav className="fixed bottom-6 left-4 right-4 max-w-[calc(32rem-2rem)] mx-auto bg-slate-900/90 backdrop-blur-2xl border border-white/10 flex justify-around p-3 pb-3 z-40 rounded-[2.5rem] shadow-[0_20px_40px_rgba(0,0,0,0.5)]">
+        <nav className="absolute bottom-6 left-6 right-6 md:left-1/2 md:right-auto md:-translate-x-1/2 md:w-full md:max-w-md bg-slate-900/90 backdrop-blur-2xl border border-white/10 flex justify-around p-3 pb-3 z-40 rounded-[2.5rem] shadow-[0_20px_40px_rgba(0,0,0,0.5)]">
           <NavButton icon={<LayoutDashboard />} label="الرئيسية" active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} />
           <NavButton icon={<Scale />} label="زكاتي" active={activeTab === 'zakat'} onClick={() => setActiveTab('zakat')} />
           <div className="w-12" />

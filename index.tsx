@@ -14,9 +14,36 @@ const startApp = () => {
   );
   
   console.info("Thari App: Successfully Initialized.");
+
+  // Progressive Web App (PWA) Service Worker Registration
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js')
+      .then((reg) => {
+        console.info('Thari SW: Service Worker registered, scope:', reg.scope);
+        
+        reg.onupdatefound = () => {
+          const installingWorker = reg.installing;
+          if (installingWorker) {
+            installingWorker.onstatechange = () => {
+              if (installingWorker.state === 'installed') {
+                if (navigator.serviceWorker.controller) {
+                  console.info('Thari SW: New update found. Will display notice.');
+                  window.dispatchEvent(new CustomEvent('pwa-update-available'));
+                } else {
+                  console.info('Thari SW: Offline caching complete!');
+                }
+              }
+            };
+          }
+        };
+      })
+      .catch((err) => {
+        console.error('Thari SW: Registration failed:', err);
+      });
+  }
 };
 
-// تشغيل فوري لضمان عدم حدوث تأخير في عرض الواجهة
+// Start app instantly to ensure minimal delays
 if (document.readyState === 'complete' || document.readyState === 'interactive') {
   startApp();
 } else {

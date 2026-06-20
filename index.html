@@ -7,16 +7,19 @@
     <meta name="theme-color" content="#020617">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://generativelanguage.googleapis.com https://cdn.tailwindcss.com https://esm.sh; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://generativelanguage.googleapis.com https://esm.sh; img-src 'self' data: blob:;">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://generativelanguage.googleapis.com https://cdn.tailwindcss.com https://esm.sh; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://generativelanguage.googleapis.com https://esm.sh; img-src 'self' data: blob:; worker-src 'self' blob:; manifest-src 'self';">
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="manifest.json">
     
     <!-- Favicon -->
-    <link rel="icon" type="image/svg+xml" href="/public/logo.svg">
-    <link rel="apple-touch-icon" href="/public/logo.svg">
+    <link rel="icon" type="image/svg+xml" href="logo.svg">
+    <link rel="apple-touch-icon" href="logo.svg">
     
     <title>Thari - ثري</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     
     <style>
         :root { 
@@ -25,7 +28,7 @@
         }
         
         body { 
-            font-family: 'IBM Plex Sans Arabic', sans-serif; 
+            font-family: 'Cairo', sans-serif; 
             background-color: #020617; 
             color: #f8fafc; 
             margin: 0; 
@@ -45,8 +48,15 @@
             width: 100%; 
             display: flex; 
             justify-content: center; 
+            align-items: stretch;
             position: relative;
             z-index: 10;
+        }
+        @media (min-width: 768px) {
+            #root {
+                align-items: center;
+                background: radial-gradient(circle at center, rgba(15, 23, 42, 0.4) 0%, rgba(2, 6, 23, 0.9) 100%);
+            }
         }
 
         /* Luxury Aurora Background - Subtle */

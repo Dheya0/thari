@@ -121,13 +121,18 @@ interface SettingsProps {
   onShowPrivacyPolicy: () => void;
   onPrint?: (type: 'summary' | 'detailed', currencyFilter?: string | null) => void;
   onShare?: (type: 'summary' | 'detailed', currencyFilter?: string | null) => void;
+  
+  // PWA optional props
+  installPrompt?: any;
+  isUpdateAvailable?: boolean;
 }
 
 const Settings: React.FC<SettingsProps> = ({ 
   userName = '', pin = '', currency, currencies, wallets, categories, apiKey = '', exchangeRates = {}, appState = {}, onUpdateSettings, 
   onAddCurrency, onRemoveCurrency, onAddWallet, onUpdateWallet, onRemoveWallet,
   onAddCategory, onUpdateCategory, onRemoveCategory,
-  onRestore, onClearData, onShowPrivacyPolicy, onPrint, onShare
+  onRestore, onClearData, onShowPrivacyPolicy, onPrint, onShare,
+  installPrompt = null, isUpdateAvailable = false
 }) => {
   const safeCurrencies = currencies || [];
   const safeWallets = wallets || [];
@@ -182,6 +187,17 @@ const Settings: React.FC<SettingsProps> = ({
   const [categoryData, setCategoryData] = useState({ name: '', icon: ICONS[0], color: COLORS[0], type: 'expense' as 'income' | 'expense' });
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleInstallClick = async () => {
+    if (!installPrompt) return;
+    try {
+      installPrompt.prompt();
+      const { outcome } = await installPrompt.userChoice;
+      console.log(`User response to install choice: ${outcome}`);
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
   const showToast = (message: string, type: 'success' | 'error' = 'success') => {
     setToast({ message, type });
@@ -612,6 +628,33 @@ const Settings: React.FC<SettingsProps> = ({
         <h3 className="font-black text-white text-lg">الإعدادات العامة</h3>
         <button onClick={handleSaveProfile} className="bg-amber-500 text-slate-950 px-8 py-3 rounded-2xl font-black text-sm active:scale-95 transition-all shadow-lg shadow-amber-500/10">حفظ</button>
       </div>
+
+      {/* PWA Section */}
+      {isUpdateAvailable && (
+        <div className="bg-gradient-to-br from-amber-500/20 to-orange-500/20 p-5 rounded-[2.5rem] border border-amber-500/30 flex items-center justify-between gap-4 shadow-xl">
+           <div className="flex gap-3 items-center">
+              <RefreshCw size={24} className="text-amber-500 animate-spin shrink-0" style={{ animationDuration: '3s' }} />
+              <div>
+                 <p className="text-xs font-black text-white">تحديث جديد متاح!</p>
+                 <p className="text-[10px] text-slate-400 font-bold leading-relaxed">يتوفر إصدار فوري حديث لتطبيق ثري مع ميزات أفضل.</p>
+              </div>
+           </div>
+           <button onClick={() => window.location.reload()} className="px-5 py-2.5 bg-amber-500 text-slate-950 font-black text-xs rounded-xl active:scale-95 transition-all shrink-0 shadow-lg shadow-amber-500/10">تحديث الآن</button>
+        </div>
+      )}
+
+      {installPrompt && (
+        <div className="bg-gradient-to-br from-indigo-500/10 to-blue-500/10 p-5 rounded-[2.5rem] border border-indigo-500/20 flex items-center justify-between gap-4 shadow-xl">
+           <div className="flex gap-3 items-center">
+              <Sparkles size={24} className="text-indigo-400 shrink-0" />
+              <div>
+                 <p className="text-xs font-black text-white">ثبّت "ثري" على هاتفك</p>
+                 <p className="text-[10px] text-slate-400 font-bold leading-relaxed">استمتع بتجربة تطبيق كاملة وسريعة بدون متصفح لراحتك.</p>
+              </div>
+           </div>
+           <button onClick={handleInstallClick} className="px-5 py-2.5 bg-indigo-500 text-white font-black text-xs rounded-xl active:scale-95 transition-all shrink-0 shadow-lg shadow-indigo-500/25">تثبيت التطبيق</button>
+        </div>
+      )}
 
       <div className="grid grid-cols-2 gap-4">
          <button onClick={() => setActiveSection('wallets')} className="bg-slate-900 p-6 rounded-[2.5rem] border border-slate-800 flex flex-col items-center gap-4 text-white font-bold hover:bg-slate-800 transition-all active:scale-95">

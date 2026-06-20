@@ -1,10 +1,11 @@
 {
   "name": "Thari",
-  "description": "A comprehensive personal finance tracker with AI-driven insights, budgeting, and detailed analytics for iOS and Android.",
+  "description": "تطبيق ثري المحاسبي الذكي لإدارة الأموال، تخطيط الميزانيات، وتتبع الأهداف المالية مع ذكاء اصطناعي تفاعلي لإدارة الوفرة المالية.",
   "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"],
   "ios": {
     "bundleId": "com.thari.finance.app",
-    "version": "1.1.0",
+    "version": "1.2.0",
     "displayName": "Thari"
   }
 }
