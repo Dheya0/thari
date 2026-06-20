@@ -360,7 +360,7 @@ const App: React.FC = () => {
   if (state.pin && state.isLocked) return <LockScreen savedPin={state.pin} onUnlock={() => setState(p => ({ ...p, isLocked: false }))} />;
 
   return (
-    <div className="w-full flex-1 flex flex-col min-h-[100dvh] md:min-h-[calc(100vh-3rem)] max-w-lg md:max-w-3xl lg:max-w-4xl xl:max-w-5xl mx-auto bg-slate-950/20 md:bg-slate-950/45 md:my-6 md:rounded-[3rem] md:border md:border-white/10 md:shadow-[0_25px_60px_rgba(0,0,0,0.8)] backdrop-blur-3xl transition-all relative border-x border-white/5 print:block print:bg-white print:max-w-none print:min-h-0">
+    <div className="w-full h-full flex flex-col max-w-lg md:max-w-3xl lg:max-w-4xl xl:max-w-5xl mx-auto bg-slate-950/20 md:bg-slate-950/45 md:h-[calc(100%-3rem)] md:my-6 md:rounded-[3rem] md:border md:border-white/10 md:shadow-[0_25px_60px_rgba(0,0,0,0.8)] backdrop-blur-3xl transition-all relative border-x border-white/5 print:block print:bg-white print:max-w-none print:h-auto overflow-hidden">
       
       {/* Hidden Print Report */}
       <FinancialReport 
@@ -375,8 +375,8 @@ const App: React.FC = () => {
         filterCurrency={printCurrencyFilter}
       />
       
-      <div className="flex flex-col flex-1 print:hidden relative z-20 min-h-[100dvh] md:min-h-0">
-        <header className="shrink-0 sticky top-0 px-4 py-4 md:px-6 md:py-6 pt-[calc(var(--sat)+1rem)] space-y-4 glass-effect border-b border-white/5 z-30 backdrop-blur-xl bg-slate-950/80">
+      <div className="flex flex-col flex-1 h-full min-h-0 print:hidden relative z-20">
+        <header className="shrink-0 px-4 py-4 md:px-6 md:py-6 pt-[calc(var(--sat)+1rem)] space-y-4 glass-effect border-b border-white/5 z-30 backdrop-blur-xl bg-slate-950/80">
           <div className="flex justify-between items-center">
             <Logo size={36} showText />
             <div className="flex gap-2">
@@ -387,8 +387,8 @@ const App: React.FC = () => {
 
           {activeTab === 'dashboard' && (
             <div className="flex items-center gap-2">
-                <div className="flex-1 overflow-hidden mask-gradient-x py-2 -my-2">
-                    <div className="flex items-center gap-3 w-max animate-marquee-rtl pause px-6 relative z-10 w-full overflow-x-auto no-scrollbar">
+                <div className="flex-1 overflow-hidden mask-gradient-x py-2 -my-2 flex">
+                    <div className="flex items-center gap-3 px-6 relative z-10 w-full overflow-x-auto no-scrollbar">
                     {state.currencies.map((curr, index) => {
                         const isActive = state.currency.code === curr.code;
                         return (
@@ -407,7 +407,7 @@ const App: React.FC = () => {
           )}
         </header>
 
-        <main className="flex-1 px-4 md:px-5 relative pb-8">
+        <main className="flex-1 overflow-y-auto no-scrollbar overflow-x-hidden px-4 md:px-5 relative pb-[calc(7rem+env(safe-area-inset-bottom))] w-full">
           <div className="py-6 space-y-8">
             {activeTab === 'dashboard' && (
               <div className="space-y-8 md:space-y-0 md:grid md:grid-cols-12 md:gap-6 md:items-start animate-luxury-pop">
@@ -527,7 +527,7 @@ const App: React.FC = () => {
           </div>
         </main>
 
-        <div className="shrink-0 w-full pt-4 pb-[calc(1rem+env(safe-area-inset-bottom))] px-4 md:px-0 flex justify-center mt-auto pointer-events-none sticky bottom-0 z-40 bg-gradient-to-t from-slate-950/80 via-slate-950/40 to-transparent">
+        <div className="absolute bottom-0 left-0 right-0 pt-16 pb-[calc(1rem+env(safe-area-inset-bottom))] px-4 md:px-0 flex justify-center pointer-events-none z-40 bg-gradient-to-t from-slate-950/95 via-slate-950/70 to-transparent">
             <nav className="pointer-events-auto w-full md:max-w-xl bg-slate-900/95 backdrop-blur-2xl border border-white/10 flex items-center justify-between px-2 py-2 rounded-[2rem] shadow-[0_20px_40px_rgba(0,0,0,0.5)]">
                 <NavButton icon={<LayoutDashboard />} label="الرئيسية" active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} />
                 <NavButton icon={<Scale />} label="زكاتي" active={activeTab === 'zakat'} onClick={() => setActiveTab('zakat')} />

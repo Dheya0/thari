@@ -110,26 +110,26 @@ const GoalTracker: React.FC<GoalTrackerProps> = ({ goals, wallets, transactions,
       </div>
 
       {showAdd && (
-        <div className="fixed inset-0 bg-slate-950/95 backdrop-blur-2xl z-[150] flex items-end justify-center p-0 sm:p-4 animate-fade">
-          <div className="bg-slate-900 w-full max-w-md rounded-t-[3.5rem] sm:rounded-[4rem] p-10 shadow-2xl border-t border-white/5 animate-slide-up">
-            <div className="flex justify-between items-center mb-10">
-              <h3 className="text-2xl font-black text-white">هدف مالي جديد</h3>
+        <div className="fixed inset-0 bg-slate-950/95 backdrop-blur-2xl z-[150] flex flex-col justify-end p-0 sm:p-4 animate-fade">
+          <div className="bg-slate-900 w-full max-w-md mx-auto sm:rounded-[4rem] rounded-t-[2.5rem] p-6 sm:p-10 shadow-2xl relative max-h-[96vh] flex flex-col min-h-0 border-t border-white/5 animate-slide-up">
+            <div className="flex justify-between items-center mb-8 shrink-0">
+              <h3 className="text-xl sm:text-2xl font-black text-white">هدف مالي جديد</h3>
               <button onClick={() => setShowAdd(false)} className="p-3 bg-slate-800 rounded-2xl text-slate-500"><Plus className="rotate-45" /></button>
             </div>
-            <div className="space-y-6">
+            <div className="flex flex-col gap-6 overflow-y-auto no-scrollbar pb-[env(safe-area-inset-bottom)] shrink-0">
                <div className="space-y-2">
                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2">ما هو حلمك القادم؟</label>
-                 <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="مثلاً: رحلة الأحلام، سيارة جديدة" className="w-full p-5 rounded-2xl bg-slate-950 text-white font-bold border-none outline-none focus:ring-1 focus:ring-amber-500 shadow-inner" />
+                 <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="مثلاً: رحلة الأحلام، سيارة جديدة" className="w-full p-4 sm:p-5 rounded-2xl bg-slate-950 text-white font-bold border-none outline-none focus:ring-1 focus:ring-amber-500 shadow-inner" />
                </div>
                
-               <div className="grid grid-cols-2 gap-4">
+               <div className="grid grid-cols-2 gap-3 sm:gap-4">
                    <div className="space-y-2">
-                     <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2">المبلغ المستهدف</label>
-                     <input type="number" value={target} onChange={e => setTarget(e.target.value)} placeholder="0.00" className="w-full p-5 rounded-2xl bg-slate-950 text-white font-black border-none outline-none focus:ring-1 focus:ring-amber-500 text-center" />
+                     <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2 text-center block">المبلغ المستهدف</label>
+                     <input type="number" inputMode="decimal" value={target} onChange={e => setTarget(e.target.value)} placeholder="0.00" className="w-full p-4 sm:p-5 rounded-2xl bg-slate-950 text-white font-black border-none outline-none focus:ring-1 focus:ring-amber-500 text-center" />
                    </div>
                    <div className="space-y-2">
-                     <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2">ربط بمحفظة</label>
-                     <select value={selectedWallet} onChange={e => setSelectedWallet(e.target.value)} className="w-full p-5 rounded-2xl bg-slate-950 text-white font-bold border-none outline-none focus:ring-1 focus:ring-amber-500">
+                     <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2 text-center block">ربط بمحفظة</label>
+                     <select value={selectedWallet} onChange={e => setSelectedWallet(e.target.value)} className="w-full p-4 sm:p-5 rounded-2xl bg-slate-950 text-sm text-white font-bold border-none outline-none focus:ring-1 focus:ring-amber-500">
                         {wallets.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
                      </select>
                    </div>
@@ -140,7 +140,7 @@ const GoalTracker: React.FC<GoalTrackerProps> = ({ goals, wallets, transactions,
                    onAddGoal({ name, targetAmount: parseFloat(target), currentAmount: 0, color: '#f59e0b', icon: 'Star', walletId: selectedWallet });
                    setShowAdd(false); setName(''); setTarget('');
                  }
-               }} className="w-full py-6 bg-amber-500 text-slate-950 font-black rounded-[2.2rem] text-lg shadow-xl active:scale-95 transition-all">
+               }} className="w-full mt-4 py-5 bg-amber-500 text-slate-950 font-black rounded-[2rem] text-lg shadow-[0_15px_30px_rgba(245,158,11,0.3)] active:scale-95 transition-all">
                  إنشاء الهدف الآن
                </button>
             </div>

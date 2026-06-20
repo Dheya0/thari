@@ -17,13 +17,15 @@ const ICONS = ['Utensils', 'Car', 'Home', 'Receipt', 'Film', 'HeartPulse', 'Grad
 // --- Reusable Helper Components ---
 // (Same helper components as before: Modal, InputField, ActionButton, ColorPicker, ToastNotification, ConfirmDialog)
 const Modal = ({ title, children, onClose }: { title: string, children?: React.ReactNode, onClose: () => void }) => (
-    <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-2xl z-[400] flex items-end justify-center animate-fade">
-        <div className="bg-slate-900 w-full max-w-lg rounded-t-[3.5rem] p-8 pb-12 shadow-2xl border-t border-slate-800 animate-slide-up overflow-y-auto no-scrollbar max-h-[95vh]">
-            <div className="flex justify-between items-center mb-10">
-                <h3 className="text-2xl font-black text-white tracking-tight">{title}</h3>
+    <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-2xl z-[400] flex flex-col justify-end p-0 sm:p-4 animate-fade">
+        <div className="bg-slate-900 w-full max-w-lg mx-auto sm:rounded-[3.5rem] rounded-t-[2.5rem] p-6 sm:p-8 pb-[calc(2rem+env(safe-area-inset-bottom))] shadow-2xl border-t border-slate-800 animate-slide-up overflow-y-auto no-scrollbar max-h-[96vh] flex flex-col min-h-0">
+            <div className="flex justify-between items-center mb-6 sm:mb-8 shrink-0">
+                <h3 className="text-xl sm:text-2xl font-black text-white tracking-tight">{title}</h3>
                 <button onClick={onClose} className="p-3 bg-slate-800 rounded-2xl text-slate-500 active:scale-90 transition-all"><X size={20} /></button>
             </div>
-            {children}
+            <div className="flex flex-col gap-4 overflow-y-auto no-scrollbar shrink-0 px-2 pb-[env(safe-area-inset-bottom)]">
+                {children}
+            </div>
         </div>
     </div>
 );

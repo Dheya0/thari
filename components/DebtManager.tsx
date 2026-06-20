@@ -351,20 +351,20 @@ const DebtManager: React.FC<DebtManagerProps> = ({ debts, wallets, onAddDebt, on
 
       {/* Add/Edit Debt Modal */}
       {showAddForm && (
-        <div className="fixed inset-0 bg-slate-950/95 backdrop-blur-2xl z-[300] flex items-end justify-center animate-fade no-print">
-          <div className="bg-slate-900 w-full max-w-lg rounded-t-[4rem] p-10 pb-16 shadow-2xl border-t border-white/5 animate-slide-up overflow-y-auto no-scrollbar max-h-[90vh]">
-            <div className="flex justify-between items-center mb-10">
-              <h3 className="text-2xl font-black text-white tracking-tight">{editingDebt ? 'تعديل بيانات الذمة' : 'تسجيل ذمة مالية جديدة'}</h3>
-              <button onClick={() => setShowAddForm(false)} className="p-4 bg-slate-800 rounded-2xl text-slate-500 active:scale-90"><X size={20} /></button>
+        <div className="fixed inset-0 bg-slate-950/95 backdrop-blur-2xl z-[300] flex flex-col justify-end sm:p-4 animate-fade no-print">
+          <div className="bg-slate-900 w-full max-w-lg mx-auto rounded-t-[2.5rem] sm:rounded-[3.5rem] p-6 sm:p-10 shadow-2xl relative max-h-[96vh] flex flex-col min-h-0 border-t border-white/5 animate-slide-up">
+            <div className="flex justify-between items-center mb-8 shrink-0">
+              <h3 className="text-xl sm:text-2xl font-black text-white tracking-tight">{editingDebt ? 'تعديل بيانات الذمة' : 'تسجيل ذمة مالية جديدة'}</h3>
+              <button onClick={() => setShowAddForm(false)} className="p-3 sm:p-4 bg-slate-800 rounded-2xl text-slate-500 active:scale-90"><X size={20} /></button>
             </div>
             
-            <form onSubmit={handleSubmit} className="space-y-8">
-              <div className="flex bg-slate-950 p-2 rounded-[2.2rem] border border-slate-800">
-                <button type="button" onClick={() => setType('on_me')} className={`flex-1 py-4 rounded-[1.8rem] text-[10px] font-black uppercase tracking-widest transition-all ${type === 'on_me' ? 'bg-rose-500 text-white shadow-xl' : 'text-slate-600'}`}>عليّ (دائن)</button>
-                <button type="button" onClick={() => setType('to_me')} className={`flex-1 py-4 rounded-[1.8rem] text-[10px] font-black uppercase tracking-widest transition-all ${type === 'to_me' ? 'bg-emerald-500 text-white shadow-xl' : 'text-slate-600'}`}>لي (مدين)</button>
+            <form onSubmit={handleSubmit} className="flex flex-col gap-6 overflow-y-auto no-scrollbar pb-[env(safe-area-inset-bottom)] shrink-0">
+              <div className="flex bg-slate-950 p-2 rounded-[2rem] border border-slate-800 px-2 shrink-0">
+                <button type="button" onClick={() => setType('on_me')} className={`flex-1 py-3 sm:py-4 rounded-[1.5rem] text-[10px] sm:text-xs font-black uppercase tracking-widest transition-all ${type === 'on_me' ? 'bg-rose-500 text-white shadow-xl' : 'text-slate-600'}`}>عليّ (دائن)</button>
+                <button type="button" onClick={() => setType('to_me')} className={`flex-1 py-3 sm:py-4 rounded-[1.5rem] text-[10px] sm:text-xs font-black uppercase tracking-widest transition-all ${type === 'to_me' ? 'bg-emerald-500 text-white shadow-xl' : 'text-slate-600'}`}>لي (مدين)</button>
               </div>
 
-              <div className="space-y-4">
+              <div className="space-y-4 shrink-0">
                  <div className="space-y-2">
                     <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-4">اسم الشخص أو الجهة</label>
                     <input type="text" value={personName} onChange={e => setPersonName(e.target.value)} placeholder="مثلاً: البنك، فلان..." className="w-full p-5 rounded-2xl bg-slate-950 border border-white/5 outline-none text-white font-bold focus:border-amber-500 transition-colors shadow-inner" required />
@@ -468,35 +468,35 @@ const DebtManager: React.FC<DebtManagerProps> = ({ debts, wallets, onAddDebt, on
 
       {/* Settle Debt Modal (Wallet Selector) */}
       {showSettleModal && (
-        <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-xl z-[400] flex items-end justify-center animate-fade no-print">
-          <div className="bg-slate-900 w-full max-w-lg rounded-t-[4rem] p-10 pb-16 shadow-2xl border-t border-slate-800 animate-slide-up text-center">
-            <div className="w-20 h-20 bg-emerald-500/10 rounded-[2rem] flex items-center justify-center mx-auto text-emerald-500 mb-6">
-                <CheckCircle size={40} />
+        <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-xl z-[400] flex flex-col justify-end p-0 sm:p-4 animate-fade no-print">
+          <div className="bg-slate-900 w-full max-w-lg mx-auto rounded-t-[2.5rem] sm:rounded-[4rem] p-6 sm:p-10 pb-[calc(2rem+env(safe-area-inset-bottom))] shadow-2xl border-t border-slate-800 animate-slide-up text-center">
+            <div className="w-16 h-16 sm:w-20 sm:h-20 bg-emerald-500/10 rounded-3xl sm:rounded-[2rem] flex items-center justify-center mx-auto text-emerald-500 mb-6">
+                <CheckCircle className="w-8 h-8 sm:w-10 sm:h-10" />
             </div>
-            <h3 className="text-2xl font-black text-white mb-3">تأكيد عملية السداد</h3>
-            <p className="text-slate-500 text-xs font-bold mb-10 leading-relaxed px-6">
+            <h3 className="text-xl sm:text-2xl font-black text-white mb-2 sm:mb-3">تأكيد عملية السداد</h3>
+            <p className="text-slate-500 text-[10px] sm:text-xs font-bold mb-8 sm:mb-10 leading-relaxed px-2 sm:px-6">
                 {showSettleModal.installmentId ? "سيتم سداد هذا القسط فقط." : "سيتم سداد كامل المبلغ المتبقي."} <br/>
                 اختر المحفظة لتحديث رصيدها، أو اختر تسوية خارجية.
             </p>
             
-            <div className="grid grid-cols-2 gap-4 mb-4">
+            <div className="grid grid-cols-2 gap-3 sm:gap-4 mb-4">
               {wallets.map(w => (
                 <button 
                   key={w.id} 
                   onClick={() => executeSettlement(w.id)}
-                  className="p-5 rounded-[2.5rem] bg-slate-950 border border-white/5 hover:border-amber-500/50 transition-all flex flex-col items-center gap-3 group active:scale-95 shadow-inner"
+                  className="p-4 sm:p-5 rounded-[2rem] sm:rounded-[2.5rem] bg-slate-950 border border-white/5 hover:border-amber-500/50 transition-all flex flex-col items-center gap-3 group active:scale-95 shadow-inner"
                 >
                   <div className="p-3 rounded-xl bg-slate-900" style={{ color: w.color }}>
                     <WalletIcon size={20} className="group-hover:scale-110 transition-transform" />
                   </div>
-                  <span className="text-[10px] font-black text-white">{w.name}</span>
+                  <span className="text-[10px] font-black text-white px-2 text-center leading-tight">{w.name}</span>
                 </button>
               ))}
             </div>
             
             <button 
                 onClick={() => executeSettlement(undefined)}
-                className="w-full py-5 rounded-[2.5rem] bg-slate-800 text-slate-300 font-bold text-xs mb-8 flex items-center justify-center gap-2 active:scale-95"
+                className="w-full py-4 sm:py-5 rounded-[2rem] sm:rounded-[2.5rem] bg-slate-800 text-slate-300 font-bold text-xs mb-6 sm:mb-8 flex items-center justify-center gap-2 active:scale-95"
             >
                 <EyeOff size={16} /> تسوية خارجية (لا تؤثر على الرصيد)
             </button>
