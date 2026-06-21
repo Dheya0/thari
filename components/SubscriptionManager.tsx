@@ -79,30 +79,32 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ subscriptions
       </div>
 
       {showAdd && (
-        <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-xl z-[200] flex items-end justify-center animate-fade">
-          <div className="bg-slate-900 w-full max-w-lg rounded-t-[3.5rem] p-8 pb-12 shadow-2xl border-t border-slate-800 animate-slide-up">
-             <div className="flex justify-between items-center mb-8">
-                <h3 className="text-2xl font-black text-white">إضافة اشتراك</h3>
-                <button onClick={() => setShowAdd(false)} className="p-3 bg-slate-800 rounded-2xl text-slate-500"><X size={20} /></button>
+        <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-xl z-[200] flex flex-col justify-end p-0 sm:p-4 animate-fade">
+          <div className="bg-slate-900 w-full max-w-lg mx-auto sm:rounded-[3.5rem] rounded-t-[2.5rem] p-6 sm:p-8 pb-[calc(2rem+env(safe-area-inset-bottom))] shadow-2xl border-t border-slate-800 animate-slide-up max-h-[96vh] flex flex-col min-h-0">
+             <div className="flex justify-between items-center mb-6 shrink-0">
+                <h3 className="text-xl sm:text-2xl font-black text-white">إضافة إشتراك</h3>
+                <button onClick={() => setShowAdd(false)} className="p-3 bg-slate-800 rounded-2xl text-slate-500 active:scale-90 transition-transform"><X size={20} /></button>
              </div>
-             <div className="space-y-6">
-                <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="اسم الاشتراك (مثلاً: Netflix)" className="w-full p-5 rounded-2xl bg-slate-950 border border-slate-800 text-white font-bold" />
-                <div className="flex gap-4">
-                  <input type="number" value={amount} onChange={e => setAmount(e.target.value)} placeholder="المبلغ" className="flex-1 p-5 rounded-2xl bg-slate-950 border border-slate-800 text-white font-bold" />
-                  <select value={period} onChange={e => setPeriod(e.target.value as any)} className="bg-slate-950 border border-slate-800 text-white p-5 rounded-2xl font-bold outline-none">
-                    <option value="monthly">شهري</option>
-                    <option value="yearly">سنوي</option>
-                  </select>
+             <div className="flex flex-col gap-5 overflow-y-auto no-scrollbar pb-[env(safe-area-inset-bottom)] shrink-0">
+                <div className="space-y-1">
+                   <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="اسم الاشتراك (مثلاً: Netflix)" className="w-full p-4 sm:p-5 rounded-2xl bg-slate-950 border border-slate-800 text-white font-bold" />
+                </div>
+                <div className="flex gap-3 sm:gap-4">
+                   <input type="number" inputMode="decimal" value={amount} onChange={e => setAmount(e.target.value)} placeholder="المبلغ" className="flex-1 p-4 sm:p-5 rounded-2xl bg-slate-950 border border-slate-800 text-white font-bold" />
+                   <select value={period} onChange={e => setPeriod(e.target.value as any)} className="bg-slate-950 border border-slate-800 text-white p-4 sm:p-5 rounded-2xl font-bold outline-none text-sm">
+                     <option value="monthly">شهري</option>
+                     <option value="yearly">سنوي</option>
+                   </select>
                 </div>
                 <div className="flex gap-4">
                     <div className="flex-1 space-y-2">
                         <label className="text-[10px] font-black text-slate-500 px-2 uppercase tracking-widest">تاريخ التجديد القادم</label>
-                        <input type="date" value={nextBilling} onChange={e => setNextBilling(e.target.value)} className="w-full p-5 rounded-2xl bg-slate-950 border border-slate-800 text-slate-400 font-bold outline-none" />
+                        <input type="date" value={nextBilling} onChange={e => setNextBilling(e.target.value)} className="w-full p-4 sm:p-5 rounded-2xl bg-slate-950 border border-slate-800 text-slate-400 font-bold outline-none" />
                     </div>
                 </div>
-                <select value={categoryId} onChange={e => setCategoryId(e.target.value)} className="w-full p-5 rounded-2xl bg-slate-950 border border-slate-800 text-white font-bold outline-none">
-                  <option value="">اختر التصنيف</option>
-                  {categories.filter(c => c.type === 'expense').map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                <select value={categoryId} onChange={e => setCategoryId(e.target.value)} className="w-full p-4 sm:p-5 rounded-2xl bg-slate-950 border border-slate-800 text-white font-bold outline-none text-sm">
+                   <option value="">اختر التصنيف</option>
+                   {categories.filter(c => c.type === 'expense').map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
                 <button onClick={() => {
                   if (name && amount && categoryId) {
@@ -110,7 +112,7 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ subscriptions
                     setShowAdd(false);
                     setName(''); setAmount(''); setNextBilling('');
                   }
-                }} className="w-full py-6 bg-amber-500 text-slate-950 font-black rounded-[2.2rem] text-lg shadow-xl">حفظ الاشتراك</button>
+                }} className="w-full mt-4 py-4 sm:py-5 bg-amber-500 text-slate-950 font-black rounded-[2rem] text-lg shadow-[0_15px_30px_rgba(245,158,11,0.3)] active:scale-95 transition-all">حفظ الاشتراك</button>
              </div>
           </div>
         </div>

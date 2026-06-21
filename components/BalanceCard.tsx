@@ -15,7 +15,7 @@ const BalanceCard: React.FC<BalanceCardProps> = ({ totalBalance, totalIncome, to
   return (
     <div className="relative overflow-hidden group perspective-1000">
       {/* Glossy Metal Card Design */}
-      <div className="relative bg-gradient-to-br from-slate-800 to-slate-950 rounded-[2rem] sm:rounded-[3rem] p-6 sm:p-8 shadow-[0_20px_50px_rgba(0,0,0,0.5)] border border-white/10 overflow-hidden transition-all duration-700 md:hover:scale-[1.02] md:hover:-rotate-1 md:active:scale-95 group w-full">
+      <div className="relative bg-gradient-to-br from-slate-800 to-slate-950 rounded-2xl md:rounded-[2.5rem] p-5 md:p-7 shadow-[0_15px_30px_rgba(0,0,0,0.4)] border border-white/10 overflow-hidden transition-all duration-700 md:hover:scale-[1.02] md:hover:-rotate-1 md:active:scale-95 group w-full">
         
         {/* Shimmer Effect */}
         <div className="shimmer absolute inset-0 pointer-events-none opacity-20"></div>
@@ -28,7 +28,7 @@ const BalanceCard: React.FC<BalanceCardProps> = ({ totalBalance, totalIncome, to
           <div className="space-y-2 flex-1 min-w-0">
             <div className="flex items-center gap-2">
                <div className={`w-2 h-2 rounded-full shrink-0 ${isTravelMode ? 'bg-purple-500' : 'bg-amber-500'} animate-pulse`}></div>
-               <p className={`text-[9px] sm:text-[10px] font-black ${isTravelMode ? 'text-purple-500/80' : 'text-amber-500/80'} uppercase tracking-[0.2em] sm:tracking-[0.3em] truncate`}>
+               <p className={`text-[11px] sm:text-[12px] font-black ${isTravelMode ? 'text-purple-400' : 'text-amber-500'} uppercase tracking-[0.1em] sm:tracking-[0.2em] truncate`}>
                  {isTravelMode ? 'وضع السفر (عملات منفصلة)' : 'الرصيد التقديري'}
                </p>
             </div>
@@ -58,7 +58,7 @@ const BalanceCard: React.FC<BalanceCardProps> = ({ totalBalance, totalIncome, to
                 <div className="bg-slate-900/50 p-4 rounded-2xl border border-white/5 mb-4">
                     <div className="space-y-4">
                         <div>
-                            <p className="text-[9px] font-bold text-slate-500 mb-2">الأرصدة المتاحة</p>
+                            <p className="text-xs font-bold text-slate-400 mb-2">الأرصدة المتاحة</p>
                             <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
                                 {Object.entries(balances).map(([code, amount]) => {
                                     const val = amount as number;
@@ -76,7 +76,7 @@ const BalanceCard: React.FC<BalanceCardProps> = ({ totalBalance, totalIncome, to
 
                         {expenseBreakdown && Object.keys(expenseBreakdown).length > 0 && (
                             <div>
-                                <p className="text-[9px] font-bold text-slate-500 mb-2">إجمالي المصروفات (حسب العملة)</p>
+                                <p className="text-xs font-bold text-slate-400 mb-2">إجمالي المصروفات (حسب العملة)</p>
                                 <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
                                     {Object.entries(expenseBreakdown).map(([code, amount]) => {
                                         const val = amount as number;
@@ -100,13 +100,13 @@ const BalanceCard: React.FC<BalanceCardProps> = ({ totalBalance, totalIncome, to
         {/* Normal Mode: Breakdown Scroll */}
         {!isTravelMode && balances && Object.keys(balances).length > 0 && (
             <div className="mb-6 relative z-10">
-                <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-2 px-1">الأرصدة الفعلية (جيوب المحفظة)</p>
+                <p className="text-xs font-bold text-slate-400 uppercase mb-2 px-1">الأرصدة الفعلية (جيوب المحفظة)</p>
                 <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2">
                     {Object.entries(balances).map(([code, amount]) => {
                         const val = amount as number;
                         return (
-                        <div key={code} className={`shrink-0 px-3 py-2 rounded-xl border flex flex-col items-start min-w-[80px] ${val < 0 ? 'bg-rose-500/10 border-rose-500/20' : 'bg-slate-900/50 border-white/10'}`}>
-                            <span className="text-[9px] font-black text-slate-400">{code}</span>
+                        <div key={code} className={`shrink-0 px-3.5 py-2.5 rounded-xl border flex flex-col items-start min-w-[85px] ${val < 0 ? 'bg-rose-500/10 border-rose-500/20' : 'bg-slate-900/50 border-white/10'}`}>
+                            <span className="text-[10px] font-bold text-slate-400">{code}</span>
                             <span className={`text-sm font-black ${val < 0 ? 'text-rose-400' : 'text-white'}`}>
                                 {val.toLocaleString(undefined, { maximumFractionDigits: 1 })}
                             </span>
@@ -118,17 +118,17 @@ const BalanceCard: React.FC<BalanceCardProps> = ({ totalBalance, totalIncome, to
         
         {!isTravelMode && (
         <div className="grid grid-cols-2 gap-4 relative z-10">
-          <div className="bg-white/5 backdrop-blur-md p-5 rounded-[2.2rem] border border-white/5 flex flex-col gap-1 transition-all hover:bg-white/10">
-            <span className="text-[9px] font-black text-emerald-400 uppercase tracking-widest">التدفقات</span>
-            <p className="text-xl font-black text-white">
-              {totalIncome.toLocaleString(undefined, { maximumFractionDigits: 0 })} <span className="text-[10px] opacity-40">{symbol}</span>
+          <div className="bg-white/5 backdrop-blur-md p-4 sm:p-5 rounded-2xl border border-white/5 flex flex-col gap-1 transition-all hover:bg-white/10">
+            <span className="text-[11px] font-black text-emerald-400 uppercase tracking-wider">التدفقات</span>
+            <p className="text-lg sm:text-xl font-black text-white">
+              {totalIncome.toLocaleString(undefined, { maximumFractionDigits: 0 })} <span className="text-[11px] opacity-40">{symbol}</span>
             </p>
           </div>
           
-          <div className="bg-white/5 backdrop-blur-md p-5 rounded-[2.2rem] border border-white/5 flex flex-col gap-1 transition-all hover:bg-white/10">
-            <span className="text-[9px] font-black text-rose-400 uppercase tracking-widest">الالتزامات</span>
-            <p className="text-xl font-black text-white">
-              {totalExpense.toLocaleString(undefined, { maximumFractionDigits: 0 })} <span className="text-[10px] opacity-40">{symbol}</span>
+          <div className="bg-white/5 backdrop-blur-md p-4 sm:p-5 rounded-2xl border border-white/5 flex flex-col gap-1 transition-all hover:bg-white/10">
+            <span className="text-[11px] font-black text-rose-400 uppercase tracking-wider">الالتزامات</span>
+            <p className="text-lg sm:text-xl font-black text-white">
+              {totalExpense.toLocaleString(undefined, { maximumFractionDigits: 0 })} <span className="text-[11px] opacity-40">{symbol}</span>
             </p>
           </div>
         </div>

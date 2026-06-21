@@ -24,6 +24,8 @@ import FinancialReport from './components/FinancialReport';
 import SmartAlerts from './components/SmartAlerts';
 import FinancialSimulation from './components/FinancialSimulation';
 import ZakatCalculator from './components/ZakatCalculator';
+import ExecutiveInsights from './components/ExecutiveInsights';
+import CashflowSankey from './components/CashflowSankey';
 
 const STORAGE_KEY = 'thari_app_v4';
 
@@ -360,7 +362,7 @@ const App: React.FC = () => {
   if (state.pin && state.isLocked) return <LockScreen savedPin={state.pin} onUnlock={() => setState(p => ({ ...p, isLocked: false }))} />;
 
   return (
-    <div className="w-full h-full flex flex-col max-w-lg md:max-w-3xl lg:max-w-4xl xl:max-w-5xl mx-auto bg-slate-950/20 md:bg-slate-950/45 md:h-[calc(100%-3rem)] md:my-6 md:rounded-[3rem] md:border md:border-white/10 md:shadow-[0_25px_60px_rgba(0,0,0,0.8)] backdrop-blur-3xl transition-all relative border-x border-white/5 print:block print:bg-white print:max-w-none print:h-auto overflow-hidden">
+    <div className="w-full h-dvh flex flex-col max-w-lg md:max-w-3xl lg:max-w-4xl xl:max-w-5xl mx-auto bg-slate-950/20 md:bg-slate-950/45 md:my-6 md:rounded-[3rem] md:border md:border-white/10 md:shadow-[0_25px_60px_rgba(0,0,0,0.8)] backdrop-blur-3xl transition-all relative border-x border-white/5 print:block print:bg-white print:max-w-none print:h-auto overflow-hidden">
       
       {/* Hidden Print Report */}
       <FinancialReport 
@@ -375,42 +377,40 @@ const App: React.FC = () => {
         filterCurrency={printCurrencyFilter}
       />
       
-      <div className="flex flex-col flex-1 h-full min-h-0 print:hidden relative z-20">
-        <header className="shrink-0 px-4 py-4 md:px-6 md:py-6 pt-[calc(var(--sat)+1rem)] space-y-4 glass-effect border-b border-white/5 z-30 backdrop-blur-xl bg-slate-950/80">
+      <div className="flex flex-col flex-1 print:hidden relative z-20 overflow-hidden">
+        <header className="sticky top-0 shrink-0 px-4 py-3 md:px-6 md:py-4 pt-[calc(var(--sat)+0.5rem)] glass-effect border-b border-white/5 z-30 backdrop-blur-xl bg-slate-950/80">
           <div className="flex justify-between items-center">
-            <Logo size={36} showText />
+            <Logo size={28} showText />
             <div className="flex gap-2">
-              <button onClick={() => setActiveTab('future')} className={`p-2.5 rounded-2xl border border-white/10 transition-all ${activeTab === 'future' ? 'bg-purple-500 text-slate-950 shadow-[0_0_20px_rgba(168,85,247,0.4)]' : 'text-slate-400 bg-white/5 hover:bg-white/10'}`}><Sparkles size={18} /></button>
-              <button onClick={() => setActiveTab('chat')} className={`p-2.5 rounded-2xl border border-white/10 transition-all ${activeTab === 'chat' ? 'bg-amber-500 text-slate-950 shadow-[0_0_20px_rgba(245,158,11,0.4)]' : 'text-slate-400 bg-white/5 hover:bg-white/10'}`}><BrainCircuit size={18} /></button>
+              <button onClick={() => setActiveTab('future')} className={`p-2 rounded-xl border border-white/10 transition-all ${activeTab === 'future' ? 'bg-purple-500 text-slate-950 shadow-[0_0_20px_rgba(168,85,247,0.4)]' : 'text-slate-400 bg-white/5 hover:bg-white/10'}`}><Sparkles size={16} /></button>
+              <button onClick={() => setActiveTab('chat')} className={`p-2 rounded-xl border border-white/10 transition-all ${activeTab === 'chat' ? 'bg-amber-500 text-slate-950 shadow-[0_0_20px_rgba(245,158,11,0.4)]' : 'text-slate-400 bg-white/5 hover:bg-white/10'}`}><BrainCircuit size={16} /></button>
+              <button onClick={() => setActiveTab('settings')} className="flex items-center justify-center w-9 h-9 rounded-xl bg-slate-800/50 border border-slate-700 text-slate-500 hover:text-amber-500 hover:border-amber-500/50 transition-all shrink-0 active:scale-95 backdrop-blur-md"><SettingsIcon size={16} /></button>
             </div>
           </div>
+        </header>
 
-          {activeTab === 'dashboard' && (
-            <div className="flex items-center gap-2">
-                <div className="flex-1 overflow-hidden mask-gradient-x py-2 -my-2 flex">
-                    <div className="flex items-center gap-3 px-6 relative z-10 w-full overflow-x-auto no-scrollbar">
+        <main className="flex-1 overflow-y-auto no-scrollbar overflow-x-hidden px-4 md:px-5 relative pb-[calc(10rem+env(safe-area-inset-bottom))] w-full">
+          <div className="py-6 space-y-8">
+            {activeTab === 'dashboard' && (
+              <div className="space-y-6 md:space-y-0 md:grid md:grid-cols-12 md:gap-6 md:items-start animate-luxury-pop">
+                
+                {/* Horizontal Sliding Currencies Marquee (Scrollable, now inside main so it scrolls away naturally and doesn't clutter top) */}
+                <div className="md:col-span-12 overflow-hidden mask-gradient-x py-1">
+                    <div className="flex items-center gap-3 relative z-10 w-full overflow-x-auto no-scrollbar py-1">
                     {state.currencies.map((curr, index) => {
                         const isActive = state.currency.code === curr.code;
                         return (
-                        <button key={`${curr.code}-${index}`} onClick={() => setState(p => ({...p, currency: curr}))} className={`shrink-0 relative flex items-center gap-3 pl-5 pr-3 py-3 rounded-full border backdrop-blur-md transition-all duration-500 ${isActive ? 'bg-amber-500 border-amber-400 text-slate-950 shadow-[0_0_25px_rgba(245,158,11,0.5)] scale-105 z-20' : 'bg-slate-800/30 border-white/5 text-slate-400 hover:bg-slate-800 hover:border-white/20 hover:scale-105'}`}>
+                        <button key={`${curr.code}-${index}`} onClick={() => setState(p => ({...p, currency: curr}))} className={`shrink-0 relative flex items-center gap-2.5 pl-4 pr-2.5 py-2 rounded-full border backdrop-blur-md transition-all duration-500 ${isActive ? 'bg-amber-500 border-amber-400 text-slate-950 shadow-[0_0_15px_rgba(245,158,11,0.35)] scale-102 z-20' : 'bg-slate-800/30 border-white/5 text-slate-400 hover:bg-slate-800 hover:border-white/20'}`}>
                             {isActive && <div className="absolute inset-0 rounded-full bg-gradient-to-br from-white/30 to-transparent opacity-50 pointer-events-none" />}
-                            <span className={`text-[10px] font-black uppercase tracking-widest ${isActive ? 'text-slate-900/60' : 'text-slate-500'}`}>{curr.code}</span>
-                            <span className="font-bold text-sm whitespace-nowrap">{curr.name}</span>
-                            <div className={`w-2 h-2 rounded-full transition-colors ${isActive ? 'bg-slate-950' : 'bg-slate-600'}`} />
+                            <span className={`text-[9px] font-black uppercase tracking-widest ${isActive ? 'text-slate-900/60' : 'text-slate-500'}`}>{curr.code}</span>
+                            <span className="font-bold text-xs whitespace-nowrap">{curr.name}</span>
+                            <div className={`w-1.5 h-1.5 rounded-full transition-colors ${isActive ? 'bg-slate-950' : 'bg-slate-600'}`} />
                         </button>
                         );
                     })}
                     </div>
                 </div>
-                <button onClick={() => setActiveTab('settings')} className="flex items-center justify-center w-10 h-10 md:w-12 md:h-12 rounded-full bg-slate-800/50 border border-slate-700 text-slate-500 hover:text-amber-500 hover:border-amber-500/50 transition-all shrink-0 active:scale-95 backdrop-blur-md shadow-lg z-20"><SettingsIcon size={18} /></button>
-            </div>
-          )}
-        </header>
 
-        <main className="flex-1 overflow-y-auto no-scrollbar overflow-x-hidden px-4 md:px-5 relative pb-[calc(7rem+env(safe-area-inset-bottom))] w-full">
-          <div className="py-6 space-y-8">
-            {activeTab === 'dashboard' && (
-              <div className="space-y-8 md:space-y-0 md:grid md:grid-cols-12 md:gap-6 md:items-start animate-luxury-pop">
                 {/* Wallets scroll stays top wide */}
                 <div className="md:col-span-12 flex gap-3 overflow-x-auto no-scrollbar py-1">
                      <button 
@@ -437,9 +437,9 @@ const App: React.FC = () => {
                    <SmartAlerts budgets={state.budgets} transactions={filteredTransactions} debts={state.debts} subscriptions={state.subscriptions} categories={state.categories} />
                 </div>
 
-                {/* Left Column on Widescreen */}
-                <div className="col-span-12 md:col-span-6 space-y-6">
-                    {/* Updated Balance Card receiving currency breakdown */}
+                {/* LEFT COLUMN: Net Worth & Analytical Executive Insights */}
+                <div className="col-span-12 lg:col-span-6 space-y-6">
+                    {/* Balanced Corporate Card */}
                     <BalanceCard 
                         totalBalance={totals.balance} 
                         totalIncome={totals.income} 
@@ -449,27 +449,33 @@ const App: React.FC = () => {
                         expenseBreakdown={totals.expenseBreakdown}
                         showSeparateCurrencies={state.showSeparateCurrencies}
                     />
-                    
-                    <div className="grid grid-cols-2 gap-3">
-                        <button onClick={() => setActiveTab('goals')} className="p-6 bg-slate-900 border border-slate-800 rounded-[2.5rem] flex flex-col items-center gap-3 hover:bg-slate-800 transition-colors shadow-xl">
-                            <div className="w-12 h-12 bg-amber-500/10 rounded-2xl flex items-center justify-center text-amber-500"><Coins size={24} /></div>
-                            <span className="text-[10px] font-black text-white uppercase tracking-widest text-center">الأهداف المالية</span>
-                        </button>
-                         <button onClick={() => setActiveTab('budgets')} className="p-6 bg-slate-900 border border-slate-800 rounded-[2.5rem] flex flex-col items-center gap-3 hover:bg-slate-800 transition-colors shadow-xl">
-                            <div className="w-12 h-12 bg-blue-500/10 rounded-2xl flex items-center justify-center text-blue-500"><LayoutDashboard size={24} /></div>
-                            <span className="text-[10px] font-black text-white uppercase tracking-widest text-center">إدارة الميزانية</span>
-                        </button>
-                    </div>
+
+                    {/* Executive Insights (Dynamic Runway, Burn Rate and Smart Natural Language reports) */}
+                    <ExecutiveInsights 
+                        transactions={filteredTransactions}
+                        budgets={state.budgets}
+                        debts={state.debts}
+                        totalBalance={totals.balance}
+                        currencySymbol={state.currency.symbol}
+                    />
                 </div>
 
-                {/* Right Column on Widescreen */}
-                <div className="col-span-12 md:col-span-6 space-y-6">
+                {/* RIGHT COLUMN: Sankey Cashflow diagrams & Compact Timeline */}
+                <div className="col-span-12 lg:col-span-6 space-y-6">
+                    {/* Sankey Flow Visualizer */}
+                    <CashflowSankey 
+                        transactions={filteredTransactions}
+                        categories={state.categories}
+                        currencySymbol={state.currency.symbol}
+                    />
+
+                    {/* Compact recent operations list */}
                     <section className="space-y-4">
                       <div className="flex justify-between items-center px-2">
                         <h3 className="text-[9px] font-black text-slate-500 uppercase flex items-center gap-2 tracking-[0.2em]"><History size={12} /> {selectedWalletId ? 'سجل المحفظة المختارة' : 'أحدث العمليات'}</h3>
                         <button onClick={() => setActiveTab('transactions')} className="text-amber-500 text-[9px] font-black uppercase flex items-center gap-1">عرض الكل <ArrowRight size={10} className="rotate-180" /></button>
                       </div>
-                      <TransactionList transactions={filteredTransactions.slice(0, 5)} categories={state.categories} wallets={state.wallets} onDelete={(id) => setState(p => ({ ...p, transactions: p.transactions.filter(t => t.id !== id) }))} onEdit={handleEditTransaction} currencySymbol={state.currency.symbol} />
+                      <TransactionList transactions={filteredTransactions.slice(0, 3)} categories={state.categories} wallets={state.wallets} onDelete={(id) => setState(p => ({ ...p, transactions: p.transactions.filter(t => t.id !== id) }))} onEdit={handleEditTransaction} currencySymbol={state.currency.symbol} />
                     </section>
                 </div>
               </div>
@@ -527,7 +533,7 @@ const App: React.FC = () => {
           </div>
         </main>
 
-        <div className="absolute bottom-0 left-0 right-0 pt-16 pb-[calc(1rem+env(safe-area-inset-bottom))] px-4 md:px-0 flex justify-center pointer-events-none z-40 bg-gradient-to-t from-slate-950/95 via-slate-950/70 to-transparent">
+        <div className="fixed bottom-0 left-0 right-0 pt-16 pb-[calc(1rem+env(safe-area-inset-bottom))] px-4 md:px-0 flex justify-center pointer-events-none z-40 bg-gradient-to-t from-slate-950 via-slate-950/80 to-transparent">
             <nav className="pointer-events-auto w-full md:max-w-xl bg-slate-900/95 backdrop-blur-2xl border border-white/10 flex items-center justify-between px-2 py-2 rounded-[2rem] shadow-[0_20px_40px_rgba(0,0,0,0.5)]">
                 <NavButton icon={<LayoutDashboard />} label="الرئيسية" active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} />
                 <NavButton icon={<Scale />} label="زكاتي" active={activeTab === 'zakat'} onClick={() => setActiveTab('zakat')} />
@@ -543,6 +549,28 @@ const App: React.FC = () => {
                 <NavButton icon={<SettingsIcon />} label="المزيد" active={activeTab === 'settings'} onClick={() => setActiveTab('settings')} />
             </nav>
         </div>
+
+        {/* Floating Quick Action Buttons (visible immediately on dashboard) */}
+        {activeTab === 'dashboard' && (
+          <div className="fixed right-4 bottom-24 md:bottom-28 md:right-[calc(50%-17rem)] z-40 flex flex-col gap-3 pointer-events-none no-print">
+            <button 
+              onClick={() => setActiveTab('goals')} 
+              className="pointer-events-auto w-12 h-12 bg-slate-900/95 backdrop-blur-3xl border border-white/10 hover:border-amber-500/50 rounded-full flex flex-col items-center justify-center text-amber-500 shadow-[0_10px_25px_rgba(0,0,0,0.6)] active:scale-90 hover:scale-105 transition-all group relative"
+              title="الأهداف المالية"
+            >
+              <Coins size={20} className="group-hover:scale-110 transition-transform" />
+              <span className="absolute right-14 bg-slate-900/95 backdrop-blur-xl border border-white/10 text-white font-bold text-[10px] px-3 py-1.5 rounded-xl whitespace-nowrap opacity-100 transition-opacity pointer-events-none shadow-md block">الأهداف</span>
+            </button>
+            <button 
+              onClick={() => setActiveTab('budgets')} 
+              className="pointer-events-auto w-12 h-12 bg-slate-900/95 backdrop-blur-3xl border border-white/10 hover:border-blue-500/50 rounded-full flex flex-col items-center justify-center text-blue-400 shadow-[0_10px_25px_rgba(0,0,0,0.6)] active:scale-90 hover:scale-105 transition-all group relative"
+              title="إدارة الميزانية"
+            >
+              <LayoutDashboard size={20} className="group-hover:scale-110 transition-transform" />
+              <span className="absolute right-14 bg-slate-900/95 backdrop-blur-xl border border-white/10 text-white font-bold text-[10px] px-3 py-1.5 rounded-xl whitespace-nowrap opacity-100 transition-opacity pointer-events-none shadow-md block">الميزانية</span>
+            </button>
+          </div>
+        )}
 
         {showAddForm && (
             <TransactionForm categories={state.categories} wallets={state.wallets} onSubmit={handleSubmitTransaction} onClose={() => { setShowAddForm(false); setEditingTransaction(null); }} initialData={editingTransaction} exchangeRates={state.exchangeRates} />
