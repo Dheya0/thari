@@ -5,7 +5,7 @@ import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
 import { 
   Trash2, User, Wallet as WalletIcon, Lock, Upload, Edit2, Plus, Tag, Coins, X, Check, Printer, FileDown, ChevronDown, AlertCircle, AlertTriangle, FileSpreadsheet, Code, ChevronLeft, Palette, Type,
-  ChevronRight, TrendingUp, ShieldCheck, ShieldAlert, Key, Unlock, Smartphone, RefreshCw, Plane
+  ChevronRight, TrendingUp, ShieldCheck, ShieldAlert, Key, Unlock, Smartphone, RefreshCw, Plane, Sparkles, FileText
 } from 'lucide-react';
 import { Currency, Wallet, Category, Transaction } from '../types';
 import { encryptData, decryptData } from '../services/encryptionService';
@@ -141,6 +141,9 @@ const Settings: React.FC<SettingsProps> = ({
   const safeWallets = wallets || [];
   const safeCategories = categories || [];
 
+  const isIOS = typeof window !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
+  const isStandalone = typeof window !== 'undefined' && ((window.navigator as any).standalone || window.matchMedia('(display-mode: standalone)').matches);
+
   const [localUserName, setLocalUserName] = useState(userName || '');
   const [localPin, setLocalPin] = useState(pin || '');
   const [localApiKey, setLocalApiKey] = useState(apiKey || '');
@@ -149,6 +152,7 @@ const Settings: React.FC<SettingsProps> = ({
   const [isExporting, setIsExporting] = useState(false);
   const [activeSection, setActiveSection] = useState<'main' | 'wallets' | 'categories' | 'currencies'>('main');
   const [showCurrencyModal, setShowCurrencyModal] = useState(false);
+  const [openAccordion, setOpenAccordion] = useState<string | null>('profile');
   
   // Report Configuration State
   const [showReportModal, setShowReportModal] = useState(false);
@@ -227,27 +231,22 @@ const Settings: React.FC<SettingsProps> = ({
   };
 
   const downloadFile = (content: string, fileName: string, mimeType: string) => {
-      // Try to open in new window first (better for WebViews)
       const blob = new Blob([content], { type: mimeType });
       const url = window.URL.createObjectURL(blob);
       
-      // Attempt to open in new tab/window which Android often handles better than hidden download links
-      const newWindow = window.open(url, '_blank');
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = fileName;
+      link.style.display = 'none';
+      document.body.appendChild(link);
+      link.click();
       
-      // Fallback to anchor tag if newWindow is blocked or null
-      if (!newWindow) {
-          const link = document.createElement('a');
-          link.href = url;
-          link.download = fileName;
-          link.style.display = 'none';
-          document.body.appendChild(link);
-          link.click();
-          setTimeout(() => {
-              document.body.removeChild(link);
-              window.URL.revokeObjectURL(url);
-          }, 200);
-      }
-      showToast("جاري التنزيل... إذا لم يبدأ، استخدم زر النسخ");
+      setTimeout(() => {
+          document.body.removeChild(link);
+          window.URL.revokeObjectURL(url);
+      }, 200);
+      
+      showToast("جاري التنزيل... إذا لم يبدأ التنزيل، يرجى تفعيل السماح بالتنزيل التلقائي أو استخدام زر النسخ اليدوي");
   };
 
   const shareOrDownload = async (content: string, fileName: string, mimeType: string) => {
@@ -279,19 +278,13 @@ const Settings: React.FC<SettingsProps> = ({
         const dataStr = JSON.stringify(appState);
         const dateStr = new Date().toISOString().split('T')[0];
         if (!password) {
-            // Offer Copy option for unencrypted JSON
-            if (confirm("هل تريد عرض البيانات للنسخ اليدوي؟ (أفضل للأندرويد)")) {
-                copyToClipboard(dataStr, "نسخة احتياطية (JSON)");
-            } else {
-                await shareOrDownload(dataStr, `Thari_Backup_${dateStr}.json`, 'application/json');
-            }
+            // Display data for easy copying and trigger download/share natively
+            copyToClipboard(dataStr, "نسخة احتياطية (JSON) - تم بدء التحميل والمشاركة");
+            await shareOrDownload(dataStr, `Thari_Backup_${dateStr}.json`, 'application/json');
         } else {
             const encrypted = await encryptData(dataStr, password);
-            if (confirm("هل تريد عرض البيانات المشفرة للنسخ؟")) {
-                copyToClipboard(encrypted, "نسخة مشفرة");
-            } else {
-                await shareOrDownload(encrypted, `Thari_Backup_Secure_${dateStr}.thari`, 'text/plain');
-            }
+            copyToClipboard(encrypted, "نسخة مشفرة - تم بدء التحميل والمشاركة");
+            await shareOrDownload(encrypted, `Thari_Backup_Secure_${dateStr}.thari`, 'text/plain');
         }
     } catch (e) {
         showToast("فشل النسخ الاحتياطي", 'error');
@@ -354,22 +347,16 @@ const Settings: React.FC<SettingsProps> = ({
             csvContent += row.join(",") + "\n";
         });
         
-        if (confirm("هل تريد عرض ملف Excel (CSV) للنسخ؟ هذا الخيار أضمن.")) {
-            copyToClipboard(csvContent, "ملف Excel (CSV)");
-        } else {
-            shareOrDownload(csvContent, `Thari_Report_${new Date().toISOString().split('T')[0]}.csv`, 'text/csv;charset=utf-8;');
-        }
+        copyToClipboard(csvContent, "ملف Excel (CSV) - تم بدء التحميل والمشاركة");
+        shareOrDownload(csvContent, `Thari_Report_${new Date().toISOString().split('T')[0]}.csv`, 'text/csv;charset=utf-8;');
     } catch (e) {
         showToast("حدث خطأ أثناء التصدير", 'error');
     }
   };
   const handleExportJSON = () => {
       const dataStr = JSON.stringify(appState, null, 2);
-      if (confirm("هل تريد عرض بيانات JSON للنسخ؟")) {
-          copyToClipboard(dataStr, "بيانات JSON");
-      } else {
-          shareOrDownload(dataStr, `Thari_Data_Raw_${new Date().toISOString().split('T')[0]}.json`, 'application/json');
-      }
+      copyToClipboard(dataStr, "بيانات JSON - تم بدء التحميل والمشاركة");
+      shareOrDownload(dataStr, `Thari_Data_Raw_${new Date().toISOString().split('T')[0]}.json`, 'application/json');
   };
 
   const handleSaveProfile = () => {
@@ -632,6 +619,30 @@ const Settings: React.FC<SettingsProps> = ({
     );
   }
 
+  const AccordionItem = ({ id, title, icon: Icon, children }: { id: string, title: string, icon: any, children: React.ReactNode }) => {
+    const isOpen = openAccordion === id;
+    return (
+        <div className="bg-slate-900 rounded-[2rem] border border-slate-800 overflow-hidden transition-all duration-300">
+            <button 
+                onClick={() => setOpenAccordion(isOpen ? null : id)}
+                className="w-full p-5 flex justify-between items-center text-white hover:bg-slate-800/50 transition-colors text-right"
+                type="button"
+            >
+                <div className="flex items-center gap-3">
+                    <Icon size={20} className="text-amber-500" />
+                    <span className="font-black text-sm">{title}</span>
+                </div>
+                <ChevronDown size={18} className={`text-slate-500 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`} />
+            </button>
+            {isOpen && (
+                <div className="p-6 border-t border-slate-800 bg-slate-950/20 space-y-5 animate-slide-down shrink-0 text-right">
+                    {children}
+                </div>
+            )}
+        </div>
+    );
+  };
+
   // (Return Main View unchanged, just ensuring it renders correctly)
   return (
     <div className="space-y-6 pb-24 animate-fade">
@@ -645,10 +656,10 @@ const Settings: React.FC<SettingsProps> = ({
         <div className="bg-gradient-to-br from-amber-500/20 to-orange-500/20 p-5 rounded-[2.5rem] border border-amber-500/30 flex items-center justify-between gap-4 shadow-xl">
            <div className="flex gap-3 items-center">
               <RefreshCw size={24} className="text-amber-500 animate-spin shrink-0" style={{ animationDuration: '3s' }} />
-              <div>
-                 <p className="text-xs font-black text-white">تحديث جديد متاح!</p>
-                 <p className="text-[10px] text-slate-400 font-bold leading-relaxed">يتوفر إصدار فوري حديث لتطبيق ثري مع ميزات أفضل.</p>
-              </div>
+               <div>
+                  <p className="text-xs font-black text-white">تحديث جديد متاح!</p>
+                  <p className="text-[10px] text-slate-400 font-bold leading-relaxed">يتوفر إصدار فوري حديث لتطبيق ثري مع ميزات أفضل.</p>
+               </div>
            </div>
            <button onClick={handleUpdateClick} className="px-5 py-2.5 bg-amber-500 text-slate-950 font-black text-xs rounded-xl active:scale-95 transition-all shrink-0 shadow-lg shadow-amber-500/10">تحديث الآن</button>
         </div>
@@ -664,6 +675,20 @@ const Settings: React.FC<SettingsProps> = ({
               </div>
            </div>
            <button onClick={handleInstallClick} className="px-5 py-2.5 bg-indigo-500 text-white font-black text-xs rounded-xl active:scale-95 transition-all shrink-0 shadow-lg shadow-indigo-500/25">تثبيت التطبيق</button>
+        </div>
+      )}
+
+      {!installPrompt && isIOS && !isStandalone && (
+        <div className="bg-gradient-to-br from-indigo-500/10 to-blue-500/10 p-5 rounded-[2.5rem] border border-indigo-500/20 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xl">
+           <div className="flex gap-3 items-center">
+              <Sparkles size={24} className="text-indigo-400 shrink-0" />
+              <div>
+                 <p className="text-xs font-black text-white">تثبيت "ثري" على آيفون / آيباد</p>
+                 <p className="text-[10px] text-slate-400 font-bold leading-relaxed">
+                   لتثبيت التطبيق على آيفون أو آيباد: اضغط على زر المشاركة <span className="font-extrabold text-amber-500 px-1">⎋</span> في سفاري، ثم اختر <span className="font-extrabold text-amber-500 px-1">إضافة إلى الشاشة الرئيسية ⊕</span> ليصبح تطبيقاً كاملاً على جهازك.
+                 </p>
+              </div>
+           </div>
         </div>
       )}
 
@@ -684,112 +709,143 @@ const Settings: React.FC<SettingsProps> = ({
             <ChevronLeft size={20} className="text-slate-600" />
          </button>
       </div>
-      
-      <button 
-        onClick={() => setShowCurrencyModal(true)}
-        className="w-full bg-slate-900 p-6 rounded-[2.5rem] border border-slate-800 flex items-center justify-between group active:scale-[0.98] transition-all hover:border-amber-500/30"
-      >
-        <div className="flex items-center gap-5">
-             <div className="w-14 h-14 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-center text-amber-500 shadow-xl">
-                 <span className="text-xl font-black">{currency?.symbol || (typeof currency === 'string' ? currency : '')}</span>
-             </div>
-             <div className="text-right">
-                 <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">العملة الأساسية للنظام</p>
-                 <p className="text-white font-black text-lg">{currency?.name || (typeof currency === 'string' ? currency : '')}</p>
-             </div>
-        </div>
-        <ChevronDown size={20} className="text-slate-500" />
-      </button>
 
-      {/* Profile & Security Section */}
-      <div className="bg-slate-900 rounded-[3rem] border border-slate-800 divide-y divide-slate-800 overflow-hidden">
-        <div className="p-8 space-y-4">
-          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2 px-2"><User size={14} /> اسم صاحب الحساب</label>
-          <input type="text" value={localUserName} onChange={e => setLocalUserName(e.target.value)} className="w-full p-5 rounded-2xl bg-slate-800 text-white font-bold border-none outline-none focus:ring-1 focus:ring-amber-500 shadow-inner" />
-        </div>
-
-        <div className="p-8 space-y-4 border-t border-slate-800">
-          <div className="flex justify-between items-center px-2">
-            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2"><Plane size={14} /> وضع السفر (فصل العملات)</label>
-            <div dir="ltr" className={`w-14 h-7 rounded-full p-1 cursor-pointer transition-all ${isTravelMode ? 'bg-amber-500 shadow-[0_0_15px_rgba(245,158,11,0.3)]' : 'bg-slate-700'}`} onClick={() => {
-                const newVal = !isTravelMode;
-                setIsTravelMode(newVal);
-                onUpdateSettings({ showSeparateCurrencies: newVal });
-            }}>
-              <div className={`w-5 h-5 bg-white rounded-full shadow-md transition-transform ${isTravelMode ? 'translate-x-7' : 'translate-x-0'}`} />
-            </div>
-          </div>
-          <p className="text-[10px] text-slate-500 px-2 leading-relaxed">
-            عند تفعيل هذا الوضع، سيتم عرض تفاصيل كل عملة بشكل منفصل في الصفحة الرئيسية، مما يساعدك على تتبع المصاريف أثناء السفر دون تحويل العملات.
-          </p>
-        </div>
-
-        <div className="p-8 space-y-6 border-t border-slate-800">
-          <div className="flex justify-between items-center px-2">
-            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2"><Lock size={14} /> حماية الخصوصية (PIN)</label>
-            <div dir="ltr" className={`w-14 h-7 rounded-full p-1 cursor-pointer transition-all ${isSecurityEnabled ? 'bg-amber-500 shadow-[0_0_15px_rgba(245,158,11,0.3)]' : 'bg-slate-700'}`} onClick={() => setIsSecurityEnabled(!isSecurityEnabled)}>
-              <div className={`w-5 h-5 bg-white rounded-full shadow-md transition-transform ${isSecurityEnabled ? 'translate-x-7' : 'translate-x-0'}`} />
-            </div>
-          </div>
-          {isSecurityEnabled && (
-            <input type="password" value={localPin} onChange={e => setLocalPin(e.target.value.replace(/\D/g, '').slice(0, 4))} className="w-full p-5 rounded-2xl bg-slate-800 text-white font-black text-center text-2xl tracking-[1em]" placeholder="****" />
-          )}
-        </div>
-
-        <div className="p-8 space-y-4">
-          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
-            <Smartphone size={14} /> مفتاح Gemini API (اختياري)
-          </label>
-          <input 
-            type="password" 
-            value={localApiKey} 
-            onChange={e => setLocalApiKey(e.target.value)} 
-            placeholder="AI Studio API Key" 
-            className="w-full p-5 rounded-2xl bg-slate-800 text-white font-bold border-none outline-none focus:ring-1 focus:ring-amber-500 shadow-inner text-center" 
-          />
-        </div>
-
-        <div className="p-8">
-            <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-6 px-2">البيانات والتقارير</h4>
-            <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                    <button onClick={handleExportCSV} className="flex flex-col items-center justify-center gap-3 p-6 bg-slate-800/50 rounded-[2.5rem] active:scale-95 transition-all group hover:bg-slate-800 border border-slate-800/50">
-                        <FileSpreadsheet size={28} className="text-emerald-500 mb-1" />
-                        <span className="text-[10px] font-black text-white uppercase tracking-widest">تصدير Excel</span>
-                    </button>
-                    <button onClick={handleExportJSON} className="flex flex-col items-center justify-center gap-3 p-6 bg-slate-800/50 rounded-[2.5rem] active:scale-95 transition-all group hover:bg-slate-800 border border-slate-800/50">
-                        <Code size={28} className="text-blue-500 mb-1" />
-                        <span className="text-[10px] font-black text-white uppercase tracking-widest">تصدير JSON</span>
-                    </button>
+      <div className="space-y-4">
+         {/* Accordion 1 - Profile Info & AI Assistance */}
+         <AccordionItem id="profile" title="الحساب وصاحب المحفظة" icon={User}>
+            <div className="space-y-4 text-right">
+                <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2 block">اسم صاحب الحساب</label>
+                    <input 
+                      type="text" 
+                      value={localUserName} 
+                      onChange={e => setLocalUserName(e.target.value)} 
+                      className="w-full p-4 rounded-xl bg-slate-800 text-white font-bold border-none outline-none focus:ring-1 focus:ring-amber-500 shadow-inner" 
+                    />
                 </div>
-                <button onClick={() => { setReportConfig({ type: 'detailed', currencyFilter: null, action: 'print' }); setShowReportModal(true); }} className="w-full flex items-center justify-center gap-4 p-6 bg-slate-800/50 rounded-[2.5rem] active:scale-95 transition-all border-2 border-dashed border-slate-800 hover:border-amber-500/50 hover:bg-slate-800 group">
-                  <Printer size={22} className="text-amber-500" />
-                  <span className="text-sm font-black text-white">طباعة كشف حساب (Web)</span>
-                </button>
-                <button onClick={() => { setReportConfig({ type: 'detailed', currencyFilter: null, action: 'share' }); setShowReportModal(true); }} className="w-full flex items-center justify-center gap-4 p-6 bg-slate-800/50 rounded-[2.5rem] active:scale-95 transition-all border-2 border-dashed border-slate-800 hover:border-emerald-500/50 hover:bg-slate-800 group mt-4">
-                  <FileDown size={22} className="text-emerald-500" />
-                  <span className="text-sm font-black text-white">مشاركة PDF (جوال)</span>
-                </button>
-                <div className="grid grid-cols-2 gap-4 pt-4">
-                    <button onClick={handleExportBackup} disabled={isExporting} className="flex items-center justify-center gap-3 p-5 bg-slate-800 rounded-3xl active:scale-95 border border-slate-700/50">
-                        <FileDown size={18} className="text-amber-500" />
-                        <span className="text-xs font-black text-white">نسخ احتياطي</span>
-                    </button>
-                    <button onClick={() => fileInputRef.current?.click()} className="flex items-center justify-center gap-3 p-5 bg-slate-800 rounded-3xl active:scale-95 border border-slate-700/50">
-                        <Upload size={18} className="text-slate-400" />
-                        <span className="text-xs font-black text-white">استعادة</span>
-                    </button>
+                <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2 block">مفتاح الذكاء الاصطناعي Gemini (اختياري)</label>
+                    <input 
+                      type="password" 
+                      value={localApiKey} 
+                      onChange={e => setLocalApiKey(e.target.value)} 
+                      placeholder="AI Studio API Key" 
+                      className="text-center w-full p-4 rounded-xl bg-slate-800 text-white font-bold border-none outline-none focus:ring-1 focus:ring-amber-500 shadow-inner text-sm" 
+                    />
                 </div>
             </div>
-            <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" />
-        </div>
+         </AccordionItem>
+
+         {/* Accordion 2 - Preferences & Security */}
+         <AccordionItem id="security" title="الأمان والعملة والخصوصية" icon={Lock}>
+            <div className="space-y-5 divide-y divide-slate-800/60 text-right">
+                <div className="pb-4">
+                    <button 
+                        onClick={() => setShowCurrencyModal(true)}
+                        className="w-full bg-slate-950 p-4 rounded-2xl border border-slate-800 flex items-center justify-between group active:scale-[0.98] transition-all hover:border-amber-500/30"
+                        type="button"
+                    >
+                        <div className="flex items-center gap-4">
+                             <div className="w-10 h-10 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center text-amber-500 font-black">
+                                 {currency?.symbol || (typeof currency === 'string' ? currency : '')}
+                             </div>
+                             <div className="text-right">
+                                 <p className="text-[9px] font-black text-slate-500 uppercase">العملة الأساسية</p>
+                                 <p className="text-white font-bold text-xs">{currency?.name || (typeof currency === 'string' ? currency : '')}</p>
+                             </div>
+                        </div>
+                        <ChevronDown size={16} className="text-slate-500" />
+                    </button>
+                </div>
+
+                <div className="pt-4 space-y-2">
+                    <div className="flex justify-between items-center bg-slate-950/40 p-3 rounded-2xl border border-white/5">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2"><Plane size={14} /> وضع السفر (فصل العملات)</label>
+                        <div dir="ltr" className={`w-12 h-6 rounded-full p-1 cursor-pointer transition-all ${isTravelMode ? 'bg-amber-500' : 'bg-slate-700'}`} onClick={() => {
+                            const newVal = !isTravelMode;
+                            setIsTravelMode(newVal);
+                            onUpdateSettings({ showSeparateCurrencies: newVal });
+                        }}>
+                            <div className={`w-4 h-4 bg-white rounded-full shadow-md transition-transform ${isTravelMode ? 'translate-x-6' : 'translate-x-0'}`} />
+                        </div>
+                    </div>
+                </div>
+
+                <div className="pt-4 space-y-3">
+                    <div className="flex justify-between items-center bg-slate-950/40 p-3 rounded-2xl border border-white/5">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2"><Lock size={14} /> كود الحماية السري (PIN)</label>
+                        <div dir="ltr" className={`w-12 h-6 rounded-full p-1 cursor-pointer transition-all ${isSecurityEnabled ? 'bg-amber-500' : 'bg-slate-700'}`} onClick={() => setIsSecurityEnabled(!isSecurityEnabled)}>
+                            <div className={`w-4 h-4 bg-white rounded-full shadow-md transition-transform ${isSecurityEnabled ? 'translate-x-6' : 'translate-x-0'}`} />
+                        </div>
+                    </div>
+                    {isSecurityEnabled && (
+                        <input 
+                            type="password" 
+                            value={localPin} 
+                            onChange={e => setLocalPin(e.target.value.replace(/\D/g, '').slice(0, 4))} 
+                            className="w-full p-4 rounded-xl bg-slate-800 text-white font-black text-center text-xl tracking-[0.5em]" 
+                            placeholder="****" 
+                        />
+                    )}
+                </div>
+            </div>
+         </AccordionItem>
+
+         {/* Accordion 3 - Data & Reports */}
+         <AccordionItem id="data" title="التقارير وسجلات الحساب والنسخ" icon={FileText}>
+            <div className="space-y-4 text-right">
+                <div className="grid grid-cols-2 gap-3">
+                    <button onClick={handleExportCSV} className="flex flex-col items-center justify-center gap-2 p-4 bg-slate-800/80 rounded-2xl active:scale-95 transition-all text-white border border-slate-800 hover:border-emerald-500/30">
+                        <FileSpreadsheet size={22} className="text-emerald-500" />
+                        <span className="text-[9px] font-black text-slate-300 uppercase tracking-wider">تصدير Excel</span>
+                    </button>
+                    <button onClick={handleExportJSON} className="flex flex-col items-center justify-center gap-2 p-4 bg-slate-800/80 rounded-2xl active:scale-95 transition-all text-white border border-slate-800 hover:border-blue-500/30">
+                        <Code size={22} className="text-blue-500" />
+                        <span className="text-[9px] font-black text-slate-300 uppercase tracking-wider">تصدير Raw JSON</span>
+                    </button>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                    <button onClick={() => { setReportConfig({ type: 'detailed', currencyFilter: null, action: 'print' }); setShowReportModal(true); }} className="flex items-center justify-center gap-2 p-4 bg-slate-800/80 rounded-2xl active:scale-95 transition-all border border-slate-800 text-white hover:border-amber-500/30 text-xs font-bold">
+                        <Printer size={16} className="text-amber-500" />
+                        <span>طباعة الكشف</span>
+                    </button>
+                    <button onClick={() => { setReportConfig({ type: 'detailed', currencyFilter: null, action: 'share' }); setShowReportModal(true); }} className="flex items-center justify-center gap-2 p-4 bg-slate-800/80 rounded-2xl active:scale-95 transition-all border border-slate-800 text-white hover:border-emerald-500/30 text-xs font-bold">
+                        <FileDown size={16} className="text-emerald-500" />
+                        <span>مشاركة كـ PDF</span>
+                    </button>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 pt-4 border-t border-slate-850">
+                    <button onClick={handleExportBackup} disabled={isExporting} className="flex items-center justify-center gap-2 p-3 bg-slate-800 rounded-xl active:scale-95 border border-slate-700/50 text-xs font-bold text-white">
+                        <FileDown size={14} className="text-amber-400" />
+                        <span>نسخ احتياطي (.thari)</span>
+                    </button>
+                    <button onClick={() => fileInputRef.current?.click()} className="flex items-center justify-center gap-2 p-3 bg-slate-800 rounded-xl active:scale-95 border border-slate-700/50 text-xs font-bold text-white">
+                        <Upload size={14} className="text-slate-400" />
+                        <span>استعادة نسخة</span>
+                    </button>
+                </div>
+                <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" />
+            </div>
+         </AccordionItem>
+
+         {/* Accordion 4 - Sensitive Actions */}
+         <AccordionItem id="danger" title="صيانة النظام ومسح البيانات" icon={Trash2}>
+            <div className="space-y-4 text-right">
+                <p className="text-[10px] text-slate-500 leading-relaxed">
+                    تنبيه: مسح البيانات سيقوم بإعادة ضبط المصنع بالكامل وحذف كافة المعاملات والديون والاشتراكات والتقارير المالية نهائياً.
+                </p>
+                <button 
+                  onClick={() => triggerConfirm("هل أنت متأكد من مسح جميع بيانات التطبيق؟ سيتم حذف جميع المعاملات والديون والاشتراكات بشكل نهائي.", onClearData, "تنبيه هام جداً", "danger")} 
+                  className="w-full py-4 text-rose-500 font-bold text-xs border border-rose-500/20 bg-rose-500/5 rounded-2xl active:scale-95 flex items-center justify-center gap-2 duration-200"
+                  type="button"
+                >
+                  <Trash2 size={16} /> مسح السجل المالي بالكامل وتصفيره
+                </button>
+            </div>
+         </AccordionItem>
       </div>
-      
-       <div className="px-1">
-           <button onClick={() => triggerConfirm("هل أنت متأكد من مسح جميع بيانات التطبيق؟ سيتم حذف جميع المعاملات والديون والاشتراكات بشكل نهائي.", onClearData, "تنبيه هام جداً", "danger")} className="w-full py-6 text-rose-500 font-black text-sm border border-rose-500/20 bg-rose-500/5 rounded-[2.5rem] active:scale-95 flex items-center justify-center gap-3">
-             <Trash2 size={20} /> مسح السجل المالي نهائياً
-           </button>
-       </div>
 
       {/* Report Configuration Modal */}
       {showReportModal && (

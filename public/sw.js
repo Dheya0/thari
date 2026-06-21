@@ -83,7 +83,8 @@ self.addEventListener('fetch', (event) => {
         })
         .catch(() => {
           // If offline and requesting an image, we can return logo if needed
-          if (req.headers.get('accept').includes('image')) {
+          const acceptHeader = req.headers.get('accept');
+          if (acceptHeader && acceptHeader.includes('image')) {
             return caches.match('logo.svg');
           }
         });

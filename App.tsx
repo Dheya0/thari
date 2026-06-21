@@ -257,22 +257,20 @@ const App: React.FC = () => {
             }
 
             if (!shared) {
-                // If share didn't work, try opening in new window (Standard Android WebView behavior)
-                const newWindow = window.open(blobUrl, '_blank');
+                // For standard browsers, trigger direct download which is clean and doesn't reveal raw text
+                const link = document.createElement('a');
+                link.href = blobUrl;
+                link.download = fileName;
+                link.style.display = 'none';
+                document.body.appendChild(link);
+                link.click();
                 
-                // If popup blocked or failed, try direct save
-                if (!newWindow) {
-                    // Try data URI navigation (sometimes works in WebViews where blob fails)
-                    try {
-                        window.location.href = pdf.output('datauristring');
-                    } catch (e) {
-                        pdf.save(fileName);
-                        alert("تم حفظ التقرير. إذا لم يظهر، يرجى التحقق من إعدادات التنزيل في المتصفح.");
-                    }
-                } else {
-                    // Revoke URL after a delay to allow loading
-                    setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
-                }
+                setTimeout(() => {
+                    document.body.removeChild(link);
+                    URL.revokeObjectURL(blobUrl);
+                }, 300);
+                
+                alert("تم حفظ التقرير بنجاح. إذا لم يتم التنزيل تلقائياً، يرجى التحقق من إعدادات المتصفح.");
             }
 
         } catch (e) {
@@ -310,6 +308,48 @@ const App: React.FC = () => {
       debts: p.debts.map(d => d.id === id ? { ...d, ...updates } : d)
     }));
   };
+  const handlePayDebt = (id: string, amount: number, walletId?: string, noteSuffix?: string, customDebtUpdates?: Partial<Debt>) => {
+    const debt = state.debts.find(d => d.id === id);
+    if (!debt) return;
+    
+    let newTransaction: Transaction | null = null;
+    if (walletId && amount > 0) {
+        newTransaction = {
+            id: 'tx-' + Date.now(),
+            amount: amount,
+            type: debt.type === 'to_me' ? 'income' : 'expense',
+            categoryId: debt.type === 'to_me' ? '11' : '4',
+            walletId: walletId,
+            note: debt.type === 'to_me' 
+                ? `دفعة مستردة من دين: ${debt.personName}${noteSuffix ? ` (${noteSuffix})` : ''}` 
+                : `دفعة مسددة من دين: ${debt.personName}${noteSuffix ? ` (${noteSuffix})` : ''}`,
+            date: new Date().toISOString().split('T')[0],
+            currency: debt.currency,
+            frequency: 'once'
+        };
+    }
+    
+    setState(p => {
+        const updatedDebts = p.debts.map(d => {
+            if (d.id === id) {
+                const newPaidAmount = (d.paidAmount || 0) + amount;
+                const isPaid = newPaidAmount >= d.amount * 0.999;
+                return {
+                    ...d,
+                    paidAmount: newPaidAmount,
+                    isPaid: isPaid,
+                    ...customDebtUpdates
+                };
+            }
+            return d;
+        });
+        return {
+            ...p,
+            transactions: newTransaction ? [newTransaction, ...p.transactions] : p.transactions,
+            debts: updatedDebts
+        };
+    });
+  };
   const handleAddDebt = (debtData: Omit<Debt, 'id'>, walletId?: string) => {
     const newDebtId = 'd-' + Date.now();
     const newTransactionId = 'tx-' + Date.now();
@@ -337,32 +377,22 @@ const App: React.FC = () => {
   const handleSettleDebt = (id: string, walletId?: string) => {
     const debt = state.debts.find(d => d.id === id);
     if (!debt) return;
-    let newTransaction: Transaction | null = null;
-    if (walletId) {
-        newTransaction = {
-            id: 'tx-' + Date.now(),
-            amount: debt.amount,
-            type: debt.type === 'to_me' ? 'income' : 'expense',
-            categoryId: debt.type === 'to_me' ? '11' : '4',
-            walletId: walletId,
-            note: debt.type === 'to_me' ? `استرداد دين من: ${debt.personName}` : `سداد دين لـ: ${debt.personName}`,
-            date: new Date().toISOString().split('T')[0],
-            currency: debt.currency,
-            frequency: 'once'
-        };
-    }
-    setState(p => ({
-        ...p,
-        transactions: newTransaction ? [newTransaction, ...p.transactions] : p.transactions,
-        debts: p.debts.map(d => d.id === id ? { ...d, isPaid: true } : d)
-    }));
+    const remaining = debt.amount - (debt.paidAmount || 0);
+    handlePayDebt(id, remaining, walletId, "سداد كامل");
   };
 
   if (!state.hasAcceptedTerms) return <WelcomeScreen onAccept={() => setState(p => ({ ...p, hasAcceptedTerms: true }))} onShowPrivacy={() => setShowPrivacyPolicy(true)} />;
   if (state.pin && state.isLocked) return <LockScreen savedPin={state.pin} onUnlock={() => setState(p => ({ ...p, isLocked: false }))} />;
 
   return (
-    <div className="w-full h-dvh flex flex-col max-w-lg md:max-w-3xl lg:max-w-4xl xl:max-w-5xl mx-auto bg-slate-950/20 md:bg-slate-950/45 md:my-6 md:rounded-[3rem] md:border md:border-white/10 md:shadow-[0_25px_60px_rgba(0,0,0,0.8)] backdrop-blur-3xl transition-all relative border-x border-white/5 print:block print:bg-white print:max-w-none print:h-auto overflow-hidden">
+    <div 
+      className="w-full flex flex-col relative print:block print:bg-white print:max-w-none print:h-auto overflow-hidden text-right bg-slate-950/30"
+      style={{
+        height: 'var(--vh, var(--app-height))',
+        paddingLeft: 'env(safe-area-inset-left, 0px)',
+        paddingRight: 'env(safe-area-inset-right, 0px)'
+      } as React.CSSProperties}
+    >
       
       {/* Hidden Print Report */}
       <FinancialReport 
@@ -378,8 +408,8 @@ const App: React.FC = () => {
       />
       
       <div className="flex flex-col flex-1 print:hidden relative z-20 overflow-hidden">
-        <header className="sticky top-0 shrink-0 px-4 py-3 md:px-6 md:py-4 pt-[calc(var(--sat)+0.5rem)] glass-effect border-b border-white/5 z-30 backdrop-blur-xl bg-slate-950/80">
-          <div className="flex justify-between items-center">
+        <header className="sticky top-0 shrink-0 px-4 pb-3 md:px-6 md:py-4 glass-effect border-b border-white/5 z-30 backdrop-blur-xl bg-slate-950/80" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 0.75rem)' }}>
+          <div className="flex justify-between items-center max-w-6xl mx-auto w-full">
             <Logo size={28} showText />
             <div className="flex gap-2">
               <button onClick={() => setActiveTab('future')} className={`p-2 rounded-xl border border-white/10 transition-all ${activeTab === 'future' ? 'bg-purple-500 text-slate-950 shadow-[0_0_20px_rgba(168,85,247,0.4)]' : 'text-slate-400 bg-white/5 hover:bg-white/10'}`}><Sparkles size={16} /></button>
@@ -389,8 +419,8 @@ const App: React.FC = () => {
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto no-scrollbar overflow-x-hidden px-4 md:px-5 relative pb-[calc(10rem+env(safe-area-inset-bottom))] w-full">
-          <div className="py-6 space-y-8">
+        <main className="flex-1 overflow-y-auto no-scrollbar overflow-x-hidden px-4 md:px-5 relative pb-[calc(7rem+env(safe-area-inset-bottom,16px))] w-full">
+          <div className="py-6 space-y-8 max-w-6xl mx-auto w-full">
             {activeTab === 'dashboard' && (
               <div className="space-y-6 md:space-y-0 md:grid md:grid-cols-12 md:gap-6 md:items-start animate-luxury-pop">
                 
@@ -438,7 +468,7 @@ const App: React.FC = () => {
                 </div>
 
                 {/* LEFT COLUMN: Net Worth & Analytical Executive Insights */}
-                <div className="col-span-12 lg:col-span-6 space-y-6">
+                <div className="col-span-12 md:col-span-6 space-y-6">
                     {/* Balanced Corporate Card */}
                     <BalanceCard 
                         totalBalance={totals.balance} 
@@ -461,7 +491,7 @@ const App: React.FC = () => {
                 </div>
 
                 {/* RIGHT COLUMN: Sankey Cashflow diagrams & Compact Timeline */}
-                <div className="col-span-12 lg:col-span-6 space-y-6">
+                <div className="col-span-12 md:col-span-6 space-y-6">
                     {/* Sankey Flow Visualizer */}
                     <CashflowSankey 
                         transactions={filteredTransactions}
@@ -485,9 +515,9 @@ const App: React.FC = () => {
             {activeTab === 'goals' && <GoalTracker goals={state.goals} wallets={state.wallets} transactions={state.transactions} onAddGoal={(g) => setState(p => ({ ...p, goals: [...p.goals, { ...g, id: 'g-'+Date.now() }] }))} onUpdateGoalAmount={(id, amt) => setState(p => ({ ...p, goals: p.goals.map(g => g.id === id ? { ...g, currentAmount: g.currentAmount + amt } : g) }))} currencySymbol={state.currency.symbol} apiKey={state.apiKey} />}
             {activeTab === 'budgets' && <BudgetManager budgets={state.budgets} categories={state.categories} transactions={filteredTransactions} onSetBudget={(catId, amount) => setState(p => ({ ...p, budgets: [...p.budgets.filter(b => b.categoryId !== catId), { categoryId: catId, amount }] }))} currencySymbol={state.currency.symbol} />}
             {activeTab === 'chat' && <AIChat history={state.chatHistory} transactions={filteredTransactions} categories={state.categories} currency={state.currency.symbol} onSendMessage={(msg) => setState(p => ({ ...p, chatHistory: [...p.chatHistory, msg].slice(-30) }))} apiKey={state.apiKey} />}
-            {activeTab === 'debts' && <DebtManager debts={state.debts} wallets={state.wallets} onAddDebt={handleAddDebt} onUpdateDebt={handleUpdateDebt} onSettleDebt={handleSettleDebt} onDeleteDebt={(id) => setState(p => ({ ...p, debts: p.debts.filter(d => d.id !== id) }))} currencySymbol={state.currency.symbol} currencyCode={state.currency.code} />}
+            {activeTab === 'debts' && <DebtManager debts={state.debts} wallets={state.wallets} onAddDebt={handleAddDebt} onUpdateDebt={handleUpdateDebt} onSettleDebt={handleSettleDebt} onPayDebt={handlePayDebt} onDeleteDebt={(id) => setState(p => ({ ...p, debts: p.debts.filter(d => d.id !== id) }))} currencySymbol={state.currency.symbol} currencyCode={state.currency.code} />}
             {activeTab === 'subscriptions' && <SubscriptionManager subscriptions={state.subscriptions} categories={state.categories} onAdd={(sub) => setState(p => ({ ...p, subscriptions: [{...sub, id: 's-'+Date.now()}, ...p.subscriptions] }))} onRemove={(id) => setState(p => ({ ...p, subscriptions: p.subscriptions.filter(s => s.id !== id) }))} currencySymbol={state.currency.symbol} />}
-            {activeTab === 'zakat' && <ZakatCalculator totalBalance={totals.balance} currencySymbol={state.currency.symbol} />}
+            {activeTab === 'zakat' && <ZakatCalculator totalBalance={totals.balance} currencySymbol={state.currency.symbol} debts={state.debts} />}
             
             {activeTab === 'transactions' && (
                 <div className="space-y-8 animate-luxury-pop">
@@ -521,7 +551,7 @@ const App: React.FC = () => {
                     onUpdateCategory={(id, updates) => setState(p => ({ ...p, categories: p.categories.map(c => c.id === id ? { ...c, ...updates } : c) }))}
                     onRemoveCategory={(id) => setState(p => ({ ...p, categories: p.categories.filter(c => c.id !== id) }))}
                     onRestore={(data) => setState(p => ({ ...INITIAL_STATE, ...data, isLocked: !!data.pin }))} 
-                    onClearData={() => { if(confirm('هل تريد مسح السجل المالي نهائياً؟')) setState(p => ({...p, transactions: [], debts: [], budgets: [], subscriptions: [], chatHistory: [], goals: []})) }} 
+                    onClearData={() => setState(p => ({...p, transactions: [], debts: [], budgets: [], subscriptions: [], chatHistory: [], goals: []}))} 
                     onShowPrivacyPolicy={() => setShowPrivacyPolicy(false)} 
                     onPrint={handlePrint}
                     onShare={handleShare}
@@ -533,7 +563,7 @@ const App: React.FC = () => {
           </div>
         </main>
 
-        <div className="fixed bottom-0 left-0 right-0 pt-16 pb-[calc(1rem+env(safe-area-inset-bottom))] px-4 md:px-0 flex justify-center pointer-events-none z-40 bg-gradient-to-t from-slate-950 via-slate-950/80 to-transparent">
+        <div className="absolute bottom-0 left-0 right-0 pt-16 pb-[calc(1rem+env(safe-area-inset-bottom,0px))] px-4 md:px-0 flex justify-center pointer-events-none z-50 bg-gradient-to-t from-slate-950 via-slate-950/80 to-transparent">
             <nav className="pointer-events-auto w-full md:max-w-xl bg-slate-900/95 backdrop-blur-2xl border border-white/10 flex items-center justify-between px-2 py-2 rounded-[2rem] shadow-[0_20px_40px_rgba(0,0,0,0.5)]">
                 <NavButton icon={<LayoutDashboard />} label="الرئيسية" active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} />
                 <NavButton icon={<Scale />} label="زكاتي" active={activeTab === 'zakat'} onClick={() => setActiveTab('zakat')} />
@@ -552,14 +582,14 @@ const App: React.FC = () => {
 
         {/* Floating Quick Action Buttons (visible immediately on dashboard) */}
         {activeTab === 'dashboard' && (
-          <div className="fixed right-4 bottom-24 md:bottom-28 md:right-[calc(50%-17rem)] z-40 flex flex-col gap-3 pointer-events-none no-print">
+          <div className="absolute left-4 bottom-28 md:bottom-32 z-40 flex flex-col gap-3 pointer-events-none no-print animate-fade">
             <button 
               onClick={() => setActiveTab('goals')} 
               className="pointer-events-auto w-12 h-12 bg-slate-900/95 backdrop-blur-3xl border border-white/10 hover:border-amber-500/50 rounded-full flex flex-col items-center justify-center text-amber-500 shadow-[0_10px_25px_rgba(0,0,0,0.6)] active:scale-90 hover:scale-105 transition-all group relative"
               title="الأهداف المالية"
             >
               <Coins size={20} className="group-hover:scale-110 transition-transform" />
-              <span className="absolute right-14 bg-slate-900/95 backdrop-blur-xl border border-white/10 text-white font-bold text-[10px] px-3 py-1.5 rounded-xl whitespace-nowrap opacity-100 transition-opacity pointer-events-none shadow-md block">الأهداف</span>
+              <span className="absolute left-14 bg-slate-900/95 backdrop-blur-xl border border-white/10 text-white font-bold text-[10px] px-3 py-1.5 rounded-xl whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-md hidden group-hover:block">الأهداف</span>
             </button>
             <button 
               onClick={() => setActiveTab('budgets')} 
@@ -567,7 +597,7 @@ const App: React.FC = () => {
               title="إدارة الميزانية"
             >
               <LayoutDashboard size={20} className="group-hover:scale-110 transition-transform" />
-              <span className="absolute right-14 bg-slate-900/95 backdrop-blur-xl border border-white/10 text-white font-bold text-[10px] px-3 py-1.5 rounded-xl whitespace-nowrap opacity-100 transition-opacity pointer-events-none shadow-md block">الميزانية</span>
+              <span className="absolute left-14 bg-slate-900/95 backdrop-blur-xl border border-white/10 text-white font-bold text-[10px] px-3 py-1.5 rounded-xl whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-md hidden group-hover:block">الميزانية</span>
             </button>
           </div>
         )}
