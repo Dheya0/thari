@@ -1,11 +1,12 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { Plus, LayoutDashboard, History, Settings as SettingsIcon, BrainCircuit, HandCoins, Repeat, Coins, ArrowRight, Sparkles, Scale, Wallet as WalletIcon, Check, Plane, FileText, Download } from 'lucide-react';
 import { AppState, Transaction, Category, Debt } from './types';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import { INITIAL_CATEGORIES, DEFAULT_CURRENCIES, DEFAULT_EXCHANGE_RATES, convertCurrency } from './constants';
-import { generateAndSharePDF, generateAndShareCSV } from './utils/exportHelper';
+import { generateAndSharePDF, generateAndShareCSV, buildExecutiveCSVContent, exportAndShareExecutiveCSV } from './utils/exportHelper';
 import BalanceCard from './components/BalanceCard';
 import TransactionForm from './components/TransactionForm';
 import TransactionList from './components/TransactionList';
@@ -196,23 +197,32 @@ const App: React.FC = () => {
   const handlePrint = (type: 'summary' | 'detailed', currencyFilter?: string | null) => {
     setPrintType(type);
     setPrintCurrencyFilter(currencyFilter || null);
-    setTimeout(() => { window.print(); }, 800);
+    // Give React time to update state and re-render FinancialReport before opening print dialog
+    setTimeout(() => { 
+      window.print(); 
+    }, 600);
   };
 
   const handleShare = async (type: 'summary' | 'detailed', currencyFilter?: string | null) => {
     setPrintType(type);
     setPrintCurrencyFilter(currencyFilter || null);
+    
     setTimeout(async () => {
         try {
             const original = document.getElementById('printable-report');
             if (!original) return;
             
+            // Clone offscreen for standard 210mm A4 rendering
             const clone = original.cloneNode(true) as HTMLElement;
             clone.classList.remove('hidden', 'print:block');
-            clone.classList.add('block', 'absolute', 'top-0', 'left-0', 'z-[-1]', 'bg-white');
-            clone.style.width = '210mm';
+            clone.classList.add('block');
+            clone.style.position = 'absolute';
+            clone.style.top = '-9999px';
+            clone.style.left = '0';
+            clone.style.width = '794px'; // A4 width at 96 DPI
             clone.style.height = 'auto';
-            clone.style.minHeight = '297mm';
+            clone.style.backgroundColor = '#ffffff';
+            clone.style.color = '#000000';
             document.body.appendChild(clone);
             
             const canvas = await html2canvas(clone, { 
@@ -222,23 +232,35 @@ const App: React.FC = () => {
                 windowWidth: 794 
             });
             
-            const imgData = canvas.toDataURL('image/png');
-            const pdf = new jsPDF('p', 'mm', 'a4');
-            const pdfWidth = pdf.internal.pageSize.getWidth();
-            const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-            
-            pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-            
             document.body.removeChild(clone);
             
-            const fileName = `Thari_Report_${new Date().toISOString().split('T')[0]}.pdf`;
+            const imgData = canvas.toDataURL('image/png');
+            const pdf = new jsPDF('p', 'mm', 'a4');
+            const pdfWidth = 210; // A4 width in mm
+            const pdfPageHeight = 297; // A4 height in mm
+            const imgHeight = (canvas.height * pdfWidth) / canvas.width; // Total height of report image in mm
+            
+            let heightLeft = imgHeight;
+            let position = 0;
 
-            // WebView-friendly approach: Open Blob URL in new window
-            // This forces Android to handle the PDF intent (View/Download)
+            // Render first page
+            pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, imgHeight);
+            heightLeft -= pdfPageHeight;
+
+            // Add additional pages if content spans across multiple pages
+            while (heightLeft > 0) {
+                position -= pdfPageHeight;
+                pdf.addPage();
+                pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, imgHeight);
+                heightLeft -= pdfPageHeight;
+            }
+            
+            const fileName = `Thari_Financial_Report_${type}_${new Date().toISOString().split('T')[0]}.pdf`;
+
             const blob = pdf.output('blob');
             const blobUrl = URL.createObjectURL(blob);
             
-            // Try to share using Web Share API first if supported
+            // Try Web Share API first
             let shared = false;
             if (navigator.share && navigator.canShare) {
                 try {
@@ -246,18 +268,18 @@ const App: React.FC = () => {
                     if (navigator.canShare({ files: [file] })) {
                         await navigator.share({
                             files: [file],
-                            title: 'تقرير ثري المالي',
+                            title: 'كشف حساب ثري المالي',
                             text: 'تقرير مالي من تطبيق ثري'
                         });
                         shared = true;
                     }
                 } catch (e) {
-                    console.log("Web Share API failed, falling back to open/download");
+                    console.log("Web Share API failed, falling back to download");
                 }
             }
 
             if (!shared) {
-                // For standard browsers, trigger direct download which is clean and doesn't reveal raw text
+                // Direct PDF download fallback
                 const link = document.createElement('a');
                 link.href = blobUrl;
                 link.download = fileName;
@@ -268,16 +290,31 @@ const App: React.FC = () => {
                 setTimeout(() => {
                     document.body.removeChild(link);
                     URL.revokeObjectURL(blobUrl);
-                }, 300);
-                
-                alert("تم حفظ التقرير بنجاح. إذا لم يتم التنزيل تلقائياً، يرجى التحقق من إعدادات المتصفح.");
+                }, 1000);
             }
 
         } catch (e) {
             console.error("Share failed", e);
             alert("فشل إنشاء ملف PDF. يرجى المحاولة مرة أخرى.");
         }
-    }, 500);
+    }, 600);
+  };
+
+  const handleExportExcelReport = (type: 'summary' | 'detailed' = 'detailed', currencyFilter?: string | null) => {
+    const csvContent = buildExecutiveCSVContent({
+      transactions: state.transactions,
+      categories: state.categories,
+      wallets: state.wallets,
+      userName: state.userName,
+      currency: state.currency,
+      exchangeRates: state.exchangeRates,
+      type,
+      filterWalletId: selectedWalletId,
+      filterCurrency: currencyFilter || null
+    });
+
+    const fileName = `Thari_Executive_Report_${type}_${new Date().toISOString().split('T')[0]}.csv`;
+    exportAndShareExecutiveCSV(csvContent, fileName);
   };
 
   const handleEditTransaction = (tx: Transaction) => {
@@ -419,205 +456,242 @@ const App: React.FC = () => {
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto no-scrollbar overflow-x-hidden px-4 md:px-5 relative pb-[calc(7rem+env(safe-area-inset-bottom,16px))] w-full">
-          <div className="py-6 space-y-8 max-w-6xl mx-auto w-full">
-            {activeTab === 'dashboard' && (
-              <div className="space-y-6 md:space-y-0 md:grid md:grid-cols-12 md:gap-6 md:items-start animate-luxury-pop">
-                
-                {/* Horizontal Sliding Currencies Marquee (Scrollable, now inside main so it scrolls away naturally and doesn't clutter top) */}
-                <div className="md:col-span-12 overflow-hidden mask-gradient-x py-1">
-                    <div className="flex items-center gap-3 relative z-10 w-full overflow-x-auto no-scrollbar py-1">
-                    {state.currencies.map((curr, index) => {
-                        const isActive = state.currency.code === curr.code;
-                        return (
-                        <button key={`${curr.code}-${index}`} onClick={() => setState(p => ({...p, currency: curr}))} className={`shrink-0 relative flex items-center gap-2.5 pl-4 pr-2.5 py-2 rounded-full border backdrop-blur-md transition-all duration-500 ${isActive ? 'bg-amber-500 border-amber-400 text-slate-950 shadow-[0_0_15px_rgba(245,158,11,0.35)] scale-102 z-20' : 'bg-slate-800/30 border-white/5 text-slate-400 hover:bg-slate-800 hover:border-white/20'}`}>
-                            {isActive && <div className="absolute inset-0 rounded-full bg-gradient-to-br from-white/30 to-transparent opacity-50 pointer-events-none" />}
-                            <span className={`text-[9px] font-black uppercase tracking-widest ${isActive ? 'text-slate-900/60' : 'text-slate-500'}`}>{curr.code}</span>
-                            <span className="font-bold text-xs whitespace-nowrap">{curr.name}</span>
-                            <div className={`w-1.5 h-1.5 rounded-full transition-colors ${isActive ? 'bg-slate-950' : 'bg-slate-600'}`} />
-                        </button>
-                        );
-                    })}
-                    </div>
-                </div>
-
-                {/* Wallets scroll stays top wide */}
-                <div className="md:col-span-12 flex gap-3 overflow-x-auto no-scrollbar py-1">
-                     <button 
-                         onClick={() => handleSelectWallet(null)}
-                         className={`shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-2xl border transition-all ${!selectedWalletId ? 'bg-white text-slate-900 border-white' : 'bg-slate-800/50 border-slate-700 text-slate-400'}`}
-                     >
-                         <LayoutDashboard size={16} />
-                         <span className="text-xs font-black">كل المحافظ</span>
-                     </button>
-                     {state.wallets.map(w => (
-                         <button 
-                             key={w.id}
-                             onClick={() => handleSelectWallet(w.id)}
-                             className={`shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-2xl border transition-all ${selectedWalletId === w.id ? 'bg-amber-500 text-slate-900 border-amber-500 shadow-lg shadow-amber-500/20' : 'bg-slate-800/50 border-slate-700 text-slate-400'}`}
-                         >
-                             <div className="w-2 h-2 rounded-full" style={{backgroundColor: w.color}} />
-                             <span className="text-xs font-black">{w.name}</span>
-                             {selectedWalletId === w.id && <Check size={14} />}
-                         </button>
-                     ))}
-                </div>
-
-                <div className="md:col-span-12">
-                   <SmartAlerts budgets={state.budgets} transactions={filteredTransactions} debts={state.debts} subscriptions={state.subscriptions} categories={state.categories} />
-                </div>
-
-                {/* LEFT COLUMN: Net Worth & Analytical Executive Insights */}
-                <div className="col-span-12 md:col-span-6 space-y-6">
-                    {/* Balanced Corporate Card */}
-                    <BalanceCard 
-                        totalBalance={totals.balance} 
-                        totalIncome={totals.income} 
-                        totalExpense={totals.expense} 
-                        symbol={state.currency.symbol}
-                        balances={totals.currencyBreakdown}
-                        expenseBreakdown={totals.expenseBreakdown}
-                        showSeparateCurrencies={state.showSeparateCurrencies}
-                    />
-
-                    {/* Executive Insights (Dynamic Runway, Burn Rate and Smart Natural Language reports) */}
-                    <ExecutiveInsights 
-                        transactions={filteredTransactions}
-                        budgets={state.budgets}
-                        debts={state.debts}
-                        totalBalance={totals.balance}
-                        currencySymbol={state.currency.symbol}
-                    />
-                </div>
-
-                {/* RIGHT COLUMN: Sankey Cashflow diagrams & Compact Timeline */}
-                <div className="col-span-12 md:col-span-6 space-y-6">
-                    {/* Sankey Flow Visualizer */}
-                    <CashflowSankey 
-                        transactions={filteredTransactions}
-                        categories={state.categories}
-                        currencySymbol={state.currency.symbol}
-                    />
-
-                    {/* Compact recent operations list */}
-                    <section className="space-y-4">
-                      <div className="flex justify-between items-center px-2">
-                        <h3 className="text-[9px] font-black text-slate-500 uppercase flex items-center gap-2 tracking-[0.2em]"><History size={12} /> {selectedWalletId ? 'سجل المحفظة المختارة' : 'أحدث العمليات'}</h3>
-                        <button onClick={() => setActiveTab('transactions')} className="text-amber-500 text-[9px] font-black uppercase flex items-center gap-1">عرض الكل <ArrowRight size={10} className="rotate-180" /></button>
-                      </div>
-                      <TransactionList transactions={filteredTransactions.slice(0, 3)} categories={state.categories} wallets={state.wallets} onDelete={(id) => setState(p => ({ ...p, transactions: p.transactions.filter(t => t.id !== id) }))} onEdit={handleEditTransaction} currencySymbol={state.currency.symbol} />
-                    </section>
-                </div>
-              </div>
-            )}
-            
-            {activeTab === 'future' && <FinancialSimulation transactions={filteredTransactions} currencySymbol={state.currency.symbol} apiKey={state.apiKey} />}
-            {activeTab === 'goals' && <GoalTracker goals={state.goals} wallets={state.wallets} transactions={state.transactions} onAddGoal={(g) => setState(p => ({ ...p, goals: [...p.goals, { ...g, id: 'g-'+Date.now() }] }))} onUpdateGoalAmount={(id, amt) => setState(p => ({ ...p, goals: p.goals.map(g => g.id === id ? { ...g, currentAmount: g.currentAmount + amt } : g) }))} currencySymbol={state.currency.symbol} apiKey={state.apiKey} />}
-            {activeTab === 'budgets' && <BudgetManager budgets={state.budgets} categories={state.categories} transactions={filteredTransactions} onSetBudget={(catId, amount) => setState(p => ({ ...p, budgets: [...p.budgets.filter(b => b.categoryId !== catId), { categoryId: catId, amount }] }))} currencySymbol={state.currency.symbol} />}
-            {activeTab === 'chat' && <AIChat history={state.chatHistory} transactions={filteredTransactions} categories={state.categories} currency={state.currency.symbol} onSendMessage={(msg) => setState(p => ({ ...p, chatHistory: [...p.chatHistory, msg].slice(-30) }))} apiKey={state.apiKey} />}
-            {activeTab === 'debts' && <DebtManager debts={state.debts} wallets={state.wallets} onAddDebt={handleAddDebt} onUpdateDebt={handleUpdateDebt} onSettleDebt={handleSettleDebt} onPayDebt={handlePayDebt} onDeleteDebt={(id) => setState(p => ({ ...p, debts: p.debts.filter(d => d.id !== id) }))} currencySymbol={state.currency.symbol} currencyCode={state.currency.code} />}
-            {activeTab === 'subscriptions' && <SubscriptionManager subscriptions={state.subscriptions} categories={state.categories} onAdd={(sub) => setState(p => ({ ...p, subscriptions: [{...sub, id: 's-'+Date.now()}, ...p.subscriptions] }))} onRemove={(id) => setState(p => ({ ...p, subscriptions: p.subscriptions.filter(s => s.id !== id) }))} currencySymbol={state.currency.symbol} />}
-            {activeTab === 'zakat' && <ZakatCalculator totalBalance={totals.balance} currencySymbol={state.currency.symbol} debts={state.debts} />}
-            
-            {activeTab === 'transactions' && (
-                <div className="space-y-8 animate-luxury-pop">
-                    <Analytics 
-                        transactions={state.transactions} 
-                        categories={state.categories} 
-                        wallets={state.wallets}
-                        currencySymbol={state.currency.symbol} 
-                        onPrint={handlePrint} 
-                        currentCurrencyCode={state.currency.code} 
-                        exchangeRates={state.exchangeRates} 
-                        initialWalletId={selectedWalletId} 
-                        onFilterChange={handleSelectWallet} 
-                    />
+        <main className="flex-1 overflow-y-auto no-scrollbar overflow-x-hidden px-3 sm:px-5 md:px-8 relative pb-[calc(7rem+env(safe-area-inset-bottom,16px))] w-full">
+          <div className="py-4 sm:py-6 max-w-7xl mx-auto w-full">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={activeTab}
+                initial={{ opacity: 0, y: 12, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -12, scale: 0.98 }}
+                transition={{ duration: 0.2, ease: "easeOut" }}
+                className="w-full"
+              >
+                {activeTab === 'dashboard' && (
+                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 lg:gap-7 items-start">
                     
-                    <TransactionList transactions={filteredTransactions} categories={state.categories} wallets={state.wallets} onDelete={(id) => setState(p => ({...p, transactions: p.transactions.filter(t => t.id !== id)}))} onEdit={handleEditTransaction} currencySymbol={state.currency.symbol} showFilters />
-                </div>
-            )}
-            
-            {activeTab === 'settings' && (
-                <Settings 
-                    {...state} 
-                    appState={state} 
-                    onUpdateSettings={(updates) => setState(p => ({...p, ...updates}))} 
-                    onAddCurrency={(c) => setState(p => ({...p, currencies: [...p.currencies, c]}))} 
-                    onRemoveCurrency={(code) => setState(p => ({...p, currencies: p.currencies.filter(c => c.code !== code)}))} 
-                    onAddWallet={(w) => setState(p => ({ ...p, wallets: [...p.wallets, { ...w, id: 'w-' + Date.now() }] }))} 
-                    onUpdateWallet={(id, updates) => setState(p => ({ ...p, wallets: p.wallets.map(w => w.id === id ? { ...w, ...updates } : w) }))}
-                    onRemoveWallet={(id) => setState(p => ({ ...p, wallets: p.wallets.filter(w => w.id !== id) }))} 
-                    onAddCategory={(c) => setState(p => ({ ...p, categories: [...p.categories, { ...c, id: 'c-' + Date.now() }] }))}
-                    onUpdateCategory={(id, updates) => setState(p => ({ ...p, categories: p.categories.map(c => c.id === id ? { ...c, ...updates } : c) }))}
-                    onRemoveCategory={(id) => setState(p => ({ ...p, categories: p.categories.filter(c => c.id !== id) }))}
-                    onRestore={(data) => setState(p => ({ ...INITIAL_STATE, ...data, isLocked: !!data.pin }))} 
-                    onClearData={() => setState(p => ({...p, transactions: [], debts: [], budgets: [], subscriptions: [], chatHistory: [], goals: []}))} 
-                    onShowPrivacyPolicy={() => setShowPrivacyPolicy(false)} 
-                    onPrint={handlePrint}
-                    onShare={handleShare}
-                    installPrompt={installPrompt}
-                    isUpdateAvailable={isUpdateAvailable}
-                    swRegistration={swRegistration}
-                />
-            )}
+                    {/* Horizontal Sliding Currencies Marquee */}
+                    <div className="lg:col-span-12 overflow-hidden mask-gradient-x py-1">
+                        <div className="flex items-center gap-2.5 relative z-10 w-full overflow-x-auto no-scrollbar py-1">
+                        {state.currencies.map((curr, index) => {
+                            const isActive = state.currency.code === curr.code;
+                            return (
+                            <motion.button 
+                              whileHover={{ scale: 1.04 }}
+                              whileTap={{ scale: 0.96 }}
+                              key={`${curr.code}-${index}`} 
+                              onClick={() => setState(p => ({...p, currency: curr}))} 
+                              className={`shrink-0 relative flex items-center gap-2 pl-3.5 pr-2.5 py-1.5 rounded-full border backdrop-blur-md transition-all duration-300 ${isActive ? 'bg-amber-500 border-amber-400 text-slate-950 shadow-[0_0_15px_rgba(245,158,11,0.35)] font-black z-20' : 'bg-slate-800/40 border-white/5 text-slate-400 hover:bg-slate-800 hover:border-white/20'}`}
+                            >
+                                {isActive && <div className="absolute inset-0 rounded-full bg-gradient-to-br from-white/30 to-transparent opacity-50 pointer-events-none" />}
+                                <span className={`text-[9px] font-black uppercase tracking-widest ${isActive ? 'text-slate-900/70' : 'text-slate-500'}`}>{curr.code}</span>
+                                <span className="font-bold text-xs whitespace-nowrap">{curr.name}</span>
+                                <div className={`w-1.5 h-1.5 rounded-full transition-colors ${isActive ? 'bg-slate-950' : 'bg-slate-600'}`} />
+                            </motion.button>
+                            );
+                        })}
+                        </div>
+                    </div>
+
+                    {/* Wallets selector */}
+                    <div className="lg:col-span-12 flex gap-2.5 overflow-x-auto no-scrollbar py-1">
+                         <motion.button 
+                             whileHover={{ scale: 1.02 }}
+                             whileTap={{ scale: 0.97 }}
+                             onClick={() => handleSelectWallet(null)}
+                             className={`shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-2xl border transition-all ${!selectedWalletId ? 'bg-white text-slate-900 border-white shadow-md' : 'bg-slate-800/50 border-slate-700 text-slate-400'}`}
+                         >
+                             <LayoutDashboard size={15} />
+                             <span className="text-xs font-black">كل المحافظ</span>
+                         </motion.button>
+                         {state.wallets.map(w => (
+                             <motion.button 
+                                 whileHover={{ scale: 1.02 }}
+                                 whileTap={{ scale: 0.97 }}
+                                 key={w.id}
+                                 onClick={() => handleSelectWallet(w.id)}
+                                 className={`shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-2xl border transition-all ${selectedWalletId === w.id ? 'bg-amber-500 text-slate-900 border-amber-500 shadow-lg shadow-amber-500/20 font-black' : 'bg-slate-800/50 border-slate-700 text-slate-400'}`}
+                             >
+                                 <div className="w-2 h-2 rounded-full" style={{backgroundColor: w.color}} />
+                                 <span className="text-xs font-black">{w.name}</span>
+                                 {selectedWalletId === w.id && <Check size={14} />}
+                             </motion.button>
+                         ))}
+                    </div>
+
+                    <div className="lg:col-span-12">
+                       <SmartAlerts budgets={state.budgets} transactions={filteredTransactions} debts={state.debts} subscriptions={state.subscriptions} categories={state.categories} />
+                    </div>
+
+                    {/* LEFT COLUMN: Balance Card & Executive Insights */}
+                    <div className="lg:col-span-6 space-y-6 w-full">
+                        <BalanceCard 
+                            totalBalance={totals.balance} 
+                            totalIncome={totals.income} 
+                            totalExpense={totals.expense} 
+                            symbol={state.currency.symbol}
+                            balances={totals.currencyBreakdown}
+                            expenseBreakdown={totals.expenseBreakdown}
+                            showSeparateCurrencies={state.showSeparateCurrencies}
+                        />
+
+                        <ExecutiveInsights 
+                            transactions={filteredTransactions}
+                            budgets={state.budgets}
+                            debts={state.debts}
+                            totalBalance={totals.balance}
+                            currencySymbol={state.currency.symbol}
+                        />
+                    </div>
+
+                    {/* RIGHT COLUMN: Sankey Flow & Recent Operations */}
+                    <div className="lg:col-span-6 space-y-6 w-full">
+                        <CashflowSankey 
+                            transactions={filteredTransactions}
+                            categories={state.categories}
+                            currencySymbol={state.currency.symbol}
+                        />
+
+                        <section className="space-y-4">
+                          <div className="flex justify-between items-center px-1">
+                            <h3 className="text-[10px] font-black text-slate-400 uppercase flex items-center gap-2 tracking-[0.15em]"><History size={13} /> {selectedWalletId ? 'سجل المحفظة المختارة' : 'أحدث العمليات'}</h3>
+                            <button onClick={() => setActiveTab('transactions')} className="text-amber-500 text-[10px] font-black uppercase flex items-center gap-1 hover:text-amber-400 transition-colors">عرض الكل <ArrowRight size={11} className="rotate-180" /></button>
+                          </div>
+                          <TransactionList transactions={filteredTransactions.slice(0, 3)} categories={state.categories} wallets={state.wallets} onDelete={(id) => setState(p => ({ ...p, transactions: p.transactions.filter(t => t.id !== id) }))} onEdit={handleEditTransaction} currencySymbol={state.currency.symbol} />
+                        </section>
+                    </div>
+                  </div>
+                )}
+                
+                {activeTab === 'future' && <FinancialSimulation transactions={filteredTransactions} currencySymbol={state.currency.symbol} apiKey={state.apiKey} />}
+                {activeTab === 'goals' && <GoalTracker goals={state.goals} wallets={state.wallets} transactions={state.transactions} onAddGoal={(g) => setState(p => ({ ...p, goals: [...p.goals, { ...g, id: 'g-'+Date.now() }] }))} onUpdateGoalAmount={(id, amt) => setState(p => ({ ...p, goals: p.goals.map(g => g.id === id ? { ...g, currentAmount: g.currentAmount + amt } : g) }))} currencySymbol={state.currency.symbol} apiKey={state.apiKey} />}
+                {activeTab === 'budgets' && <BudgetManager budgets={state.budgets} categories={state.categories} transactions={filteredTransactions} onSetBudget={(catId, amount) => setState(p => ({ ...p, budgets: [...p.budgets.filter(b => b.categoryId !== catId), { categoryId: catId, amount }] }))} currencySymbol={state.currency.symbol} />}
+                {activeTab === 'chat' && <AIChat history={state.chatHistory} transactions={filteredTransactions} categories={state.categories} currency={state.currency.symbol} onSendMessage={(msg) => setState(p => ({ ...p, chatHistory: [...p.chatHistory, msg].slice(-30) }))} apiKey={state.apiKey} />}
+                {activeTab === 'debts' && <DebtManager debts={state.debts} wallets={state.wallets} onAddDebt={handleAddDebt} onUpdateDebt={handleUpdateDebt} onSettleDebt={handleSettleDebt} onPayDebt={handlePayDebt} onDeleteDebt={(id) => setState(p => ({ ...p, debts: p.debts.filter(d => d.id !== id) }))} currencySymbol={state.currency.symbol} currencyCode={state.currency.code} />}
+                {activeTab === 'subscriptions' && <SubscriptionManager subscriptions={state.subscriptions} categories={state.categories} onAdd={(sub) => setState(p => ({ ...p, subscriptions: [{...sub, id: 's-'+Date.now()}, ...p.subscriptions] }))} onRemove={(id) => setState(p => ({ ...p, subscriptions: p.subscriptions.filter(s => s.id !== id) }))} currencySymbol={state.currency.symbol} />}
+                {activeTab === 'zakat' && <ZakatCalculator totalBalance={totals.balance} currencySymbol={state.currency.symbol} debts={state.debts} />}
+                
+                {activeTab === 'transactions' && (
+                    <div className="space-y-8">
+                        <Analytics 
+                            transactions={state.transactions} 
+                            categories={state.categories} 
+                            wallets={state.wallets}
+                            currencySymbol={state.currency.symbol} 
+                            onPrint={handlePrint} 
+                            currentCurrencyCode={state.currency.code} 
+                            exchangeRates={state.exchangeRates} 
+                            initialWalletId={selectedWalletId} 
+                            onFilterChange={handleSelectWallet} 
+                            userName={state.userName}
+                        />
+                        
+                        <TransactionList transactions={filteredTransactions} categories={state.categories} wallets={state.wallets} onDelete={(id) => setState(p => ({...p, transactions: p.transactions.filter(t => t.id !== id)}))} onEdit={handleEditTransaction} currencySymbol={state.currency.symbol} showFilters />
+                    </div>
+                )}
+                
+                {activeTab === 'settings' && (
+                    <Settings 
+                        {...state} 
+                        appState={state} 
+                        onUpdateSettings={(updates) => setState(p => ({...p, ...updates}))} 
+                        onAddCurrency={(c) => setState(p => ({...p, currencies: [...p.currencies, c]}))} 
+                        onRemoveCurrency={(code) => setState(p => ({...p, currencies: p.currencies.filter(c => c.code !== code)}))} 
+                        onAddWallet={(w) => setState(p => ({ ...p, wallets: [...p.wallets, { ...w, id: 'w-' + Date.now() }] }))} 
+                        onUpdateWallet={(id, updates) => setState(p => ({ ...p, wallets: p.wallets.map(w => w.id === id ? { ...w, ...updates } : w) }))}
+                        onRemoveWallet={(id) => setState(p => ({ ...p, wallets: p.wallets.filter(w => w.id !== id) }))} 
+                        onAddCategory={(c) => setState(p => ({ ...p, categories: [...p.categories, { ...c, id: 'c-' + Date.now() }] }))}
+                        onUpdateCategory={(id, updates) => setState(p => ({ ...p, categories: p.categories.map(c => c.id === id ? { ...c, ...updates } : c) }))}
+                        onRemoveCategory={(id) => setState(p => ({ ...p, categories: p.categories.filter(c => c.id !== id) }))}
+                        onRestore={(data) => setState(p => ({ ...INITIAL_STATE, ...data, isLocked: !!data.pin }))} 
+                        onClearData={() => setState(p => ({...p, transactions: [], debts: [], budgets: [], subscriptions: [], chatHistory: [], goals: []}))} 
+                        onShowPrivacyPolicy={() => setShowPrivacyPolicy(false)} 
+                        onPrint={handlePrint}
+                        onShare={handleShare}
+                        onExportExcel={handleExportExcelReport}
+                        installPrompt={installPrompt}
+                        isUpdateAvailable={isUpdateAvailable}
+                        swRegistration={swRegistration}
+                    />
+                )}
+              </motion.div>
+            </AnimatePresence>
           </div>
         </main>
 
-        <div className="absolute bottom-0 left-0 right-0 pt-16 pb-[calc(1rem+env(safe-area-inset-bottom,0px))] px-4 md:px-0 flex justify-center pointer-events-none z-50 bg-gradient-to-t from-slate-950 via-slate-950/80 to-transparent">
+        <div className="fixed bottom-0 left-0 right-0 pt-16 pb-[calc(1rem+env(safe-area-inset-bottom,0px))] px-4 md:px-0 flex justify-center pointer-events-none z-50 bg-gradient-to-t from-slate-950 via-slate-950/80 to-transparent">
             <nav className="pointer-events-auto w-full md:max-w-xl bg-slate-900/95 backdrop-blur-2xl border border-white/10 flex items-center justify-between px-2 py-2 rounded-[2rem] shadow-[0_20px_40px_rgba(0,0,0,0.5)]">
                 <NavButton icon={<LayoutDashboard />} label="الرئيسية" active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} />
                 <NavButton icon={<Scale />} label="زكاتي" active={activeTab === 'zakat'} onClick={() => setActiveTab('zakat')} />
                 
-                <button 
+                <motion.button 
+                  whileHover={{ scale: 1.08 }}
+                  whileTap={{ scale: 0.92 }}
                   onClick={() => { setEditingTransaction(null); setShowAddForm(true); }}
-                  className="w-14 h-14 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-[1.5rem] shadow-[0_10px_20px_rgba(245,158,11,0.4)] flex items-center justify-center z-50 border-[4px] border-slate-900 active:scale-95 transition-all mx-1 shrink-0"
+                  className="w-14 h-14 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-[1.5rem] shadow-[0_10px_20px_rgba(245,158,11,0.4)] flex items-center justify-center z-50 border-[4px] border-slate-900 mx-1 shrink-0"
                 >
                   <Plus size={28} strokeWidth={4} />
-                </button>
+                </motion.button>
 
                 <NavButton icon={<HandCoins />} label="ديون" active={activeTab === 'debts'} onClick={() => setActiveTab('debts')} />
                 <NavButton icon={<SettingsIcon />} label="المزيد" active={activeTab === 'settings'} onClick={() => setActiveTab('settings')} />
             </nav>
         </div>
 
-        {/* Floating Quick Action Buttons (visible immediately on dashboard) */}
+        {/* Floating Quick Action Buttons */}
         {activeTab === 'dashboard' && (
-          <div className="absolute left-4 bottom-28 md:bottom-32 z-40 flex flex-col gap-3 pointer-events-none no-print animate-fade">
-            <button 
+          <div className="fixed left-4 bottom-28 md:bottom-32 z-40 flex flex-col gap-3 pointer-events-none no-print">
+            <motion.button 
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
               onClick={() => setActiveTab('goals')} 
-              className="pointer-events-auto w-12 h-12 bg-slate-900/95 backdrop-blur-3xl border border-white/10 hover:border-amber-500/50 rounded-full flex flex-col items-center justify-center text-amber-500 shadow-[0_10px_25px_rgba(0,0,0,0.6)] active:scale-90 hover:scale-105 transition-all group relative"
+              className="pointer-events-auto w-12 h-12 bg-slate-900/95 backdrop-blur-3xl border border-white/10 hover:border-amber-500/50 rounded-full flex flex-col items-center justify-center text-amber-500 shadow-[0_10px_25px_rgba(0,0,0,0.6)] group relative"
               title="الأهداف المالية"
             >
               <Coins size={20} className="group-hover:scale-110 transition-transform" />
               <span className="absolute left-14 bg-slate-900/95 backdrop-blur-xl border border-white/10 text-white font-bold text-[10px] px-3 py-1.5 rounded-xl whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-md hidden group-hover:block">الأهداف</span>
-            </button>
-            <button 
+            </motion.button>
+            <motion.button 
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
               onClick={() => setActiveTab('budgets')} 
-              className="pointer-events-auto w-12 h-12 bg-slate-900/95 backdrop-blur-3xl border border-white/10 hover:border-blue-500/50 rounded-full flex flex-col items-center justify-center text-blue-400 shadow-[0_10px_25px_rgba(0,0,0,0.6)] active:scale-90 hover:scale-105 transition-all group relative"
+              className="pointer-events-auto w-12 h-12 bg-slate-900/95 backdrop-blur-3xl border border-white/10 hover:border-blue-500/50 rounded-full flex flex-col items-center justify-center text-blue-400 shadow-[0_10px_25px_rgba(0,0,0,0.6)] group relative"
               title="إدارة الميزانية"
             >
               <LayoutDashboard size={20} className="group-hover:scale-110 transition-transform" />
               <span className="absolute left-14 bg-slate-900/95 backdrop-blur-xl border border-white/10 text-white font-bold text-[10px] px-3 py-1.5 rounded-xl whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-md hidden group-hover:block">الميزانية</span>
-            </button>
+            </motion.button>
           </div>
         )}
 
-        {showAddForm && (
-            <TransactionForm categories={state.categories} wallets={state.wallets} onSubmit={handleSubmitTransaction} onClose={() => { setShowAddForm(false); setEditingTransaction(null); }} initialData={editingTransaction} exchangeRates={state.exchangeRates} />
-        )}
-        {showPrivacyPolicy && <PrivacyPolicy onBack={() => setShowPrivacyPolicy(false)} />}
+        <AnimatePresence>
+          {showAddForm && (
+              <TransactionForm categories={state.categories} wallets={state.wallets} onSubmit={handleSubmitTransaction} onClose={() => { setShowAddForm(false); setEditingTransaction(null); }} initialData={editingTransaction} exchangeRates={state.exchangeRates} />
+          )}
+          {showPrivacyPolicy && <PrivacyPolicy onBack={() => setShowPrivacyPolicy(false)} />}
+        </AnimatePresence>
       </div>
     </div>
   );
 };
 
 const NavButton = ({ icon, label, active, onClick }: { icon: any, label: string, active: boolean, onClick: () => void }) => (
-  <button onClick={onClick} className={`flex flex-col items-center justify-center gap-1 transition-all flex-1 min-w-[60px] group ${active ? 'text-amber-500' : 'text-slate-500'}`}>
-    <div className={`p-2 rounded-xl transition-all duration-300 ${active ? 'bg-amber-500/10 text-amber-500' : 'group-hover:bg-white/5'}`}>
+  <motion.button 
+    whileTap={{ scale: 0.92 }}
+    onClick={onClick} 
+    className={`flex flex-col items-center justify-center gap-1 transition-all flex-1 min-w-[60px] group ${active ? 'text-amber-500' : 'text-slate-500'}`}
+  >
+    <div className={`p-2 rounded-xl transition-all duration-300 relative ${active ? 'bg-amber-500/10 text-amber-500' : 'group-hover:bg-white/5'}`}>
         {React.cloneElement(icon, { size: 24, strokeWidth: active ? 2.5 : 2 })}
+        {active && (
+          <motion.div 
+            layoutId="activeTabGlow" 
+            className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-4 h-1 bg-amber-500 rounded-full shadow-[0_0_8px_rgba(245,158,11,0.8)]" 
+          />
+        )}
     </div>
     <span className={`text-[10px] font-bold transition-all duration-300 ${active ? 'opacity-100' : 'opacity-70'}`}>{label}</span>
-  </button>
+  </motion.button>
 );
 
 export default App;

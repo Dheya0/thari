@@ -10,6 +10,7 @@ import {
 import { Currency, Wallet, Category, Transaction } from '../types';
 import { encryptData, decryptData } from '../services/encryptionService';
 import { getIcon, DEFAULT_EXCHANGE_RATES } from '../constants';
+import { buildExecutiveCSVContent, exportAndShareExecutiveCSV } from '../utils/exportHelper';
 
 const COLORS = ['#f59e0b', '#10b981', '#3b82f6', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16', '#f43f5e', '#64748b'];
 const ICONS = ['Utensils', 'Car', 'Home', 'Receipt', 'Film', 'HeartPulse', 'GraduationCap', 'Briefcase', 'Wallet', 'CreditCard', 'ShoppingBag', 'Gift', 'PiggyBank', 'Coffee', 'Zap', 'Bus', 'Plane', 'Smartphone', 'ShieldCheck'];
@@ -17,13 +18,13 @@ const ICONS = ['Utensils', 'Car', 'Home', 'Receipt', 'Film', 'HeartPulse', 'Grad
 // --- Reusable Helper Components ---
 // (Same helper components as before: Modal, InputField, ActionButton, ColorPicker, ToastNotification, ConfirmDialog)
 const Modal = ({ title, children, onClose }: { title: string, children?: React.ReactNode, onClose: () => void }) => (
-    <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-2xl z-[400] flex flex-col justify-end p-0 sm:p-4 animate-fade">
-        <div className="bg-slate-900 w-full max-w-lg mx-auto sm:rounded-[3.5rem] rounded-t-[2.5rem] p-6 sm:p-8 pb-[calc(2rem+env(safe-area-inset-bottom))] shadow-2xl border-t border-slate-800 animate-slide-up overflow-y-auto no-scrollbar max-h-[96vh] flex flex-col min-h-0">
-            <div className="flex justify-between items-center mb-6 sm:mb-8 shrink-0">
-                <h3 className="text-xl sm:text-2xl font-black text-white tracking-tight">{title}</h3>
-                <button onClick={onClose} className="p-3 bg-slate-800 rounded-2xl text-slate-500 active:scale-90 transition-all"><X size={20} /></button>
+    <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-[400] flex items-center justify-center p-3 sm:p-4 animate-fade no-print overflow-hidden">
+        <div className="bg-slate-900 w-full max-w-lg mx-auto rounded-3xl p-5 sm:p-7 shadow-2xl border border-white/10 animate-slide-up flex flex-col max-h-[85vh] sm:max-h-[88vh] overflow-hidden">
+            <div className="flex justify-between items-center mb-4 sm:mb-6 shrink-0 pb-3 border-b border-white/5">
+                <h3 className="text-lg sm:text-xl font-black text-white tracking-tight">{title}</h3>
+                <button onClick={onClose} className="p-2.5 bg-slate-800/80 hover:bg-slate-700 rounded-2xl text-slate-400 hover:text-white active:scale-90 transition-all"><X size={18} /></button>
             </div>
-            <div className="flex flex-col gap-4 overflow-y-auto no-scrollbar shrink-0 px-2 pb-[env(safe-area-inset-bottom)]">
+            <div className="flex-1 overflow-y-auto custom-scrollbar space-y-4 min-h-0 pr-1 pl-1">
                 {children}
             </div>
         </div>
@@ -123,6 +124,7 @@ interface SettingsProps {
   onShowPrivacyPolicy: () => void;
   onPrint?: (type: 'summary' | 'detailed', currencyFilter?: string | null) => void;
   onShare?: (type: 'summary' | 'detailed', currencyFilter?: string | null) => void;
+  onExportExcel?: (type: 'summary' | 'detailed', currencyFilter?: string | null) => void;
   
   // PWA optional props
   installPrompt?: any;
@@ -134,7 +136,7 @@ const Settings: React.FC<SettingsProps> = ({
   userName = '', pin = '', currency, currencies, wallets, categories, apiKey = '', exchangeRates = {}, appState = {}, onUpdateSettings, 
   onAddCurrency, onRemoveCurrency, onAddWallet, onUpdateWallet, onRemoveWallet,
   onAddCategory, onUpdateCategory, onRemoveCategory,
-  onRestore, onClearData, onShowPrivacyPolicy, onPrint, onShare,
+  onRestore, onClearData, onShowPrivacyPolicy, onPrint, onShare, onExportExcel,
   installPrompt = null, isUpdateAvailable = false, swRegistration = null
 }) => {
   const safeCurrencies = currencies || [];
@@ -159,8 +161,8 @@ const Settings: React.FC<SettingsProps> = ({
   const [reportConfig, setReportConfig] = useState<{
       type: 'summary' | 'detailed';
       currencyFilter: string | null; // null = All Currencies
-      action: 'print' | 'share' | null;
-  }>({ type: 'detailed', currencyFilter: null, action: null });
+      action: 'print' | 'share' | 'excel';
+  }>({ type: 'detailed', currencyFilter: null, action: 'print' });
 
   // Exchange Rate Editing
   const [editingRateCode, setEditingRateCode] = useState<string | null>(null);
@@ -333,24 +335,25 @@ const Settings: React.FC<SettingsProps> = ({
       }
   };
 
-  const handleExportCSV = () => {
+  const handleExportCSV = (reportType: 'summary' | 'detailed' = 'detailed', currencyFilter: string | null = null) => {
     try {
         const transactions: Transaction[] = appState?.transactions || [];
-        const headers = ["التاريخ", "النوع", "المبلغ", "العملة", "التصنيف", "المحفظة", "ملاحظات"];
-        let csvContent = "\uFEFF" + headers.join(",") + "\n";
-        transactions.forEach(t => {
-            const cat = safeCategories.find(c => c.id === t.categoryId)?.name || 'غير مصنف';
-            const wallet = safeWallets.find(w => w.id === t.walletId)?.name || 'محفظة محذوفة';
-            const typeLabel = t.type === 'income' ? 'دخل' : 'صرف';
-            const note = t.note ? `"${t.note.replace(/"/g, '""')}"` : "";
-            const row = [t.date, typeLabel, t.amount, t.currency, cat, wallet, note];
-            csvContent += row.join(",") + "\n";
+        const csvContent = buildExecutiveCSVContent({
+            transactions,
+            categories: safeCategories,
+            wallets: safeWallets,
+            userName: userName || localUserName || 'مستخدم ثري',
+            currency: currency || { code: 'SAR', symbol: 'ر.س', name: 'ريال سعودي', icon: '' },
+            exchangeRates: exchangeRates || {},
+            type: reportType,
+            filterCurrency: currencyFilter
         });
         
-        copyToClipboard(csvContent, "ملف Excel (CSV) - تم بدء التحميل والمشاركة");
-        shareOrDownload(csvContent, `Thari_Report_${new Date().toISOString().split('T')[0]}.csv`, 'text/csv;charset=utf-8;');
+        const fileName = `Thari_Executive_Report_${reportType}_${new Date().toISOString().split('T')[0]}.csv`;
+        exportAndShareExecutiveCSV(csvContent, fileName);
+        showToast("تم تصدير التقرير المالي المؤسسي بنجاح");
     } catch (e) {
-        showToast("حدث خطأ أثناء التصدير", 'error');
+        showToast("حدث خطأ أثناء تصدير ملف Excel", 'error');
     }
   };
   const handleExportJSON = () => {
@@ -794,25 +797,29 @@ const Settings: React.FC<SettingsProps> = ({
          {/* Accordion 3 - Data & Reports */}
          <AccordionItem id="data" title="التقارير وسجلات الحساب والنسخ" icon={FileText}>
             <div className="space-y-4 text-right">
-                <div className="grid grid-cols-2 gap-3">
-                    <button onClick={handleExportCSV} className="flex flex-col items-center justify-center gap-2 p-4 bg-slate-800/80 rounded-2xl active:scale-95 transition-all text-white border border-slate-800 hover:border-emerald-500/30">
-                        <FileSpreadsheet size={22} className="text-emerald-500" />
-                        <span className="text-[9px] font-black text-slate-300 uppercase tracking-wider">تصدير Excel</span>
+                <div className="grid grid-cols-3 gap-2">
+                    <button onClick={() => { setReportConfig({ type: 'detailed', currencyFilter: null, action: 'print' }); setShowReportModal(true); }} className="flex flex-col items-center justify-center gap-1.5 p-3.5 bg-slate-800/80 rounded-2xl active:scale-95 transition-all border border-slate-800 text-white hover:border-amber-500/30 text-xs font-bold">
+                        <Printer size={18} className="text-amber-500" />
+                        <span className="text-[10px]">طباعة الكشف</span>
                     </button>
-                    <button onClick={handleExportJSON} className="flex flex-col items-center justify-center gap-2 p-4 bg-slate-800/80 rounded-2xl active:scale-95 transition-all text-white border border-slate-800 hover:border-blue-500/30">
-                        <Code size={22} className="text-blue-500" />
-                        <span className="text-[9px] font-black text-slate-300 uppercase tracking-wider">تصدير Raw JSON</span>
+                    <button onClick={() => { setReportConfig({ type: 'detailed', currencyFilter: null, action: 'share' }); setShowReportModal(true); }} className="flex flex-col items-center justify-center gap-1.5 p-3.5 bg-slate-800/80 rounded-2xl active:scale-95 transition-all border border-slate-800 text-white hover:border-emerald-500/30 text-xs font-bold">
+                        <FileDown size={18} className="text-emerald-500" />
+                        <span className="text-[10px]">مشاركة PDF</span>
+                    </button>
+                    <button onClick={() => { setReportConfig({ type: 'detailed', currencyFilter: null, action: 'excel' }); setShowReportModal(true); }} className="flex flex-col items-center justify-center gap-1.5 p-3.5 bg-slate-800/80 rounded-2xl active:scale-95 transition-all border border-slate-800 text-white hover:border-blue-500/30 text-xs font-bold">
+                        <FileSpreadsheet size={18} className="text-blue-500" />
+                        <span className="text-[10px]">تصدير Excel</span>
                     </button>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                    <button onClick={() => { setReportConfig({ type: 'detailed', currencyFilter: null, action: 'print' }); setShowReportModal(true); }} className="flex items-center justify-center gap-2 p-4 bg-slate-800/80 rounded-2xl active:scale-95 transition-all border border-slate-800 text-white hover:border-amber-500/30 text-xs font-bold">
-                        <Printer size={16} className="text-amber-500" />
-                        <span>طباعة الكشف</span>
+                <div className="grid grid-cols-2 gap-3 pt-2">
+                    <button onClick={() => handleExportCSV('detailed', null)} className="flex items-center justify-center gap-2 p-3 bg-slate-800/60 rounded-xl active:scale-95 transition-all text-slate-300 border border-slate-800 hover:border-emerald-500/30 text-xs font-bold">
+                        <FileSpreadsheet size={16} className="text-emerald-400" />
+                        <span>تصدير سريع Excel</span>
                     </button>
-                    <button onClick={() => { setReportConfig({ type: 'detailed', currencyFilter: null, action: 'share' }); setShowReportModal(true); }} className="flex items-center justify-center gap-2 p-4 bg-slate-800/80 rounded-2xl active:scale-95 transition-all border border-slate-800 text-white hover:border-emerald-500/30 text-xs font-bold">
-                        <FileDown size={16} className="text-emerald-500" />
-                        <span>مشاركة كـ PDF</span>
+                    <button onClick={handleExportJSON} className="flex items-center justify-center gap-2 p-3 bg-slate-800/60 rounded-xl active:scale-95 transition-all text-slate-300 border border-slate-800 hover:border-blue-500/30 text-xs font-bold">
+                        <Code size={16} className="text-blue-400" />
+                        <span>تصدير JSON</span>
                     </button>
                 </div>
 
@@ -849,22 +856,37 @@ const Settings: React.FC<SettingsProps> = ({
 
       {/* Report Configuration Modal */}
       {showReportModal && (
-        <Modal title={reportConfig.action === 'print' ? "إعدادات الطباعة" : "إعدادات المشاركة"} onClose={() => setShowReportModal(false)}>
-            <div className="space-y-6">
-                <div className="space-y-3">
-                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2">نوع التقرير</label>
-                    <div className="flex bg-slate-950 p-1 rounded-2xl border border-slate-800">
-                        <button onClick={() => setReportConfig({...reportConfig, type: 'summary'})} className={`flex-1 py-4 rounded-xl text-xs font-black transition-all ${reportConfig.type === 'summary' ? 'bg-amber-500 text-slate-950 shadow-lg' : 'text-slate-500'}`}>ملخص (مختصر)</button>
-                        <button onClick={() => setReportConfig({...reportConfig, type: 'detailed'})} className={`flex-1 py-4 rounded-xl text-xs font-black transition-all ${reportConfig.type === 'detailed' ? 'bg-amber-500 text-slate-950 shadow-lg' : 'text-slate-500'}`}>تفصيلي (كامل)</button>
+        <Modal title="خيارات تصدير التقرير المالي" onClose={() => setShowReportModal(false)}>
+            <div className="space-y-3.5">
+                <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-1">صيغة وإجراء التقرير</label>
+                    <div className="grid grid-cols-3 gap-1.5 bg-slate-950 p-1 rounded-xl border border-white/5">
+                        <button onClick={() => setReportConfig({...reportConfig, action: 'print'})} className={`py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${reportConfig.action === 'print' ? 'bg-amber-500 text-slate-950 shadow-md' : 'text-slate-400 hover:text-white'}`}>
+                            <Printer size={14} /> طباعة
+                        </button>
+                        <button onClick={() => setReportConfig({...reportConfig, action: 'share'})} className={`py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${reportConfig.action === 'share' ? 'bg-amber-500 text-slate-950 shadow-md' : 'text-slate-400 hover:text-white'}`}>
+                            <FileDown size={14} /> PDF
+                        </button>
+                        <button onClick={() => setReportConfig({...reportConfig, action: 'excel'})} className={`py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${reportConfig.action === 'excel' ? 'bg-amber-500 text-slate-950 shadow-md' : 'text-slate-400 hover:text-white'}`}>
+                            <FileSpreadsheet size={14} /> Excel
+                        </button>
                     </div>
                 </div>
 
-                <div className="space-y-3">
-                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2">تصفية حسب العملة</label>
-                    <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-1">نوع التقرير</label>
+                    <div className="flex bg-slate-950 p-1 rounded-xl border border-white/5">
+                        <button onClick={() => setReportConfig({...reportConfig, type: 'summary'})} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${reportConfig.type === 'summary' ? 'bg-amber-500 text-slate-950 shadow-md' : 'text-slate-400 hover:text-white'}`}>ملخص (مختصر)</button>
+                        <button onClick={() => setReportConfig({...reportConfig, type: 'detailed'})} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${reportConfig.type === 'detailed' ? 'bg-amber-500 text-slate-950 shadow-md' : 'text-slate-400 hover:text-white'}`}>تفصيلي (شامل)</button>
+                    </div>
+                </div>
+
+                <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-1">تصفية حسب العملة</label>
+                    <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto custom-scrollbar pr-0.5">
                         <button 
                             onClick={() => setReportConfig({...reportConfig, currencyFilter: null})}
-                            className={`p-4 rounded-2xl border text-xs font-black transition-all ${reportConfig.currencyFilter === null ? 'bg-slate-800 border-amber-500 text-amber-500' : 'bg-slate-950 border-slate-800 text-slate-500'}`}
+                            className={`p-2.5 rounded-xl border text-xs font-bold transition-all ${reportConfig.currencyFilter === null ? 'bg-amber-500/10 border-amber-500 text-amber-400' : 'bg-slate-950 border-white/5 text-slate-400 hover:text-white'}`}
                         >
                             الكل (عملة العرض)
                         </button>
@@ -872,7 +894,7 @@ const Settings: React.FC<SettingsProps> = ({
                             <button 
                                 key={c.code}
                                 onClick={() => setReportConfig({...reportConfig, currencyFilter: c.code})}
-                                className={`p-4 rounded-2xl border text-xs font-black transition-all ${reportConfig.currencyFilter === c.code ? 'bg-slate-800 border-amber-500 text-amber-500' : 'bg-slate-950 border-slate-800 text-slate-500'}`}
+                                className={`p-2.5 rounded-xl border text-xs font-bold transition-all truncate ${reportConfig.currencyFilter === c.code ? 'bg-amber-500/10 border-amber-500 text-amber-400' : 'bg-slate-950 border-white/5 text-slate-400 hover:text-white'}`}
                             >
                                 {c.name} ({c.code})
                             </button>
@@ -881,12 +903,22 @@ const Settings: React.FC<SettingsProps> = ({
                 </div>
 
                 <ActionButton 
-                    label={reportConfig.action === 'print' ? "طباعة التقرير" : "إنشاء ومشاركة PDF"} 
+                    label={
+                        reportConfig.action === 'print' ? "طباعة التقرير" : 
+                        reportConfig.action === 'share' ? "إنشاء ومشاركة PDF" : 
+                        "تصدير كـ Excel (CSV)"
+                    } 
                     onClick={() => {
                         if (reportConfig.action === 'print') {
                             onPrint?.(reportConfig.type, reportConfig.currencyFilter);
-                        } else {
+                        } else if (reportConfig.action === 'share') {
                             onShare?.(reportConfig.type, reportConfig.currencyFilter);
+                        } else {
+                            if (onExportExcel) {
+                                onExportExcel(reportConfig.type, reportConfig.currencyFilter);
+                            } else {
+                                handleExportCSV(reportConfig.type, reportConfig.currencyFilter);
+                            }
                         }
                         setShowReportModal(false);
                     }} 

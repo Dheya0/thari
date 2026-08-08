@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
+import { motion } from 'motion/react';
 import { X, Calendar, StickyNote, RefreshCw, Wallet as WalletIcon } from 'lucide-react';
 import { Transaction, Category, TransactionType, Wallet } from '../types';
 import { getIcon, DEFAULT_CURRENCIES } from '../constants';
@@ -66,20 +67,27 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, wallets, 
   };
 
   return (
-    <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm flex flex-col justify-end z-[100] sm:p-4 sm:justify-center animate-fade no-print">
-      <div className="bg-slate-900 w-full max-w-sm mx-auto sm:rounded-2xl rounded-t-2xl p-4 sm:p-5 shadow-2xl relative max-h-[90vh] flex flex-col min-h-0 border border-white/5">
-        
-        {/* Top sheet decorative handle on mobile */}
-        <div className="sm:hidden absolute top-2 left-1/2 -translate-x-1/2 w-10 h-1 bg-slate-800 rounded-full shrink-0" />
-
-        <div className="flex justify-between items-center mb-3 mt-1 sm:mt-0 shrink-0">
+    <motion.div 
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 z-[100] no-print overflow-hidden"
+    >
+      <motion.div 
+        initial={{ scale: 0.95, y: 10, opacity: 0 }}
+        animate={{ scale: 1, y: 0, opacity: 1 }}
+        exit={{ scale: 0.95, y: 10, opacity: 0 }}
+        transition={{ type: "spring", damping: 25, stiffness: 300 }}
+        className="bg-slate-900 w-full max-w-md mx-auto rounded-3xl p-5 shadow-2xl relative max-h-[85vh] sm:max-h-[88vh] flex flex-col min-h-0 border border-white/10 overflow-hidden"
+      >
+        <div className="flex justify-between items-center mb-3 shrink-0 pb-2 border-b border-white/5">
           <h3 className="text-sm sm:text-base font-bold text-white">{initialData ? 'تعديل المعاملة المالية' : 'تسجيل معاملة مالية جديدة'}</h3>
-          <button onClick={onClose} className="p-1.5 bg-slate-850 hover:bg-slate-800 rounded-lg text-slate-400 border border-white/5 active:scale-90 transition-transform">
-            <X size={15} />
+          <button onClick={onClose} className="p-1.5 bg-slate-800 hover:bg-slate-700 rounded-xl text-slate-400 hover:text-white transition-colors border border-white/5 active:scale-90">
+            <X size={16} />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-3.5 overflow-y-auto no-scrollbar pb-[env(safe-area-inset-bottom)]">
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto custom-scrollbar space-y-3.5 min-h-0 pr-1 pl-1 pb-1">
           
           {/* Transaction Type Tabs */}
           <div className="grid grid-cols-2 bg-slate-950 p-0.5 rounded-xl border border-white/5 shrink-0">
@@ -226,8 +234,8 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ categories, wallets, 
             {initialData ? 'حفظ تعديلات المعاملة' : 'تأكيد وحفظ المعاملة'}
           </button>
         </form>
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 };
 

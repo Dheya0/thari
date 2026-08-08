@@ -79,13 +79,13 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ subscriptions
       </div>
 
       {showAdd && (
-        <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-xl z-[200] flex flex-col justify-end p-0 sm:p-4 animate-fade">
-          <div className="bg-slate-900 w-full max-w-lg mx-auto sm:rounded-[3.5rem] rounded-t-[2.5rem] p-6 sm:p-8 pb-[calc(2rem+env(safe-area-inset-bottom))] shadow-2xl border-t border-slate-800 animate-slide-up max-h-[96vh] flex flex-col min-h-0">
-             <div className="flex justify-between items-center mb-6 shrink-0">
-                <h3 className="text-xl sm:text-2xl font-black text-white">إضافة إشتراك</h3>
-                <button onClick={() => setShowAdd(false)} className="p-3 bg-slate-800 rounded-2xl text-slate-500 active:scale-90 transition-transform"><X size={20} /></button>
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-[200] flex items-center justify-center p-3 sm:p-4 animate-fade no-print overflow-hidden">
+          <div className="bg-slate-900 w-full max-w-lg mx-auto rounded-3xl p-5 sm:p-7 shadow-2xl border border-white/10 animate-slide-up max-h-[85vh] sm:max-h-[88vh] flex flex-col min-h-0 overflow-hidden">
+             <div className="flex justify-between items-center mb-4 shrink-0 pb-2 border-b border-white/5">
+                <h3 className="text-lg sm:text-xl font-bold text-white">إضافة إشتراك جديد</h3>
+                <button onClick={() => setShowAdd(false)} className="p-2 bg-slate-800 rounded-xl text-slate-400 hover:text-white active:scale-90 transition-all"><X size={18} /></button>
              </div>
-             <div className="flex flex-col gap-5 overflow-y-auto no-scrollbar pb-[env(safe-area-inset-bottom)] shrink-0">
+             <div className="flex-1 overflow-y-auto custom-scrollbar space-y-4 min-h-0 pr-1 pl-1 pb-1">
                 <div className="space-y-1">
                    <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="اسم الاشتراك (مثلاً: Netflix)" className="w-full p-4 sm:p-5 rounded-2xl bg-slate-950 border border-slate-800 text-white font-bold" />
                 </div>

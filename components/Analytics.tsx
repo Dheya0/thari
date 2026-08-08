@@ -4,6 +4,7 @@ import { Download, Printer, FileText, TrendingUp, TrendingDown, Minus, Filter } 
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { Transaction, Category, Wallet } from '../types';
 import { convertCurrency } from '../constants';
+import { buildExecutiveCSVContent, exportAndShareExecutiveCSV } from '../utils/exportHelper';
 
 interface AnalyticsProps {
   transactions: Transaction[];
@@ -15,9 +16,10 @@ interface AnalyticsProps {
   wallets: Wallet[];
   initialWalletId?: string | null;
   onFilterChange: (walletId: string | null) => void;
+  userName?: string;
 }
 
-const Analytics: React.FC<AnalyticsProps> = ({ transactions, categories, currencySymbol, onPrint, currentCurrencyCode = 'SAR', exchangeRates, wallets, initialWalletId, onFilterChange }) => {
+const Analytics: React.FC<AnalyticsProps> = ({ transactions, categories, currencySymbol, onPrint, currentCurrencyCode = 'SAR', exchangeRates, wallets, initialWalletId, onFilterChange, userName = 'مستخدم ثري' }) => {
   // We use transactions (which are already filtered by App.tsx if a filter is active), 
   // but to allow changing the report scope FROM here, we use the onFilterChange prop.
   
@@ -80,21 +82,19 @@ const Analytics: React.FC<AnalyticsProps> = ({ transactions, categories, currenc
   }, [transactions, categories, currentCurrencyCode, exchangeRates]);
 
   const handleExportCSV = () => {
-    const headers = "Date,Type,Amount,Currency,ConvertedAmount,Category,Wallet,Note\n";
-    const csvContent = transactions.map(t => {
-      const cat = categories.find(c => c.id === t.categoryId)?.name || 'N/A';
-      const typeLabel = t.type === 'income' ? 'Income' : 'Expense';
-      const converted = convertCurrency(t.amount, t.currency, currentCurrencyCode, exchangeRates).toFixed(2);
-      return `${t.date},${typeLabel},${t.amount},${t.currency},${converted},"${cat}","${t.walletId}","${t.note.replace(/"/g, '""')}"`;
-    }).join("\n");
+    const csvContent = buildExecutiveCSVContent({
+      transactions,
+      categories,
+      wallets,
+      userName,
+      currency: { code: currentCurrencyCode, symbol: currencySymbol, name: currentCurrencyCode, icon: '' },
+      exchangeRates,
+      type: 'detailed',
+      filterWalletId: initialWalletId,
+    });
 
-    const blob = new Blob(["\ufeff" + headers + csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.setAttribute("download", `Thari_Data_${new Date().toISOString().split('T')[0]}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const fileName = `Thari_Executive_Report_${new Date().toISOString().split('T')[0]}.csv`;
+    exportAndShareExecutiveCSV(csvContent, fileName);
   };
 
   if (transactions.length === 0) {

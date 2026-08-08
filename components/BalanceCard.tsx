@@ -1,4 +1,5 @@
 import React from 'react';
+import { motion } from 'motion/react';
 import { Wallet, Sparkles, TrendingUp, Plane } from 'lucide-react';
 
 interface BalanceCardProps {
@@ -13,9 +14,14 @@ interface BalanceCardProps {
 
 const BalanceCard: React.FC<BalanceCardProps> = ({ totalBalance, totalIncome, totalExpense, symbol, balances, expenseBreakdown, isTravelMode }) => {
   return (
-    <div className="relative overflow-hidden group perspective-1000">
+    <motion.div 
+      initial={{ opacity: 0, scale: 0.96 }}
+      animate={{ opacity: 1, scale: 1 }}
+      whileHover={{ y: -2 }}
+      className="relative overflow-hidden group perspective-1000 w-full"
+    >
       {/* Glossy Metal Card Design */}
-      <div className="relative bg-gradient-to-br from-slate-800 to-slate-950 rounded-2xl md:rounded-[2.5rem] p-5 md:p-7 shadow-[0_15px_30px_rgba(0,0,0,0.4)] border border-white/10 overflow-hidden transition-all duration-700 md:hover:scale-[1.02] md:hover:-rotate-1 md:active:scale-95 group w-full">
+      <div className="relative bg-gradient-to-br from-slate-850 via-slate-900 to-slate-950 rounded-2xl md:rounded-[2.5rem] p-5 sm:p-6 md:p-7 shadow-[0_15px_30px_rgba(0,0,0,0.4)] border border-white/10 overflow-hidden transition-all duration-500 group w-full">
         
         {/* Shimmer Effect */}
         <div className="shimmer absolute inset-0 pointer-events-none opacity-20"></div>
@@ -134,7 +140,7 @@ const BalanceCard: React.FC<BalanceCardProps> = ({ totalBalance, totalIncome, to
         </div>
         )}
       </div>
-    </div>
+    </motion.div>
   );
 };
 

@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Target, Plus, TrendingUp, Wallet as WalletIcon, Star, CheckCircle2, ChevronRight, BrainCircuit, Loader2 } from 'lucide-react';
+import { Target, Plus, TrendingUp, Wallet as WalletIcon, Star, CheckCircle2, ChevronRight, BrainCircuit, Loader2, X } from 'lucide-react';
 import { Goal, Wallet, Transaction } from '../types';
 import { getGoalAdvice } from '../services/geminiService';
 
@@ -110,13 +110,13 @@ const GoalTracker: React.FC<GoalTrackerProps> = ({ goals, wallets, transactions,
       </div>
 
       {showAdd && (
-        <div className="fixed inset-0 bg-slate-950/95 backdrop-blur-2xl z-[150] flex flex-col justify-end p-0 sm:p-4 animate-fade">
-          <div className="bg-slate-900 w-full max-w-md mx-auto sm:rounded-[4rem] rounded-t-[2.5rem] p-6 sm:p-10 shadow-2xl relative max-h-[96vh] flex flex-col min-h-0 border-t border-white/5 animate-slide-up">
-            <div className="flex justify-between items-center mb-8 shrink-0">
-              <h3 className="text-xl sm:text-2xl font-black text-white">هدف مالي جديد</h3>
-              <button onClick={() => setShowAdd(false)} className="p-3 bg-slate-800 rounded-2xl text-slate-500"><Plus className="rotate-45" /></button>
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-[150] flex items-center justify-center p-3 sm:p-4 animate-fade no-print overflow-hidden">
+          <div className="bg-slate-900 w-full max-w-md mx-auto rounded-3xl p-5 sm:p-7 shadow-2xl relative max-h-[85vh] sm:max-h-[88vh] flex flex-col min-h-0 border border-white/10 animate-slide-up overflow-hidden">
+            <div className="flex justify-between items-center mb-4 shrink-0 pb-2 border-b border-white/5">
+              <h3 className="text-lg sm:text-xl font-bold text-white">هدف مالي جديد</h3>
+              <button onClick={() => setShowAdd(false)} className="p-2 bg-slate-800 rounded-xl text-slate-400 hover:text-white transition-all"><X size={18} /></button>
             </div>
-            <div className="flex flex-col gap-6 overflow-y-auto no-scrollbar pb-[env(safe-area-inset-bottom)] shrink-0">
+            <div className="flex-1 overflow-y-auto custom-scrollbar space-y-4 min-h-0 pr-1 pl-1 pb-1">
                <div className="space-y-2">
                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2">ما هو حلمك القادم؟</label>
                  <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="مثلاً: رحلة الأحلام، سيارة جديدة" className="w-full p-4 sm:p-5 rounded-2xl bg-slate-950 text-white font-bold border-none outline-none focus:ring-1 focus:ring-amber-500 shadow-inner" />
