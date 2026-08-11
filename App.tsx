@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Plus, LayoutDashboard, History, Settings as SettingsIcon, BrainCircuit, HandCoins, Repeat, Coins, ArrowRight, Sparkles, Scale, Wallet as WalletIcon, Check, Plane, FileText, Download } from 'lucide-react';
+import { Plus, LayoutDashboard, History, Settings as SettingsIcon, BrainCircuit, HandCoins, Repeat, Coins, ArrowRight, Sparkles, Scale, Wallet as WalletIcon, Check, Plane, FileText, Download, ArrowUpRight, ArrowDownLeft, Calendar } from 'lucide-react';
 import { AppState, Transaction, Category, Debt } from './types';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
@@ -91,6 +91,8 @@ const App: React.FC = () => {
   
   // Wallet Filter State (null = All Wallets)
   const [selectedWalletId, setSelectedWalletId] = useState<string | null>(null);
+  const [timePeriodFilter, setTimePeriodFilter] = useState<'all' | 'today' | 'week' | 'month'>('all');
+  const [formDefaultType, setFormDefaultType] = useState<'expense' | 'income' | undefined>(undefined);
 
   // PWA states
   const [isUpdateAvailable, setIsUpdateAvailable] = useState(false);
@@ -127,11 +129,28 @@ const App: React.FC = () => {
 
   // --- Filtering Logic ---
   
-  // 1. Get Transactions based on Selected Wallet
+  // 1. Get Transactions based on Selected Wallet & Time Period
   const filteredTransactions = useMemo(() => {
-      if (!selectedWalletId) return state.transactions;
-      return state.transactions.filter(t => t.walletId === selectedWalletId);
-  }, [state.transactions, selectedWalletId]);
+      let list = state.transactions;
+      if (selectedWalletId) {
+          list = list.filter(t => t.walletId === selectedWalletId);
+      }
+      if (timePeriodFilter !== 'all') {
+          const todayStr = new Date().toISOString().split('T')[0];
+          if (timePeriodFilter === 'today') {
+              list = list.filter(t => t.date === todayStr);
+          } else if (timePeriodFilter === 'week') {
+              const sevenDaysAgo = new Date();
+              sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+              const limitStr = sevenDaysAgo.toISOString().split('T')[0];
+              list = list.filter(t => t.date >= limitStr);
+          } else if (timePeriodFilter === 'month') {
+              const monthStr = todayStr.substring(0, 7);
+              list = list.filter(t => t.date.startsWith(monthStr));
+          }
+      }
+      return list;
+  }, [state.transactions, selectedWalletId, timePeriodFilter]);
 
   // 2. Calculate Totals and Multi-Currency Breakdown
   const totals = useMemo(() => {
@@ -519,6 +538,61 @@ const App: React.FC = () => {
                          ))}
                     </div>
 
+                    {/* Mobile-First Quick Action Bar & Time Period Filter */}
+                    <div className="lg:col-span-12 space-y-2.5">
+                        <div className="grid grid-cols-3 gap-2 sm:gap-3">
+                            <motion.button 
+                                whileTap={{ scale: 0.95 }}
+                                onClick={() => { setEditingTransaction(null); setFormDefaultType('expense'); setShowAddForm(true); }}
+                                className="bg-rose-500/10 border border-rose-500/20 hover:border-rose-500/40 text-rose-400 p-2.5 sm:p-3 rounded-2xl flex items-center justify-center gap-1.5 sm:gap-2 transition-all active:scale-95 shadow-sm"
+                            >
+                                <ArrowDownLeft size={16} className="shrink-0" />
+                                <span className="text-xs font-bold truncate">تسجيل مصروف</span>
+                            </motion.button>
+
+                            <motion.button 
+                                whileTap={{ scale: 0.95 }}
+                                onClick={() => { setEditingTransaction(null); setFormDefaultType('income'); setShowAddForm(true); }}
+                                className="bg-emerald-500/10 border border-emerald-500/20 hover:border-emerald-500/40 text-emerald-400 p-2.5 sm:p-3 rounded-2xl flex items-center justify-center gap-1.5 sm:gap-2 transition-all active:scale-95 shadow-sm"
+                            >
+                                <ArrowUpRight size={16} className="shrink-0" />
+                                <span className="text-xs font-bold truncate">تسجيل دخل</span>
+                            </motion.button>
+
+                            <motion.button 
+                                whileTap={{ scale: 0.95 }}
+                                onClick={() => setActiveTab('debts')}
+                                className="bg-amber-500/10 border border-amber-500/20 hover:border-amber-500/40 text-amber-400 p-2.5 sm:p-3 rounded-2xl flex items-center justify-center gap-1.5 sm:gap-2 transition-all active:scale-95 shadow-sm"
+                            >
+                                <HandCoins size={16} className="shrink-0" />
+                                <span className="text-xs font-bold truncate">ديون والتزامات</span>
+                            </motion.button>
+                        </div>
+
+                        {/* Period Filter Chips */}
+                        <div className="flex items-center justify-between gap-2 bg-slate-900/60 p-1.5 rounded-2xl border border-white/5 overflow-x-auto no-scrollbar">
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-2 shrink-0 flex items-center gap-1">
+                                <Calendar size={12} /> الفترة:
+                            </span>
+                            <div className="flex gap-1 shrink-0">
+                                {[
+                                    { id: 'all', label: 'الكل' },
+                                    { id: 'today', label: 'اليوم' },
+                                    { id: 'week', label: 'هذا الأسبوع' },
+                                    { id: 'month', label: 'هذا الشهر' },
+                                ].map((p) => (
+                                    <button
+                                        key={p.id}
+                                        onClick={() => setTimePeriodFilter(p.id as any)}
+                                        className={`px-3 py-1 rounded-xl text-xs font-bold transition-all shrink-0 ${timePeriodFilter === p.id ? 'bg-amber-500 text-slate-950 shadow-md' : 'text-slate-400 hover:text-white'}`}
+                                    >
+                                        {p.label}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+
                     <div className="lg:col-span-12">
                        <SmartAlerts budgets={state.budgets} transactions={filteredTransactions} debts={state.debts} subscriptions={state.subscriptions} categories={state.categories} />
                     </div>
@@ -666,7 +740,7 @@ const App: React.FC = () => {
 
         <AnimatePresence>
           {showAddForm && (
-              <TransactionForm categories={state.categories} wallets={state.wallets} onSubmit={handleSubmitTransaction} onClose={() => { setShowAddForm(false); setEditingTransaction(null); }} initialData={editingTransaction} exchangeRates={state.exchangeRates} />
+              <TransactionForm categories={state.categories} wallets={state.wallets} onSubmit={handleSubmitTransaction} onClose={() => { setShowAddForm(false); setEditingTransaction(null); setFormDefaultType(undefined); }} initialData={editingTransaction} defaultType={formDefaultType} exchangeRates={state.exchangeRates} />
           )}
           {showPrivacyPolicy && <PrivacyPolicy onBack={() => setShowPrivacyPolicy(false)} />}
         </AnimatePresence>

@@ -12,10 +12,11 @@ interface TransactionFormProps {
   onClose: () => void;
   initialData?: Transaction | null;
   exchangeRates: Record<string, number>;
+  defaultType?: TransactionType;
 }
 
-const TransactionForm: React.FC<TransactionFormProps> = ({ categories, wallets, onSubmit, onClose, initialData }) => {
-  const [type, setType] = useState<TransactionType>('expense');
+const TransactionForm: React.FC<TransactionFormProps> = ({ categories, wallets, onSubmit, onClose, initialData, defaultType }) => {
+  const [type, setType] = useState<TransactionType>(initialData?.type || defaultType || 'expense');
   const [amount, setAmount] = useState('');
   const [categoryId, setCategoryId] = useState('');
   const [walletId, setWalletId] = useState(wallets[0]?.id || '');
