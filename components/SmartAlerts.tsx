@@ -80,31 +80,31 @@ const SmartAlerts: React.FC<SmartAlertsProps> = ({ budgets, transactions, debts,
         <Bell size={14} className="text-amber-500 animate-pulse" />
         <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest">تنبيهات ثري الذكية</h3>
       </div>
-      <div className="flex gap-3 overflow-x-auto no-scrollbar pb-2 snap-x">
+      <div className="flex gap-2.5 overflow-x-auto no-scrollbar pb-1 snap-x">
         {alerts.map(alert => (
           <div 
             key={alert.id} 
-            className={`snap-start min-w-[85%] sm:min-w-[300px] p-5 rounded-[2.5rem] border flex items-center gap-4 shadow-xl backdrop-blur-md ${
-              alert.type === 'critical' ? 'bg-rose-500/10 border-rose-500/30' : 
-              alert.type === 'warning' ? 'bg-amber-500/10 border-amber-500/30' : 
-              'bg-blue-500/10 border-blue-500/30'
+            className={`snap-start min-w-[85%] sm:min-w-[280px] p-3.5 sm:p-4 rounded-2xl border flex items-center gap-3 shadow-md backdrop-blur-md ${
+              alert.type === 'critical' ? 'bg-rose-500/10 border-rose-500/20' : 
+              alert.type === 'warning' ? 'bg-amber-500/10 border-amber-500/20' : 
+              'bg-blue-500/10 border-blue-500/20'
             }`}
           >
-            <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${
-               alert.type === 'critical' ? 'bg-rose-500 text-white shadow-lg shadow-rose-500/20' : 
+            <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
+               alert.type === 'critical' ? 'bg-rose-500 text-white shadow-md shadow-rose-500/20' : 
                alert.type === 'warning' ? 'bg-amber-500 text-slate-950' : 
                'bg-blue-500 text-white'
             }`}>
-              <alert.icon size={18} />
+              <alert.icon size={16} />
             </div>
-            <p className={`text-[11px] font-black flex-1 leading-relaxed ${
-               alert.type === 'critical' ? 'text-rose-500' : 
-               alert.type === 'warning' ? 'text-amber-500' : 
-               'text-blue-500'
+            <p className={`text-[11px] font-bold flex-1 leading-snug ${
+               alert.type === 'critical' ? 'text-rose-400' : 
+               alert.type === 'warning' ? 'text-amber-400' : 
+               'text-blue-400'
             }`}>
               {alert.message}
             </p>
-            <ChevronLeft size={16} className="opacity-30" />
+            <ChevronLeft size={14} className="opacity-30 shrink-0" />
           </div>
         ))}
       </div>

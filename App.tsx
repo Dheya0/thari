@@ -714,26 +714,26 @@ const App: React.FC = () => {
 
         {/* Floating Quick Action Buttons */}
         {activeTab === 'dashboard' && (
-          <div className="fixed left-4 bottom-28 md:bottom-32 z-40 flex flex-col gap-3 pointer-events-none no-print">
+          <div className="fixed left-3 sm:left-4 bottom-24 sm:bottom-28 md:bottom-32 z-40 flex flex-col gap-2.5 pointer-events-none no-print">
             <motion.button 
-              whileHover={{ scale: 1.1 }}
+              whileHover={{ scale: 1.08 }}
               whileTap={{ scale: 0.9 }}
               onClick={() => setActiveTab('goals')} 
-              className="pointer-events-auto w-12 h-12 bg-slate-900/95 backdrop-blur-3xl border border-white/10 hover:border-amber-500/50 rounded-full flex flex-col items-center justify-center text-amber-500 shadow-[0_10px_25px_rgba(0,0,0,0.6)] group relative"
+              className="pointer-events-auto w-10 h-10 sm:w-12 sm:h-12 bg-slate-900/95 backdrop-blur-3xl border border-white/10 hover:border-amber-500/50 rounded-full flex flex-col items-center justify-center text-amber-500 shadow-[0_10px_25px_rgba(0,0,0,0.6)] group relative"
               title="الأهداف المالية"
             >
-              <Coins size={20} className="group-hover:scale-110 transition-transform" />
-              <span className="absolute left-14 bg-slate-900/95 backdrop-blur-xl border border-white/10 text-white font-bold text-[10px] px-3 py-1.5 rounded-xl whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-md hidden group-hover:block">الأهداف</span>
+              <Coins size={18} className="group-hover:scale-110 transition-transform" />
+              <span className="absolute right-12 sm:right-14 bg-slate-900/95 backdrop-blur-xl border border-white/10 text-white font-bold text-[10px] px-2.5 py-1 rounded-xl whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-md hidden group-hover:block">الأهداف</span>
             </motion.button>
             <motion.button 
-              whileHover={{ scale: 1.1 }}
+              whileHover={{ scale: 1.08 }}
               whileTap={{ scale: 0.9 }}
               onClick={() => setActiveTab('budgets')} 
-              className="pointer-events-auto w-12 h-12 bg-slate-900/95 backdrop-blur-3xl border border-white/10 hover:border-blue-500/50 rounded-full flex flex-col items-center justify-center text-blue-400 shadow-[0_10px_25px_rgba(0,0,0,0.6)] group relative"
+              className="pointer-events-auto w-10 h-10 sm:w-12 sm:h-12 bg-slate-900/95 backdrop-blur-3xl border border-white/10 hover:border-blue-500/50 rounded-full flex flex-col items-center justify-center text-blue-400 shadow-[0_10px_25px_rgba(0,0,0,0.6)] group relative"
               title="إدارة الميزانية"
             >
-              <LayoutDashboard size={20} className="group-hover:scale-110 transition-transform" />
-              <span className="absolute left-14 bg-slate-900/95 backdrop-blur-xl border border-white/10 text-white font-bold text-[10px] px-3 py-1.5 rounded-xl whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-md hidden group-hover:block">الميزانية</span>
+              <LayoutDashboard size={18} className="group-hover:scale-110 transition-transform" />
+              <span className="absolute right-12 sm:right-14 bg-slate-900/95 backdrop-blur-xl border border-white/10 text-white font-bold text-[10px] px-2.5 py-1 rounded-xl whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-md hidden group-hover:block">الميزانية</span>
             </motion.button>
           </div>
         )}

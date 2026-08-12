@@ -20,41 +20,34 @@ const BalanceCard: React.FC<BalanceCardProps> = ({ totalBalance, totalIncome, to
       whileHover={{ y: -2 }}
       className="relative overflow-hidden group perspective-1000 w-full"
     >
-      {/* Glossy Metal Card Design */}
-      <div className="relative bg-gradient-to-br from-slate-850 via-slate-900 to-slate-950 rounded-2xl md:rounded-[2.5rem] p-5 sm:p-6 md:p-7 shadow-[0_15px_30px_rgba(0,0,0,0.4)] border border-white/10 overflow-hidden transition-all duration-500 group w-full">
+      {/* Sleek Dark Card Design - Clean without heavy blurs */}
+      <div className="relative bg-gradient-to-br from-slate-900 via-slate-900 to-slate-950 rounded-2xl md:rounded-3xl p-5 sm:p-6 shadow-xl border border-white/10 overflow-hidden transition-all duration-300 w-full">
         
-        {/* Shimmer Effect */}
-        <div className="shimmer absolute inset-0 pointer-events-none opacity-20"></div>
-
-        {/* Decorative Elements */}
-        <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/10 blur-3xl rounded-full -mr-16 -mt-16 pointer-events-none"></div>
-        <div className="absolute bottom-0 left-0 w-24 h-24 bg-blue-500/10 blur-3xl rounded-full -ml-12 -mb-12 pointer-events-none"></div>
-
-        <div className="flex justify-between items-start mb-6 relative z-10 gap-2">
-          <div className="space-y-2 flex-1 min-w-0">
+        <div className="flex justify-between items-start mb-5 relative z-10 gap-2">
+          <div className="space-y-1.5 flex-1 min-w-0">
             <div className="flex items-center gap-2">
                <div className={`w-2 h-2 rounded-full shrink-0 ${isTravelMode ? 'bg-purple-500' : 'bg-amber-500'} animate-pulse`}></div>
-               <p className={`text-[11px] sm:text-[12px] font-black ${isTravelMode ? 'text-purple-400' : 'text-amber-500'} uppercase tracking-[0.1em] sm:tracking-[0.2em] truncate`}>
+               <p className={`text-[11px] font-bold ${isTravelMode ? 'text-purple-400' : 'text-amber-500'} uppercase tracking-wider truncate`}>
                  {isTravelMode ? 'وضع السفر (عملات منفصلة)' : 'الرصيد التقديري'}
                </p>
             </div>
             {!isTravelMode && (
-                <div className="flex items-baseline gap-1 sm:gap-2 overflow-hidden">
-                    <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-white tracking-tighter truncate">
+                <div className="flex items-baseline gap-1.5 overflow-hidden">
+                    <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-white tracking-tight truncate">
                         {totalBalance.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                     </h2>
-                    <span className="text-sm sm:text-xl text-slate-500 font-bold shrink-0">{symbol}</span>
+                    <span className="text-sm sm:text-lg text-slate-400 font-bold shrink-0">{symbol}</span>
                 </div>
             )}
             {isTravelMode && (
                 <div className="flex items-center gap-2 mt-1">
-                    <Plane size={24} className="text-purple-500 shrink-0" />
+                    <Plane size={22} className="text-purple-500 shrink-0" />
                     <span className="text-xl sm:text-2xl font-black text-white truncate">ملخص الرحلة</span>
                 </div>
             )}
           </div>
-          <div className={`shrink-0 w-12 h-12 sm:w-16 sm:h-16 bg-white/5 backdrop-blur-xl border border-white/10 rounded-xl sm:rounded-2xl flex items-center justify-center ${isTravelMode ? 'text-purple-500' : 'text-amber-500'} shadow-2xl transition-transform md:group-hover:rotate-12`}>
-            {isTravelMode ? <Plane className="w-6 h-6 sm:w-7 sm:h-7" /> : <Wallet className="w-6 h-6 sm:w-7 sm:h-7" />}
+          <div className={`shrink-0 w-12 h-12 sm:w-14 sm:h-14 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-center ${isTravelMode ? 'text-purple-400' : 'text-amber-500'} shadow-lg`}>
+            {isTravelMode ? <Plane className="w-6 h-6" /> : <Wallet className="w-6 h-6" />}
           </div>
         </div>
         
@@ -123,18 +116,18 @@ const BalanceCard: React.FC<BalanceCardProps> = ({ totalBalance, totalIncome, to
         )}
         
         {!isTravelMode && (
-        <div className="grid grid-cols-2 gap-4 relative z-10">
-          <div className="bg-white/5 backdrop-blur-md p-4 sm:p-5 rounded-2xl border border-white/5 flex flex-col gap-1 transition-all hover:bg-white/10">
-            <span className="text-[11px] font-black text-emerald-400 uppercase tracking-wider">التدفقات</span>
-            <p className="text-lg sm:text-xl font-black text-white">
-              {totalIncome.toLocaleString(undefined, { maximumFractionDigits: 0 })} <span className="text-[11px] opacity-40">{symbol}</span>
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 relative z-10">
+          <div className="bg-white/5 p-3.5 sm:p-4 rounded-2xl border border-white/5 flex flex-col gap-0.5">
+            <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider">التدفقات</span>
+            <p className="text-base sm:text-lg font-black text-white">
+              {totalIncome.toLocaleString(undefined, { maximumFractionDigits: 0 })} <span className="text-[10px] font-bold text-slate-400">{symbol}</span>
             </p>
           </div>
           
-          <div className="bg-white/5 backdrop-blur-md p-4 sm:p-5 rounded-2xl border border-white/5 flex flex-col gap-1 transition-all hover:bg-white/10">
-            <span className="text-[11px] font-black text-rose-400 uppercase tracking-wider">الالتزامات</span>
-            <p className="text-lg sm:text-xl font-black text-white">
-              {totalExpense.toLocaleString(undefined, { maximumFractionDigits: 0 })} <span className="text-[11px] opacity-40">{symbol}</span>
+          <div className="bg-white/5 p-3.5 sm:p-4 rounded-2xl border border-white/5 flex flex-col gap-0.5">
+            <span className="text-[10px] font-bold text-rose-400 uppercase tracking-wider">الالتزامات</span>
+            <p className="text-base sm:text-lg font-black text-white">
+              {totalExpense.toLocaleString(undefined, { maximumFractionDigits: 0 })} <span className="text-[10px] font-bold text-slate-400">{symbol}</span>
             </p>
           </div>
         </div>

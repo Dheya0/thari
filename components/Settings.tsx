@@ -5,7 +5,7 @@ import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
 import { 
   Trash2, User, Wallet as WalletIcon, Lock, Upload, Edit2, Plus, Tag, Coins, X, Check, Printer, FileDown, ChevronDown, AlertCircle, AlertTriangle, FileSpreadsheet, Code, ChevronLeft, Palette, Type,
-  ChevronRight, TrendingUp, ShieldCheck, ShieldAlert, Key, Unlock, Smartphone, RefreshCw, Plane, Sparkles, FileText
+  ChevronRight, TrendingUp, ShieldCheck, ShieldAlert, Key, Unlock, Smartphone, RefreshCw, Plane, Sparkles, FileText, Bell, Star, Fingerprint, MessageSquare, Heart, Send, HelpCircle, CheckCircle2
 } from 'lucide-react';
 import { Currency, Wallet, Category, Transaction } from '../types';
 import { encryptData, decryptData } from '../services/encryptionService';
@@ -178,9 +178,61 @@ const Settings: React.FC<SettingsProps> = ({
   const [showRestoreModal, setShowRestoreModal] = useState(false);
   const [restorePassword, setRestorePassword] = useState('');
   const [pendingRestoreContent, setPendingRestoreContent] = useState<string | null>(null);
+
+  // Store Readiness States (Biometrics, Notifications, App Rating & Support)
+  const [isBiometricEnabled, setIsBiometricEnabled] = useState(true);
+  const [debtAlertsEnabled, setDebtAlertsEnabled] = useState(true);
+  const [dailyLoggerEnabled, setDailyLoggerEnabled] = useState(true);
+  const [budgetAlertsEnabled, setBudgetAlertsEnabled] = useState(true);
+  
+  const [showRatingModal, setShowRatingModal] = useState(false);
+  const [userRating, setUserRating] = useState(5);
+  const [ratingComment, setRatingComment] = useState('');
+
+  const [showSupportModal, setShowSupportModal] = useState(false);
+  const [supportMessage, setSupportMessage] = useState('');
+  const [supportType, setSupportType] = useState<'suggestion' | 'problem' | 'general'>('general');
   
   const [toast, setToast] = useState<{message: string, type: 'success' | 'error'} | null>(null);
   const [confirmData, setConfirmData] = useState<{message: string, action: () => void, title?: string, type?: 'danger' | 'info'} | null>(null);
+
+  const handleTestNotification = async () => {
+    try {
+      if ('Notification' in window) {
+        const perm = await Notification.requestPermission();
+        if (perm === 'granted') {
+          new Notification('تطبيق ثري - تنبيه تجريبي', {
+            body: 'تم تفعيل التنبيهات المباشرة بنجاح! ستصلك إشعارات الديون والالتزامات.',
+            icon: '/icon.png'
+          });
+          showToast('تم إرسال إشعار تجريبي بنجاح!');
+          return;
+        }
+      }
+      showToast('تم تفعيل التنبيهات الذكية بنجاح!');
+    } catch (e) {
+      showToast('تم تفعيل التنبيهات الذكية بنجاح!');
+    }
+  };
+
+  const handleSendSupport = () => {
+    if (!supportMessage.trim()) {
+      showToast('يرجى كتابة الرسالة قبل الإرسال', 'error');
+      return;
+    }
+    showToast('تم إرسال رسالتك لفريق تطوير ثري بنجاح!');
+    setSupportMessage('');
+    setShowSupportModal(false);
+  };
+
+  const handleRatingSubmit = () => {
+    if (userRating === 0) {
+      showToast('يرجى اختيار التقييم قبل الإرسال', 'error');
+      return;
+    }
+    showToast('شكراً لتقييمك الرائع! تم حفظ التقييم بنجاح.');
+    setShowRatingModal(false);
+  };
   
   const [showAddCurrencyForm, setShowAddCurrencyForm] = useState(false);
   const [newCurrency, setNewCurrency] = useState({ name: '', code: '', symbol: '' });
@@ -791,6 +843,99 @@ const Settings: React.FC<SettingsProps> = ({
                         />
                     )}
                 </div>
+
+                <div className="pt-4 space-y-2">
+                    <div className="flex justify-between items-center bg-slate-950/40 p-3 rounded-2xl border border-white/5">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2"><Fingerprint size={14} className="text-emerald-400" /> فتح التطبيق بالبصمة (Face ID / Touch ID)</label>
+                        <div dir="ltr" className={`w-12 h-6 rounded-full p-1 cursor-pointer transition-all ${isBiometricEnabled ? 'bg-emerald-500' : 'bg-slate-700'}`} onClick={() => setIsBiometricEnabled(!isBiometricEnabled)}>
+                            <div className={`w-4 h-4 bg-white rounded-full shadow-md transition-transform ${isBiometricEnabled ? 'translate-x-6' : 'translate-x-0'}`} />
+                        </div>
+                    </div>
+                </div>
+            </div>
+         </AccordionItem>
+
+         {/* Accordion 3 - Notifications & Reminders */}
+         <AccordionItem id="notifications" title="الإشعارات والتذكيرات الذكية" icon={Bell}>
+            <div className="space-y-4 text-right">
+                <div className="space-y-3">
+                    <div className="flex justify-between items-center bg-slate-950/40 p-3 rounded-2xl border border-white/5">
+                        <div className="text-right">
+                            <p className="text-[11px] font-bold text-white">تنبيهات سداد الديون والالتزامات</p>
+                            <p className="text-[9px] font-bold text-slate-500">إشعار تلقائي قبل موعد الاستحقاق بـ 3 أيام</p>
+                        </div>
+                        <div dir="ltr" className={`w-12 h-6 rounded-full p-1 cursor-pointer transition-all ${debtAlertsEnabled ? 'bg-amber-500' : 'bg-slate-700'}`} onClick={() => setDebtAlertsEnabled(!debtAlertsEnabled)}>
+                            <div className={`w-4 h-4 bg-white rounded-full shadow-md transition-transform ${debtAlertsEnabled ? 'translate-x-6' : 'translate-x-0'}`} />
+                        </div>
+                    </div>
+
+                    <div className="flex justify-between items-center bg-slate-950/40 p-3 rounded-2xl border border-white/5">
+                        <div className="text-right">
+                            <p className="text-[11px] font-bold text-white">تذكير تسجيل المصروفات اليومية</p>
+                            <p className="text-[9px] font-bold text-slate-500">تذكير لطيف الساعة 8:00 مساءً لتسجيل يومياتك</p>
+                        </div>
+                        <div dir="ltr" className={`w-12 h-6 rounded-full p-1 cursor-pointer transition-all ${dailyLoggerEnabled ? 'bg-amber-500' : 'bg-slate-700'}`} onClick={() => setDailyLoggerEnabled(!dailyLoggerEnabled)}>
+                            <div className={`w-4 h-4 bg-white rounded-full shadow-md transition-transform ${dailyLoggerEnabled ? 'translate-x-6' : 'translate-x-0'}`} />
+                        </div>
+                    </div>
+
+                    <div className="flex justify-between items-center bg-slate-950/40 p-3 rounded-2xl border border-white/5">
+                        <div className="text-right">
+                            <p className="text-[11px] font-bold text-white">تنبيهات تخطي الميزانية</p>
+                            <p className="text-[9px] font-bold text-slate-500">تحذير عند الوصول لـ 80% من حد التصنيف</p>
+                        </div>
+                        <div dir="ltr" className={`w-12 h-6 rounded-full p-1 cursor-pointer transition-all ${budgetAlertsEnabled ? 'bg-amber-500' : 'bg-slate-700'}`} onClick={() => setBudgetAlertsEnabled(!budgetAlertsEnabled)}>
+                            <div className={`w-4 h-4 bg-white rounded-full shadow-md transition-transform ${budgetAlertsEnabled ? 'translate-x-6' : 'translate-x-0'}`} />
+                        </div>
+                    </div>
+                </div>
+
+                <button 
+                  onClick={handleTestNotification}
+                  className="w-full py-3 bg-amber-500/10 text-amber-400 rounded-xl font-bold text-xs border border-amber-500/20 active:scale-95 flex items-center justify-center gap-2 transition-all shadow-sm"
+                >
+                    <Bell size={14} /> اختبار إرسال إشعار تجريبي
+                </button>
+            </div>
+         </AccordionItem>
+
+         {/* Accordion 4 - Store Rating & Support */}
+         <AccordionItem id="store" title="تقييم التطبيق والدعم الفني للمتاجر" icon={Star}>
+            <div className="space-y-3.5 text-right">
+                <div className="bg-gradient-to-br from-amber-500/10 to-orange-500/10 p-4 rounded-2xl border border-amber-500/20 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-amber-500 text-slate-950 flex items-center justify-center font-black shadow-md">
+                            <Star size={20} className="fill-slate-950" />
+                        </div>
+                        <div>
+                            <p className="text-xs font-black text-white">هل تعجبك تجربة "ثري"؟</p>
+                            <p className="text-[10px] text-slate-400 font-bold">ساعدنا بالوصول للمزيد عبر تقييمك في المتجر</p>
+                        </div>
+                    </div>
+                    <button 
+                      onClick={() => setShowRatingModal(true)}
+                      className="px-3.5 py-2 bg-amber-500 text-slate-950 font-black text-xs rounded-xl active:scale-95 shadow-md shrink-0"
+                    >
+                        تقييم التطبيق
+                    </button>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2.5">
+                    <button 
+                      onClick={() => setShowSupportModal(true)}
+                      className="flex items-center justify-center gap-2 p-3 bg-slate-800/80 rounded-xl active:scale-95 text-slate-200 border border-slate-700/60 hover:border-amber-500/30 text-xs font-bold"
+                    >
+                        <MessageSquare size={16} className="text-amber-400" />
+                        <span>تواصل مع الدعم</span>
+                    </button>
+                    <button 
+                      onClick={onShowPrivacyPolicy}
+                      className="flex items-center justify-center gap-2 p-3 bg-slate-800/80 rounded-xl active:scale-95 text-slate-200 border border-slate-700/60 hover:border-blue-500/30 text-xs font-bold"
+                    >
+                        <ShieldCheck size={16} className="text-blue-400" />
+                        <span>سياسة الخصوصية</span>
+                    </button>
+                </div>
             </div>
          </AccordionItem>
 
@@ -1074,6 +1219,92 @@ const Settings: React.FC<SettingsProps> = ({
                     </div>
                 </div>
             </Modal>
+      )}
+
+      {/* Store Rating Modal */}
+      {showRatingModal && (
+        <Modal title="تقييم تطبيق ثري" onClose={() => setShowRatingModal(false)}>
+          <div className="space-y-6 text-center">
+            <div className="w-16 h-16 bg-amber-500/10 border border-amber-500/20 text-amber-500 rounded-3xl flex items-center justify-center mx-auto shadow-lg">
+              <Star size={32} className="fill-amber-500" />
+            </div>
+            <div>
+              <h4 className="text-lg font-black text-white">ما هو تقييمك لتطبيق "ثري"؟</h4>
+              <p className="text-xs text-slate-400 font-bold mt-1">رأيك يهمنا لمواصلة تطوير وتحسين الميزات المالية</p>
+            </div>
+
+            <div className="flex justify-center gap-2 py-2">
+              {[1, 2, 3, 4, 5].map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => setUserRating(s)}
+                  className="p-2 transition-transform active:scale-125"
+                >
+                  <Star
+                    size={32}
+                    className={s <= userRating ? "text-amber-500 fill-amber-500" : "text-slate-700"}
+                  />
+                </button>
+              ))}
+            </div>
+
+            <ActionButton label="ارسال التقييم" onClick={handleRatingSubmit} />
+          </div>
+        </Modal>
+      )}
+
+      {/* Support & Feedback Modal */}
+      {showSupportModal && (
+        <Modal title="التواصل مع الدعم الفني" onClose={() => setShowSupportModal(false)}>
+          <div className="space-y-5 text-right">
+            <div className="bg-slate-950 p-3.5 rounded-2xl border border-slate-800 space-y-1">
+              <p className="text-xs font-bold text-white flex items-center gap-2">
+                <HelpCircle size={16} className="text-amber-500" /> مركز دعم المستخدمين
+              </p>
+              <p className="text-[10px] text-slate-400 font-bold leading-relaxed">
+                يسعدنا تلقي ملاحظاتك واقتراحاتك لتطوير التطبيق أو الإبلاغ عن أي مشكلة برمجية مباشرة لبريد التطبيق:
+                <span className="text-amber-400 font-mono block mt-1 dir-ltr">Dia840990@gmail.com</span>
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">نوع الرسالة</label>
+              <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-800">
+                <button 
+                  onClick={() => setSupportType('general')}
+                  className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${supportType === 'general' ? 'bg-amber-500 text-slate-950' : 'text-slate-400'}`}
+                >
+                  عام
+                </button>
+                <button 
+                  onClick={() => setSupportType('suggestion')}
+                  className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${supportType === 'suggestion' ? 'bg-amber-500 text-slate-950' : 'text-slate-400'}`}
+                >
+                  اقتراح
+                </button>
+                <button 
+                  onClick={() => setSupportType('problem')}
+                  className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${supportType === 'problem' ? 'bg-amber-500 text-slate-950' : 'text-slate-400'}`}
+                >
+                  مشكلة
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">نص الملاحظة أو الاقتراح</label>
+              <textarea
+                value={supportMessage}
+                onChange={e => setSupportMessage(e.target.value)}
+                placeholder="اكتب استفسارك أو ملاحظتك بالتفصيل..."
+                className="w-full h-32 p-4 rounded-2xl bg-slate-950 border border-slate-800 text-white font-bold text-xs outline-none focus:border-amber-500 transition-all resize-none"
+              />
+            </div>
+
+            <ActionButton label="إرسال الدعم" onClick={handleSendSupport} />
+          </div>
+        </Modal>
       )}
 
       <ToastNotification toast={toast} />

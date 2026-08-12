@@ -100,12 +100,11 @@ const TransactionList: React.FC<TransactionListProps> = ({
                   </div>
                 </div>
                 
-                <div className="flex items-center gap-3 sm:gap-4 shrink-0">
-                  <div className="text-left flex flex-col items-end">
+                <div className="flex items-center gap-2.5 sm:gap-3 shrink-0">
+                  <div className="text-left">
                     <p className={`font-black text-sm sm:text-base tracking-tight ${isIncome ? 'text-emerald-400' : 'text-rose-400'}`}>
-                      {isIncome ? '+' : '-'}{tx.amount.toLocaleString()}
+                      {isIncome ? '+' : '-'}{tx.amount.toLocaleString()} <span className="text-[11px] font-bold text-slate-400 ml-0.5">{currencySymbol}</span>
                     </p>
-                    <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">{currencySymbol}</span>
                   </div>
                   
                   <div className="flex gap-1.5">
