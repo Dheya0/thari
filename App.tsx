@@ -23,7 +23,6 @@ import LockScreen from './components/LockScreen';
 import Logo from './components/Logo';
 import FinancialReport from './components/FinancialReport';
 import SmartAlerts from './components/SmartAlerts';
-import FinancialSimulation from './components/FinancialSimulation';
 import ZakatCalculator from './components/ZakatCalculator';
 import ExecutiveInsights from './components/ExecutiveInsights';
 import CashflowSankey from './components/CashflowSankey';
@@ -82,7 +81,7 @@ const App: React.FC = () => {
     } catch { return INITIAL_STATE; }
   });
 
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'transactions' | 'debts' | 'chat' | 'subscriptions' | 'settings' | 'budgets' | 'goals' | 'future' | 'zakat'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'transactions' | 'debts' | 'chat' | 'subscriptions' | 'settings' | 'budgets' | 'goals' | 'zakat'>('dashboard');
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [showPrivacyPolicy, setShowPrivacyPolicy] = useState(false);
@@ -468,9 +467,8 @@ const App: React.FC = () => {
           <div className="flex justify-between items-center max-w-6xl mx-auto w-full">
             <Logo size={28} showText />
             <div className="flex gap-2">
-              <button onClick={() => setActiveTab('future')} className={`p-2 rounded-xl border border-white/10 transition-all ${activeTab === 'future' ? 'bg-purple-500 text-slate-950 shadow-[0_0_20px_rgba(168,85,247,0.4)]' : 'text-slate-400 bg-white/5 hover:bg-white/10'}`}><Sparkles size={16} /></button>
-              <button onClick={() => setActiveTab('chat')} className={`p-2 rounded-xl border border-white/10 transition-all ${activeTab === 'chat' ? 'bg-amber-500 text-slate-950 shadow-[0_0_20px_rgba(245,158,11,0.4)]' : 'text-slate-400 bg-white/5 hover:bg-white/10'}`}><BrainCircuit size={16} /></button>
-              <button onClick={() => setActiveTab('settings')} className="flex items-center justify-center w-9 h-9 rounded-xl bg-slate-800/50 border border-slate-700 text-slate-500 hover:text-amber-500 hover:border-amber-500/50 transition-all shrink-0 active:scale-95 backdrop-blur-md"><SettingsIcon size={16} /></button>
+              <button onClick={() => setActiveTab('chat')} className={`p-2 rounded-xl border border-white/10 transition-all ${activeTab === 'chat' ? 'bg-amber-500 text-slate-950 shadow-[0_0_20px_rgba(245,158,11,0.4)]' : 'text-slate-400 bg-white/5 hover:bg-white/10'}`} title="المساعد الذكي"><BrainCircuit size={16} /></button>
+              <button onClick={() => setActiveTab('settings')} className="flex items-center justify-center w-9 h-9 rounded-xl bg-slate-800/50 border border-slate-700 text-slate-500 hover:text-amber-500 hover:border-amber-500/50 transition-all shrink-0 active:scale-95 backdrop-blur-md" title="الإعدادات"><SettingsIcon size={16} /></button>
             </div>
           </div>
         </header>
@@ -637,7 +635,6 @@ const App: React.FC = () => {
                   </div>
                 )}
                 
-                {activeTab === 'future' && <FinancialSimulation transactions={filteredTransactions} currencySymbol={state.currency.symbol} apiKey={state.apiKey} />}
                 {activeTab === 'goals' && <GoalTracker goals={state.goals} wallets={state.wallets} transactions={state.transactions} onAddGoal={(g) => setState(p => ({ ...p, goals: [...p.goals, { ...g, id: 'g-'+Date.now() }] }))} onUpdateGoalAmount={(id, amt) => setState(p => ({ ...p, goals: p.goals.map(g => g.id === id ? { ...g, currentAmount: g.currentAmount + amt } : g) }))} currencySymbol={state.currency.symbol} apiKey={state.apiKey} />}
                 {activeTab === 'budgets' && <BudgetManager budgets={state.budgets} categories={state.categories} transactions={filteredTransactions} onSetBudget={(catId, amount) => setState(p => ({ ...p, budgets: [...p.budgets.filter(b => b.categoryId !== catId), { categoryId: catId, amount }] }))} currencySymbol={state.currency.symbol} />}
                 {activeTab === 'chat' && <AIChat history={state.chatHistory} transactions={filteredTransactions} categories={state.categories} currency={state.currency.symbol} onSendMessage={(msg) => setState(p => ({ ...p, chatHistory: [...p.chatHistory, msg].slice(-30) }))} apiKey={state.apiKey} />}

@@ -784,7 +784,7 @@ const Settings: React.FC<SettingsProps> = ({
                       type="password" 
                       value={localApiKey} 
                       onChange={e => setLocalApiKey(e.target.value)} 
-                      placeholder="AI Studio API Key" 
+                      placeholder="Gemini API Key" 
                       className="text-center w-full p-4 rounded-xl bg-slate-800 text-white font-bold border-none outline-none focus:ring-1 focus:ring-amber-500 shadow-inner text-sm" 
                     />
                 </div>
