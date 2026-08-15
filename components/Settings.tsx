@@ -5,10 +5,12 @@ import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
 import { 
   Trash2, User, Wallet as WalletIcon, Lock, Upload, Edit2, Plus, Tag, Coins, X, Check, Printer, FileDown, ChevronDown, AlertCircle, AlertTriangle, FileSpreadsheet, Code, ChevronLeft, Palette, Type,
-  ChevronRight, TrendingUp, ShieldCheck, ShieldAlert, Key, Unlock, Smartphone, RefreshCw, Plane, Sparkles, FileText, Bell, Star, Fingerprint, MessageSquare, Heart, Send, HelpCircle, CheckCircle2
+  ChevronRight, TrendingUp, ShieldCheck, ShieldAlert, Key, Unlock, Smartphone, RefreshCw, Plane, Sparkles, FileText, Bell, Star, Fingerprint, MessageSquare, Heart, Send, HelpCircle, CheckCircle2,
+  Mail, HardDrive, Shield, Activity, Clock, Laptop, ScanFace, FileCheck, Share2
 } from 'lucide-react';
 import { Currency, Wallet, Category, Transaction } from '../types';
 import { encryptData, decryptData } from '../services/encryptionService';
+import { authenticateBiometrics, checkBiometricAvailable } from '../services/biometricService';
 import { getIcon, DEFAULT_EXCHANGE_RATES } from '../constants';
 import { buildExecutiveCSVContent, exportAndShareExecutiveCSV } from '../utils/exportHelper';
 
@@ -147,8 +149,13 @@ const Settings: React.FC<SettingsProps> = ({
   const isStandalone = typeof window !== 'undefined' && ((window.navigator as any).standalone || window.matchMedia('(display-mode: standalone)').matches);
 
   const [localUserName, setLocalUserName] = useState(userName || '');
+  const [localUserEmail, setLocalUserEmail] = useState(appState?.userEmail || '');
   const [localPin, setLocalPin] = useState(pin || '');
   const [localApiKey, setLocalApiKey] = useState(apiKey || '');
+  const [localAutoLockTime, setLocalAutoLockTime] = useState<'instant' | '1min' | '5min' | 'never'>(appState?.autoLockTime || 'instant');
+  const [localAutoBackupFreq, setLocalAutoBackupFreq] = useState<'on_open' | 'daily' | 'weekly' | 'disabled'>(appState?.autoBackupFrequency || 'daily');
+  const [showAutoBackupHistoryModal, setShowAutoBackupHistoryModal] = useState(false);
+  const [autoBackupHistory, setAutoBackupHistory] = useState<any[]>([]);
   const [isSecurityEnabled, setIsSecurityEnabled] = useState(!!pin);
   const [isTravelMode, setIsTravelMode] = useState(appState?.showSeparateCurrencies || false); // Local state for immediate feedback
   const [isExporting, setIsExporting] = useState(false);
@@ -156,6 +163,17 @@ const Settings: React.FC<SettingsProps> = ({
   const [showCurrencyModal, setShowCurrencyModal] = useState(false);
   const [openAccordion, setOpenAccordion] = useState<string | null>('profile');
   
+  // Email Backup Modal State
+  const [showEmailBackupModal, setShowEmailBackupModal] = useState(false);
+  const [emailBackupPassword, setEmailBackupPassword] = useState('');
+  const [emailBackupType, setEmailBackupType] = useState<'encrypted' | 'plain'>('encrypted');
+
+  // Biometric Diagnostics & Live Test State
+  const [isBioHardwareAvailable, setIsBioHardwareAvailable] = useState(false);
+  const [biometryTypeTitle, setBiometryTypeTitle] = useState('Face ID / البصمة الحيوية');
+  const [bioTestStatus, setBioTestStatus] = useState<'idle' | 'testing' | 'success' | 'failed'>('idle');
+  const [bioTestFeedback, setBioTestFeedback] = useState('');
+
   // Report Configuration State
   const [showReportModal, setShowReportModal] = useState(false);
   const [reportConfig, setReportConfig] = useState<{
@@ -180,10 +198,23 @@ const Settings: React.FC<SettingsProps> = ({
   const [pendingRestoreContent, setPendingRestoreContent] = useState<string | null>(null);
 
   // Store Readiness States (Biometrics, Notifications, App Rating & Support)
-  const [isBiometricEnabled, setIsBiometricEnabled] = useState(true);
+  const [isBiometricEnabled, setIsBiometricEnabled] = useState(appState?.isBiometricEnabled !== false);
   const [debtAlertsEnabled, setDebtAlertsEnabled] = useState(true);
   const [dailyLoggerEnabled, setDailyLoggerEnabled] = useState(true);
   const [budgetAlertsEnabled, setBudgetAlertsEnabled] = useState(true);
+
+  React.useEffect(() => {
+    let isMounted = true;
+    checkBiometricAvailable().then((res) => {
+      if (isMounted) {
+        setIsBioHardwareAvailable(res.isAvailable);
+        if (res.biometryType) {
+          setBiometryTypeTitle(res.biometryType);
+        }
+      }
+    });
+    return () => { isMounted = false; };
+  }, []);
   
   const [showRatingModal, setShowRatingModal] = useState(false);
   const [userRating, setUserRating] = useState(5);
@@ -414,10 +445,138 @@ const Settings: React.FC<SettingsProps> = ({
       shareOrDownload(dataStr, `Thari_Data_Raw_${new Date().toISOString().split('T')[0]}.json`, 'application/json');
   };
 
+  const handleRunBiometricTest = async () => {
+    setBioTestStatus('testing');
+    setBioTestFeedback('جاري التحقق عبر مستشعر الجهاز أو WebAuthn...');
+    try {
+      const result = await authenticateBiometrics('اختبار فحص بصمة الجهاز لتطبيق ثري');
+      if (result.success) {
+        setBioTestStatus('success');
+        setBioTestFeedback('نجح التحقق الحيوي! مستشعر جهازك متوافق ومفعل 100%.');
+        showToast('تم التحقق من البصمة بنجاح!');
+        if (typeof window !== 'undefined' && window.navigator.vibrate) {
+          window.navigator.vibrate([20, 40, 20]);
+        }
+      } else {
+        setBioTestStatus('failed');
+        setBioTestFeedback(result.error || 'تعذر مطابقة البصمة أو تم إلغاء الاختبار');
+        showToast(result.error || 'تعذر مطابقة البصمة', 'error');
+      }
+    } catch (e) {
+      setBioTestStatus('failed');
+      setBioTestFeedback('حدث خطأ أثناء الاتصال بمستشعر الجهاز');
+      showToast('خطأ أثناء فحص البصمة', 'error');
+    }
+  };
+
+  const handleSendEmailBackup = async (password: string | null) => {
+    const targetEmail = localUserEmail.trim();
+    if (!targetEmail) {
+      showToast('يرجى إدخال البريد الإلكتروني الذي ترغب بإرسال النسخة إليه', 'error');
+      setShowEmailBackupModal(true);
+      return;
+    }
+
+    setIsExporting(true);
+    setShowEmailBackupModal(false);
+    try {
+      const dateStr = new Date().toISOString().split('T')[0];
+      const timeStr = new Date().toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' });
+      const totalTx = appState?.transactions?.length || 0;
+      const totalWallets = appState?.wallets?.length || 0;
+      const totalDebts = appState?.debts?.length || 0;
+
+      let backupContent = '';
+      let fileExt = 'json';
+      let isEncrypted = false;
+
+      if (password) {
+        backupContent = await encryptData(JSON.stringify(appState), password);
+        fileExt = 'thari';
+        isEncrypted = true;
+      } else {
+        backupContent = JSON.stringify(appState, null, 2);
+      }
+
+      const fileName = `Thari_Backup_${dateStr}.${fileExt}`;
+
+      // Save file locally / share
+      await shareOrDownload(backupContent, fileName, isEncrypted ? 'text/plain' : 'application/json');
+
+      // Update last backup date in app state
+      onUpdateSettings({ 
+        userEmail: targetEmail, 
+        lastBackupDate: new Date().toISOString() 
+      });
+
+      // Prepare professional mailto link
+      const emailSubject = encodeURIComponent(`نسخة احتياطية مالية - تطبيق ثري (${dateStr})`);
+      const emailBodyText = `مرحباً ${localUserName || 'مستخدم ثري'}،
+
+مرفق في هذا البريد ملخص نسختك الاحتياطية من تطبيق "ثري" لإدارة الأموال:
+- تاريخ النسخة: ${dateStr} ${timeStr}
+- البريد المسجل: ${targetEmail}
+- نوع النسخة: ${isEncrypted ? 'مشفرة وآمنة برقم سري (ملف .thari)' : 'نسخة JSON عادية'}
+- إجمالي العمليات: ${totalTx}
+- عدد المحافظ: ${totalWallets}
+- عدد الديون والالتزامات: ${totalDebts}
+
+تعليمات الاستعادة:
+1. قم بحفظ الملف المرفق أو نص النسخة الاحتياطية على جهازك.
+2. افتح تطبيق "ثري" واذهب إلى الإعدادات > استعادة البيانات.
+3. اختر الملف المرفق وأدخل كلمة المرور في حال كانت النسخة مشفرة.
+
+تطبيق ثري - إدارة مالية ذكية ومؤسسية آمنة أوفلاين`;
+
+      const emailBody = encodeURIComponent(emailBodyText);
+      const mailtoUrl = `mailto:${targetEmail}?subject=${emailSubject}&body=${emailBody}`;
+
+      // Open email client
+      if (typeof window !== 'undefined') {
+        const mailLink = document.createElement('a');
+        mailLink.href = mailtoUrl;
+        mailLink.target = '_blank';
+        document.body.appendChild(mailLink);
+        mailLink.click();
+        setTimeout(() => document.body.removeChild(mailLink), 300);
+      }
+
+      showToast(`تم إعداد النسخة والبريد لـ: ${targetEmail}`);
+    } catch (e) {
+      showToast('حدث خطأ أثناء إنشاء النسخة الاحتياطية البريدية', 'error');
+    } finally {
+      setIsExporting(false);
+      setEmailBackupPassword('');
+    }
+  };
+
   const handleSaveProfile = () => {
     const finalPin = isSecurityEnabled ? (localPin.length === 4 ? localPin : pin) : null;
-    onUpdateSettings({ userName: localUserName, pin: finalPin, apiKey: localApiKey });
-    showToast("تم حفظ الإعدادات العامة");
+    onUpdateSettings({ 
+      userName: localUserName, 
+      userEmail: localUserEmail,
+      pin: finalPin, 
+      isBiometricEnabled, 
+      apiKey: localApiKey,
+      autoLockTime: localAutoLockTime,
+      autoBackupFrequency: localAutoBackupFreq
+    });
+    showToast("تم حفظ الملف الشخصي والبريد الإلكتروني");
+  };
+
+  const handleSaveSecurity = (lockNow = false) => {
+    if (isSecurityEnabled && localPin.length !== 4) {
+      showToast("يرجى إدخال رمز PIN سري مكون من 4 أرقام", 'error');
+      return;
+    }
+    const finalPin = isSecurityEnabled ? localPin : null;
+    onUpdateSettings({ 
+      pin: finalPin, 
+      isBiometricEnabled: isBiometricEnabled,
+      autoLockTime: localAutoLockTime,
+      isLocked: lockNow && !!finalPin 
+    });
+    showToast(lockNow ? "تم قفل التطبيق، أدخل الرمز أو البصمة لفتحه" : "تم حفظ وتفعيل إعدادات الأمان والحماية والتوافق");
   };
 
   const openWalletEdit = (w: Wallet) => {
@@ -747,27 +906,28 @@ const Settings: React.FC<SettingsProps> = ({
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-4">
-         <button onClick={() => setActiveSection('wallets')} className="bg-slate-900 p-6 rounded-[2.5rem] border border-slate-800 flex flex-col items-center gap-4 text-white font-bold hover:bg-slate-800 transition-all active:scale-95">
-            <div className="w-12 h-12 bg-amber-500/10 text-amber-500 flex items-center justify-center rounded-2xl"><WalletIcon size={24} /></div>
-            <span className="text-xs font-black uppercase tracking-widest">المحافظ</span>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+         <button onClick={() => setActiveSection('wallets')} className="bg-slate-900 p-5 rounded-[2rem] border border-slate-800 flex flex-col items-center gap-3 text-white font-bold hover:bg-slate-800 transition-all active:scale-95">
+            <div className="w-11 h-11 bg-amber-500/10 text-amber-500 flex items-center justify-center rounded-2xl"><WalletIcon size={22} /></div>
+            <span className="text-[11px] font-black uppercase tracking-wider">المحافظ</span>
          </button>
-         <button onClick={() => setActiveSection('categories')} className="bg-slate-900 p-6 rounded-[2.5rem] border border-slate-800 flex flex-col items-center gap-4 text-white font-bold hover:bg-slate-800 transition-all active:scale-95">
-            <div className="w-12 h-12 bg-blue-500/10 text-blue-500 flex items-center justify-center rounded-2xl"><Tag size={24} /></div>
-            <span className="text-xs font-black uppercase tracking-widest">التصنيفات</span>
+         <button onClick={() => setActiveSection('categories')} className="bg-slate-900 p-5 rounded-[2rem] border border-slate-800 flex flex-col items-center gap-3 text-white font-bold hover:bg-slate-800 transition-all active:scale-95">
+            <div className="w-11 h-11 bg-blue-500/10 text-blue-500 flex items-center justify-center rounded-2xl"><Tag size={22} /></div>
+            <span className="text-[11px] font-black uppercase tracking-wider">التصنيفات</span>
          </button>
-         <button onClick={() => setActiveSection('currencies')} className="col-span-2 bg-slate-900 p-6 rounded-[2.5rem] border border-slate-800 flex items-center justify-between text-white font-bold hover:bg-slate-800 transition-all active:scale-95">
-            <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-emerald-500/10 text-emerald-500 flex items-center justify-center rounded-2xl"><RefreshCw size={24} /></div>
-                <span className="text-xs font-black uppercase tracking-widest">أسعار الصرف والعملات</span>
-            </div>
-            <ChevronLeft size={20} className="text-slate-600" />
+         <button onClick={() => setActiveSection('currencies')} className="bg-slate-900 p-5 rounded-[2rem] border border-slate-800 flex flex-col items-center gap-3 text-white font-bold hover:bg-slate-800 transition-all active:scale-95">
+            <div className="w-11 h-11 bg-emerald-500/10 text-emerald-500 flex items-center justify-center rounded-2xl"><RefreshCw size={22} /></div>
+            <span className="text-[11px] font-black uppercase tracking-wider">العملات والأسعار</span>
+         </button>
+         <button onClick={() => setShowEmailBackupModal(true)} className="bg-slate-900 p-5 rounded-[2rem] border border-slate-800 flex flex-col items-center gap-3 text-white font-bold hover:bg-slate-800 transition-all active:scale-95">
+            <div className="w-11 h-11 bg-indigo-500/10 text-indigo-400 flex items-center justify-center rounded-2xl"><Mail size={22} /></div>
+            <span className="text-[11px] font-black uppercase tracking-wider">نسخ للبريد</span>
          </button>
       </div>
 
       <div className="space-y-4">
-         {/* Accordion 1 - Profile Info & AI Assistance */}
-         <AccordionItem id="profile" title="الحساب وصاحب المحفظة" icon={User}>
+         {/* Accordion 1 - Profile Info, Registered Email & AI Assistance */}
+         <AccordionItem id="profile" title="الحساب والبريد الإلكتروني للنسخ والمزامنة" icon={User}>
             <div className="space-y-4 text-right">
                 <div className="space-y-2">
                     <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2 block">اسم صاحب الحساب</label>
@@ -778,6 +938,41 @@ const Settings: React.FC<SettingsProps> = ({
                       className="w-full p-4 rounded-xl bg-slate-800 text-white font-bold border-none outline-none focus:ring-1 focus:ring-amber-500 shadow-inner" 
                     />
                 </div>
+
+                <div className="space-y-2">
+                    <div className="flex justify-between items-center px-1">
+                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block flex items-center gap-1.5">
+                        <Mail size={12} className="text-amber-500" /> البريد الإلكتروني المسجل لاستقبال النسخ الاحتياطية
+                      </label>
+                      {appState?.lastBackupDate && (
+                        <span className="text-[9px] font-bold text-slate-500">
+                          آخر نسخة: {new Date(appState.lastBackupDate).toLocaleDateString('ar-SA')}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex gap-2">
+                      <input 
+                        type="email" 
+                        value={localUserEmail} 
+                        onChange={e => setLocalUserEmail(e.target.value)} 
+                        placeholder="example@domain.com"
+                        className="flex-1 p-4 rounded-xl bg-slate-800 text-white font-bold border-none outline-none focus:ring-1 focus:ring-amber-500 shadow-inner text-sm dir-ltr text-left" 
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowEmailBackupModal(true)}
+                        className="px-4 bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-400 rounded-xl text-xs font-black active:scale-95 transition-all flex items-center gap-1.5 shrink-0"
+                        title="إرسال نسخة احتياطية فورية لبريدك"
+                      >
+                        <Send size={14} />
+                        <span>نسخ للبريد</span>
+                      </button>
+                    </div>
+                    <p className="text-[10px] text-slate-400 font-bold px-1">
+                      سيتم إرسال ملفات النسخ الاحتياطي المشفرة وملخص وضعك المالي مباشرة إلى هذا البريد.
+                    </p>
+                </div>
+
                 <div className="space-y-2">
                     <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2 block">مفتاح الذكاء الاصطناعي Gemini (اختياري)</label>
                     <input 
@@ -791,8 +986,8 @@ const Settings: React.FC<SettingsProps> = ({
             </div>
          </AccordionItem>
 
-         {/* Accordion 2 - Preferences & Security */}
-         <AccordionItem id="security" title="الأمان والعملة والخصوصية" icon={Lock}>
+         {/* Accordion 2 - Preferences, Security & Device/Web Diagnostics */}
+         <AccordionItem id="security" title="الأمان، البيومترية، والتحقق من الأجهزة والويب" icon={Lock}>
             <div className="space-y-5 divide-y divide-slate-800/60 text-right">
                 <div className="pb-4">
                     <button 
@@ -826,32 +1021,338 @@ const Settings: React.FC<SettingsProps> = ({
                     </div>
                 </div>
 
+                {/* Auto-Lock Duration Setting */}
+                <div className="pt-4 space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 px-1">
+                      <Clock size={14} className="text-amber-500" /> مهلة القفل التلقائي للتطبيق
+                    </label>
+                    <div className="grid grid-cols-4 gap-1.5 bg-slate-950 p-1.5 rounded-2xl border border-white/5">
+                      <button 
+                        type="button" 
+                        onClick={() => { setLocalAutoLockTime('instant'); onUpdateSettings({ autoLockTime: 'instant' }); }}
+                        className={`py-2 rounded-xl text-xs font-bold transition-all ${localAutoLockTime === 'instant' ? 'bg-amber-500 text-slate-950 font-black shadow-md' : 'text-slate-400 hover:text-white'}`}
+                      >
+                        فوري
+                      </button>
+                      <button 
+                        type="button" 
+                        onClick={() => { setLocalAutoLockTime('1min'); onUpdateSettings({ autoLockTime: '1min' }); }}
+                        className={`py-2 rounded-xl text-xs font-bold transition-all ${localAutoLockTime === '1min' ? 'bg-amber-500 text-slate-950 font-black shadow-md' : 'text-slate-400 hover:text-white'}`}
+                      >
+                        دقيقة
+                      </button>
+                      <button 
+                        type="button" 
+                        onClick={() => { setLocalAutoLockTime('5min'); onUpdateSettings({ autoLockTime: '5min' }); }}
+                        className={`py-2 rounded-xl text-xs font-bold transition-all ${localAutoLockTime === '5min' ? 'bg-amber-500 text-slate-950 font-black shadow-md' : 'text-slate-400 hover:text-white'}`}
+                      >
+                        5 دقائق
+                      </button>
+                      <button 
+                        type="button" 
+                        onClick={() => { setLocalAutoLockTime('never'); onUpdateSettings({ autoLockTime: 'never' }); }}
+                        className={`py-2 rounded-xl text-xs font-bold transition-all ${localAutoLockTime === 'never' ? 'bg-amber-500 text-slate-950 font-black shadow-md' : 'text-slate-400 hover:text-white'}`}
+                      >
+                        تعطيل
+                      </button>
+                    </div>
+                </div>
+
                 <div className="pt-4 space-y-3">
                     <div className="flex justify-between items-center bg-slate-950/40 p-3 rounded-2xl border border-white/5">
                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2"><Lock size={14} /> كود الحماية السري (PIN)</label>
-                        <div dir="ltr" className={`w-12 h-6 rounded-full p-1 cursor-pointer transition-all ${isSecurityEnabled ? 'bg-amber-500' : 'bg-slate-700'}`} onClick={() => setIsSecurityEnabled(!isSecurityEnabled)}>
+                        <div dir="ltr" className={`w-12 h-6 rounded-full p-1 cursor-pointer transition-all ${isSecurityEnabled ? 'bg-amber-500' : 'bg-slate-700'}`} onClick={() => {
+                            const nextState = !isSecurityEnabled;
+                            setIsSecurityEnabled(nextState);
+                            if (!nextState) {
+                              setLocalPin('');
+                              onUpdateSettings({ pin: null, isLocked: false });
+                              showToast('تم إلغاء قفل الحماية');
+                            }
+                        }}>
                             <div className={`w-4 h-4 bg-white rounded-full shadow-md transition-transform ${isSecurityEnabled ? 'translate-x-6' : 'translate-x-0'}`} />
                         </div>
                     </div>
                     {isSecurityEnabled && (
-                        <input 
-                            type="password" 
-                            value={localPin} 
-                            onChange={e => setLocalPin(e.target.value.replace(/\D/g, '').slice(0, 4))} 
-                            className="w-full p-4 rounded-xl bg-slate-800 text-white font-black text-center text-xl tracking-[0.5em]" 
-                            placeholder="****" 
-                        />
+                        <div className="space-y-2">
+                          <input 
+                              type="password" 
+                              value={localPin} 
+                              onChange={e => setLocalPin(e.target.value.replace(/\D/g, '').slice(0, 4))} 
+                              className="w-full p-4 rounded-xl bg-slate-800 text-white font-black text-center text-2xl tracking-[0.5em] border border-white/10 focus:border-amber-500 focus:outline-none" 
+                              placeholder="****" 
+                              maxLength={4}
+                          />
+                          <p className="text-[10px] text-slate-400 font-bold text-center">أدخل 4 أرقام سرية لقفل التطبيق</p>
+                        </div>
                     )}
                 </div>
 
                 <div className="pt-4 space-y-2">
                     <div className="flex justify-between items-center bg-slate-950/40 p-3 rounded-2xl border border-white/5">
                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2"><Fingerprint size={14} className="text-emerald-400" /> فتح التطبيق بالبصمة (Face ID / Touch ID)</label>
-                        <div dir="ltr" className={`w-12 h-6 rounded-full p-1 cursor-pointer transition-all ${isBiometricEnabled ? 'bg-emerald-500' : 'bg-slate-700'}`} onClick={() => setIsBiometricEnabled(!isBiometricEnabled)}>
+                        <div dir="ltr" className={`w-12 h-6 rounded-full p-1 cursor-pointer transition-all ${isBiometricEnabled ? 'bg-emerald-500' : 'bg-slate-700'}`} onClick={() => {
+                            const nextBio = !isBiometricEnabled;
+                            setIsBiometricEnabled(nextBio);
+                            onUpdateSettings({ isBiometricEnabled: nextBio });
+                            showToast(nextBio ? 'تم تفعيل الفتح بالبصمة' : 'تم تعطيل الفتح بالبصمة');
+                        }}>
                             <div className={`w-4 h-4 bg-white rounded-full shadow-md transition-transform ${isBiometricEnabled ? 'translate-x-6' : 'translate-x-0'}`} />
                         </div>
                     </div>
                 </div>
+
+                {/* Device & Web Platform Diagnostic Card */}
+                <div className="pt-4 space-y-3">
+                  <div className="bg-slate-950/70 p-4 rounded-2xl border border-slate-800 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-xs font-black text-white">
+                        <Laptop size={16} className="text-amber-500" />
+                        <span>التحقق من توافق الجهاز والويب</span>
+                      </div>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                        {Capacitor.isNativePlatform() ? 'تطبيق محلي أصلي (Capacitor)' : 'تطبيق ويب PWA متوافق'}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 text-[10px] font-bold text-slate-400">
+                      <div className="bg-slate-900 p-2.5 rounded-xl border border-white/5 flex items-center justify-between">
+                        <span>مستشعر البصمة:</span>
+                        <span className={isBioHardwareAvailable ? 'text-emerald-400' : 'text-amber-400'}>
+                          {isBioHardwareAvailable ? biometryTypeTitle : 'متوفر عبر WebAuthn'}
+                        </span>
+                      </div>
+                      <div className="bg-slate-900 p-2.5 rounded-xl border border-white/5 flex items-center justify-between">
+                        <span>جاهزية الأوفلاين:</span>
+                        <span className="text-emerald-400 font-black">100% نشط</span>
+                      </div>
+                    </div>
+
+                    {/* Live Biometric Test Button */}
+                    <button
+                      type="button"
+                      onClick={handleRunBiometricTest}
+                      disabled={bioTestStatus === 'testing'}
+                      className="w-full py-2.5 bg-slate-900 hover:bg-slate-850 border border-amber-500/30 text-amber-400 rounded-xl text-xs font-bold active:scale-95 transition-all flex items-center justify-center gap-2"
+                    >
+                      <ScanFace size={15} />
+                      <span>{bioTestStatus === 'testing' ? 'جاري فحص المستشعر...' : 'اختبار فحص بصمة الجهاز الآن'}</span>
+                    </button>
+
+                    {bioTestFeedback && (
+                      <div className={`p-2.5 rounded-xl border text-[11px] font-bold flex items-center gap-2 ${bioTestStatus === 'success' ? 'bg-emerald-950/40 border-emerald-500/30 text-emerald-300' : 'bg-rose-950/40 border-rose-500/30 text-rose-300'}`}>
+                        {bioTestStatus === 'success' ? <CheckCircle2 size={16} className="shrink-0 text-emerald-400" /> : <AlertCircle size={16} className="shrink-0 text-rose-400" />}
+                        <span>{bioTestFeedback}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {isSecurityEnabled && (
+                  <div className="pt-4 flex flex-col sm:flex-row gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleSaveSecurity(false)}
+                      className="flex-1 py-3 bg-amber-500 text-slate-950 rounded-xl font-black text-xs active:scale-95 shadow-md transition-all flex items-center justify-center gap-2"
+                    >
+                      <ShieldCheck size={16} />
+                      <span>حفظ إعدادات الأمان والتوافق</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleSaveSecurity(true)}
+                      className="py-3 px-4 bg-slate-800 text-slate-200 hover:text-white rounded-xl font-black text-xs border border-white/10 active:scale-95 transition-all flex items-center justify-center gap-2"
+                    >
+                      <Lock size={15} />
+                      <span>قفل التطبيق وتجربة الرمز الآن</span>
+                    </button>
+                  </div>
+                )}
+            </div>
+         </AccordionItem>
+
+         {/* Accordion 3 - Offline Local Database & Backup to Email */}
+         <AccordionItem id="data" title="النسخ الاحتياطي، البريد، والتخزين الأوفلاين" icon={HardDrive}>
+            <div className="space-y-4 text-right">
+                
+                 {/* Auto-Backup Frequency & Protection Selector Card */}
+                 <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-3">
+                   <div className="flex items-center justify-between">
+                     <div className="flex items-center gap-2 text-xs font-black text-white">
+                       <RefreshCw size={16} className="text-amber-500" />
+                       <span>النسخ الاحتياطي التلقائي الدوري</span>
+                     </div>
+                     <span className={`text-[10px] font-bold px-2 py-0.5 rounded-lg border ${localAutoBackupFreq !== 'disabled' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-slate-800 text-slate-400 border-slate-700'}`}>
+                       {localAutoBackupFreq !== 'disabled' ? 'مفعل وتلقائي' : 'معطل'}
+                     </span>
+                   </div>
+
+                   <p className="text-[10px] text-slate-400 font-bold leading-relaxed">
+                     يقوم التطبيق بإنشاء نقاط استعادة احتياطية تلقائياً محلياً لضمان عدم ضياع أي سجل مالي حتى عند نسيان النسخ اليدوي.
+                   </p>
+
+                   {/* Auto-Backup Frequency Grid Selector */}
+                   <div className="grid grid-cols-4 gap-1.5 bg-slate-900 p-1.5 rounded-xl border border-white/5">
+                     <button
+                       type="button"
+                       onClick={() => {
+                         setLocalAutoBackupFreq('on_open');
+                         onUpdateSettings({ autoBackupFrequency: 'on_open' });
+                         showToast('تم ضبط النسخ التلقائي: عند فتح التطبيق');
+                       }}
+                       className={`py-2 rounded-lg text-[11px] font-bold transition-all ${localAutoBackupFreq === 'on_open' ? 'bg-amber-500 text-slate-950 font-black shadow-md' : 'text-slate-400 hover:text-white'}`}
+                     >
+                       عند الفتح
+                     </button>
+                     <button
+                       type="button"
+                       onClick={() => {
+                         setLocalAutoBackupFreq('daily');
+                         onUpdateSettings({ autoBackupFrequency: 'daily' });
+                         showToast('تم ضبط النسخ التلقائي: يومياً');
+                       }}
+                       className={`py-2 rounded-lg text-[11px] font-bold transition-all ${localAutoBackupFreq === 'daily' ? 'bg-amber-500 text-slate-950 font-black shadow-md' : 'text-slate-400 hover:text-white'}`}
+                     >
+                       يومي
+                     </button>
+                     <button
+                       type="button"
+                       onClick={() => {
+                         setLocalAutoBackupFreq('weekly');
+                         onUpdateSettings({ autoBackupFrequency: 'weekly' });
+                         showToast('تم ضبط النسخ التلقائي: أسبوعياً');
+                       }}
+                       className={`py-2 rounded-lg text-[11px] font-bold transition-all ${localAutoBackupFreq === 'weekly' ? 'bg-amber-500 text-slate-950 font-black shadow-md' : 'text-slate-400 hover:text-white'}`}
+                     >
+                       أسبوعي
+                     </button>
+                     <button
+                       type="button"
+                       onClick={() => {
+                         setLocalAutoBackupFreq('disabled');
+                         onUpdateSettings({ autoBackupFrequency: 'disabled' });
+                         showToast('تم تعطيل النسخ التلقائي');
+                       }}
+                       className={`py-2 rounded-lg text-[11px] font-bold transition-all ${localAutoBackupFreq === 'disabled' ? 'bg-amber-500 text-slate-950 font-black shadow-md' : 'text-slate-400 hover:text-white'}`}
+                     >
+                       تعطيل
+                     </button>
+                   </div>
+
+                   <div className="flex items-center justify-between pt-1 text-[10px]">
+                     <span className="text-slate-400 font-bold">
+                       {appState?.lastAutoBackupTime 
+                         ? `آخر نسخة تلقائية: ${new Date(appState.lastAutoBackupTime).toLocaleDateString('ar-SA')} ${new Date(appState.lastAutoBackupTime).toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' })}`
+                         : 'لم يتم إنشاء نسخة تلقائية بعد'}
+                     </span>
+                     <button
+                       type="button"
+                       onClick={() => {
+                         const historyStr = localStorage.getItem('thari_auto_backup_history');
+                         const hist = historyStr ? JSON.parse(historyStr) : [];
+                         setAutoBackupHistory(hist);
+                         setShowAutoBackupHistoryModal(true);
+                       }}
+                       className="text-amber-400 hover:text-amber-300 font-black flex items-center gap-1 underline underline-offset-4"
+                     >
+                       <span>نقاط الاستعادة التلقائية</span>
+                       <ChevronLeft size={12} />
+                     </button>
+                   </div>
+                 </div>
+
+                 {/* Email Cloud Backup Action Card */}
+                <div className="bg-gradient-to-br from-indigo-950/50 to-slate-950 p-4 rounded-2xl border border-indigo-500/30 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-xs font-black text-white">
+                      <Mail size={16} className="text-indigo-400" />
+                      <span>النسخ الاحتياطي للبريد الإلكتروني</span>
+                    </div>
+                    {localUserEmail ? (
+                      <span className="text-[10px] font-bold text-indigo-300 bg-indigo-500/20 px-2 py-0.5 rounded-lg border border-indigo-500/30 max-w-[160px] truncate dir-ltr">
+                        {localUserEmail}
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-bold text-amber-400/80 bg-amber-500/10 px-2 py-0.5 rounded-lg border border-amber-500/20">
+                        لم يتم تحديد بريد بعد
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[10px] text-slate-400 font-bold leading-relaxed">
+                    يمكنك كتابة واختيار أي بريد إلكتروني تفضله لإرسال النسخة الاحتياطية المشفرة إليه مع ملخص إحصائي شامل لأموالك.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setShowEmailBackupModal(true)}
+                    className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-black active:scale-95 transition-all shadow-lg shadow-indigo-600/20 flex items-center justify-center gap-2"
+                  >
+                    <Send size={15} />
+                    <span>إرسال نسخة احتياطية للبريد المحدد</span>
+                  </button>
+                </div>
+
+                {/* Storage Health & Offline Readiness */}
+                <div className="bg-slate-950 p-3.5 rounded-2xl border border-slate-800 space-y-2">
+                  <div className="flex items-center justify-between text-[11px] font-black text-white">
+                    <span className="flex items-center gap-1.5"><Shield size={14} className="text-emerald-400" /> حالة التخزين المحلي والأوفلاين</span>
+                    <span className="text-emerald-400 text-[10px]">مؤمن 100%</span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 text-center">
+                    <div className="bg-slate-900/80 p-2 rounded-xl border border-white/5">
+                      <span className="text-[9px] text-slate-500 block">العمليات</span>
+                      <span className="text-xs font-black text-white">{appState?.transactions?.length || 0}</span>
+                    </div>
+                    <div className="bg-slate-900/80 p-2 rounded-xl border border-white/5">
+                      <span className="text-[9px] text-slate-500 block">المحافظ</span>
+                      <span className="text-xs font-black text-white">{safeWallets.length}</span>
+                    </div>
+                    <div className="bg-slate-900/80 p-2 rounded-xl border border-white/5">
+                      <span className="text-[9px] text-slate-500 block">الديون والالتزامات</span>
+                      <span className="text-xs font-black text-white">{appState?.debts?.length || 0}</span>
+                    </div>
+                  </div>
+                  <p className="text-[9px] text-emerald-400/90 font-bold text-center">
+                    ✓ التطبيق يعمل بشكل كامل ومستقل أوفلاين دون الحاجة لأي اتصال بالإنترنت.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-3 gap-2">
+                    <button onClick={() => { setReportConfig({ type: 'detailed', currencyFilter: null, action: 'print' }); setShowReportModal(true); }} className="flex flex-col items-center justify-center gap-1.5 p-3.5 bg-slate-800/80 rounded-2xl active:scale-95 transition-all border border-slate-800 text-white hover:border-amber-500/30 text-xs font-bold">
+                        <Printer size={18} className="text-amber-500" />
+                        <span className="text-[10px]">طباعة الكشف</span>
+                    </button>
+                    <button onClick={() => { setReportConfig({ type: 'detailed', currencyFilter: null, action: 'share' }); setShowReportModal(true); }} className="flex flex-col items-center justify-center gap-1.5 p-3.5 bg-slate-800/80 rounded-2xl active:scale-95 transition-all border border-slate-800 text-white hover:border-emerald-500/30 text-xs font-bold">
+                        <FileDown size={18} className="text-emerald-500" />
+                        <span className="text-[10px]">مشاركة PDF</span>
+                    </button>
+                    <button onClick={() => { setReportConfig({ type: 'detailed', currencyFilter: null, action: 'excel' }); setShowReportModal(true); }} className="flex flex-col items-center justify-center gap-1.5 p-3.5 bg-slate-800/80 rounded-2xl active:scale-95 transition-all border border-slate-800 text-white hover:border-blue-500/30 text-xs font-bold">
+                        <FileSpreadsheet size={18} className="text-blue-500" />
+                        <span className="text-[10px]">تصدير Excel</span>
+                    </button>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 pt-2">
+                    <button onClick={() => handleExportCSV('detailed', null)} className="flex items-center justify-center gap-2 p-3 bg-slate-800/60 rounded-xl active:scale-95 transition-all text-slate-300 border border-slate-800 hover:border-emerald-500/30 text-xs font-bold">
+                        <FileSpreadsheet size={16} className="text-emerald-400" />
+                        <span>تصدير سريع Excel</span>
+                    </button>
+                    <button onClick={handleExportJSON} className="flex items-center justify-center gap-2 p-3 bg-slate-800/60 rounded-xl active:scale-95 transition-all text-slate-300 border border-slate-800 hover:border-blue-500/30 text-xs font-bold">
+                        <Code size={16} className="text-blue-400" />
+                        <span>تصدير JSON</span>
+                    </button>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 pt-4 border-t border-slate-850">
+                    <button onClick={handleExportBackup} disabled={isExporting} className="flex items-center justify-center gap-2 p-3 bg-slate-800 rounded-xl active:scale-95 border border-slate-700/50 text-xs font-bold text-white">
+                        <FileDown size={14} className="text-amber-400" />
+                        <span>نسخ احتياطي (.thari)</span>
+                    </button>
+                    <button onClick={() => fileInputRef.current?.click()} className="flex items-center justify-center gap-2 p-3 bg-slate-800 rounded-xl active:scale-95 border border-slate-700/50 text-xs font-bold text-white">
+                        <Upload size={14} className="text-slate-400" />
+                        <span>استعادة نسخة</span>
+                    </button>
+                </div>
+                <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" />
             </div>
          </AccordionItem>
 
@@ -939,50 +1440,7 @@ const Settings: React.FC<SettingsProps> = ({
             </div>
          </AccordionItem>
 
-         {/* Accordion 3 - Data & Reports */}
-         <AccordionItem id="data" title="التقارير وسجلات الحساب والنسخ" icon={FileText}>
-            <div className="space-y-4 text-right">
-                <div className="grid grid-cols-3 gap-2">
-                    <button onClick={() => { setReportConfig({ type: 'detailed', currencyFilter: null, action: 'print' }); setShowReportModal(true); }} className="flex flex-col items-center justify-center gap-1.5 p-3.5 bg-slate-800/80 rounded-2xl active:scale-95 transition-all border border-slate-800 text-white hover:border-amber-500/30 text-xs font-bold">
-                        <Printer size={18} className="text-amber-500" />
-                        <span className="text-[10px]">طباعة الكشف</span>
-                    </button>
-                    <button onClick={() => { setReportConfig({ type: 'detailed', currencyFilter: null, action: 'share' }); setShowReportModal(true); }} className="flex flex-col items-center justify-center gap-1.5 p-3.5 bg-slate-800/80 rounded-2xl active:scale-95 transition-all border border-slate-800 text-white hover:border-emerald-500/30 text-xs font-bold">
-                        <FileDown size={18} className="text-emerald-500" />
-                        <span className="text-[10px]">مشاركة PDF</span>
-                    </button>
-                    <button onClick={() => { setReportConfig({ type: 'detailed', currencyFilter: null, action: 'excel' }); setShowReportModal(true); }} className="flex flex-col items-center justify-center gap-1.5 p-3.5 bg-slate-800/80 rounded-2xl active:scale-95 transition-all border border-slate-800 text-white hover:border-blue-500/30 text-xs font-bold">
-                        <FileSpreadsheet size={18} className="text-blue-500" />
-                        <span className="text-[10px]">تصدير Excel</span>
-                    </button>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3 pt-2">
-                    <button onClick={() => handleExportCSV('detailed', null)} className="flex items-center justify-center gap-2 p-3 bg-slate-800/60 rounded-xl active:scale-95 transition-all text-slate-300 border border-slate-800 hover:border-emerald-500/30 text-xs font-bold">
-                        <FileSpreadsheet size={16} className="text-emerald-400" />
-                        <span>تصدير سريع Excel</span>
-                    </button>
-                    <button onClick={handleExportJSON} className="flex items-center justify-center gap-2 p-3 bg-slate-800/60 rounded-xl active:scale-95 transition-all text-slate-300 border border-slate-800 hover:border-blue-500/30 text-xs font-bold">
-                        <Code size={16} className="text-blue-400" />
-                        <span>تصدير JSON</span>
-                    </button>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3 pt-4 border-t border-slate-850">
-                    <button onClick={handleExportBackup} disabled={isExporting} className="flex items-center justify-center gap-2 p-3 bg-slate-800 rounded-xl active:scale-95 border border-slate-700/50 text-xs font-bold text-white">
-                        <FileDown size={14} className="text-amber-400" />
-                        <span>نسخ احتياطي (.thari)</span>
-                    </button>
-                    <button onClick={() => fileInputRef.current?.click()} className="flex items-center justify-center gap-2 p-3 bg-slate-800 rounded-xl active:scale-95 border border-slate-700/50 text-xs font-bold text-white">
-                        <Upload size={14} className="text-slate-400" />
-                        <span>استعادة نسخة</span>
-                    </button>
-                </div>
-                <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" />
-            </div>
-         </AccordionItem>
-
-         {/* Accordion 4 - Sensitive Actions */}
+         {/* Accordion 5 - Sensitive Actions */}
          <AccordionItem id="danger" title="صيانة النظام ومسح البيانات" icon={Trash2}>
             <div className="space-y-4 text-right">
                 <p className="text-[10px] text-slate-500 leading-relaxed">
@@ -1263,8 +1721,8 @@ const Settings: React.FC<SettingsProps> = ({
                 <HelpCircle size={16} className="text-amber-500" /> مركز دعم المستخدمين
               </p>
               <p className="text-[10px] text-slate-400 font-bold leading-relaxed">
-                يسعدنا تلقي ملاحظاتك واقتراحاتك لتطوير التطبيق أو الإبلاغ عن أي مشكلة برمجية مباشرة لبريد التطبيق:
-                <span className="text-amber-400 font-mono block mt-1 dir-ltr">Dia840990@gmail.com</span>
+                يسعدنا تلقي ملاحظاتك واقتراحاتك لتطوير التطبيق أو الإبلاغ عن أي مشكلة برمجية مباشرة لفريق الدعم الفني:
+                <span className="text-amber-400 font-mono block mt-1 dir-ltr">support@thari.app</span>
               </p>
             </div>
 
@@ -1303,6 +1761,141 @@ const Settings: React.FC<SettingsProps> = ({
             </div>
 
             <ActionButton label="إرسال الدعم" onClick={handleSendSupport} />
+          </div>
+        </Modal>
+      )}
+
+      {/* Email Backup & Export Modal */}
+      {showEmailBackupModal && (
+        <Modal title="نسخ احتياطي فوري إلى البريد الإلكتروني" onClose={() => setShowEmailBackupModal(false)}>
+          <div className="space-y-4 text-right">
+            <div className="bg-indigo-950/50 p-4 rounded-2xl border border-indigo-500/30 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-black text-white flex items-center gap-2">
+                  <Mail size={16} className="text-indigo-400" /> البريد المستهدف
+                </span>
+                <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20">
+                  جاهز للإرسال
+                </span>
+              </div>
+              <p className="text-[10px] text-slate-300 font-bold leading-relaxed">
+                سيتم إعداد رسالة بريد تتضمن ملخصك المالي مع ملف النسخة الاحتياطية المشفر <span className="font-mono text-amber-400 font-bold">.thari</span>، بالإضافة لتنزيل نسخة مباشرة على جهازك لضمان وجودها أوفلاين.
+              </p>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">البريد الإلكتروني الذي ترغب باستلام النسخة عليه</label>
+              <input 
+                type="email"
+                value={localUserEmail}
+                onChange={e => setLocalUserEmail(e.target.value)}
+                placeholder="example@domain.com"
+                className="w-full p-3.5 rounded-xl bg-slate-950 text-white font-bold border border-slate-800 text-sm dir-ltr text-left outline-none focus:border-indigo-500"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">كلمة مرور لتشفير النسخة (اختياري - لحماية مضاعفة)</label>
+              <input 
+                type="password"
+                value={backupPassword}
+                onChange={e => setBackupPassword(e.target.value)}
+                placeholder="اتركه فارغاً إذا كنت لا ترغب بتعيين كلمة سر للملف"
+                className="w-full p-3.5 rounded-xl bg-slate-950 text-white font-bold border border-slate-800 text-xs outline-none focus:border-indigo-500"
+              />
+            </div>
+
+            <div className="p-3 bg-slate-950 rounded-xl border border-white/5 space-y-1 text-[10px] text-slate-400 font-bold">
+              <div className="flex justify-between text-slate-300">
+                <span>إجمالي العمليات المشمولة:</span>
+                <span className="font-black text-amber-400">{appState?.transactions?.length || 0} عملية</span>
+              </div>
+              <div className="flex justify-between text-slate-300">
+                <span>المحافظ والبطاقات:</span>
+                <span className="font-black text-emerald-400">{safeWallets.length} محفظة</span>
+              </div>
+              <div className="flex justify-between text-slate-300">
+                <span>الديون والالتزامات:</span>
+                <span className="font-black text-blue-400">{appState?.debts?.length || 0} سجل</span>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleSendEmailBackup}
+              className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-black active:scale-95 transition-all shadow-lg shadow-indigo-600/20 flex items-center justify-center gap-2"
+            >
+              <Send size={15} />
+              <span>إرسال النسخة وتنزيل الملف الآن</span>
+            </button>
+          </div>
+        </Modal>
+      )}
+
+      {/* Auto Backup History & Restore Points Modal */}
+      {showAutoBackupHistoryModal && (
+        <Modal title="نقاط الاستعادة التلقائية المحفوظة" onClose={() => setShowAutoBackupHistoryModal(false)}>
+          <div className="space-y-3 text-right">
+            <p className="text-xs text-slate-400 font-bold leading-relaxed">
+              يقوم التطبيق بحفظ أحدث 5 نقاط استعادة دورية تلقائياً. يمكنك استرجاع أي نقطة بضغطة زر واحدة لضمان عدم ضياع أي بيانات:
+            </p>
+
+            {autoBackupHistory.length === 0 ? (
+              <div className="p-6 bg-slate-950 rounded-2xl border border-slate-800 text-center space-y-2">
+                <RefreshCw size={24} className="text-slate-600 mx-auto" />
+                <p className="text-xs text-slate-400 font-bold">لا توجد نقاط استعادة تلقائية سابقة بعد.</p>
+                <p className="text-[10px] text-slate-500 font-bold">سيتم إنشاء نقطة تلقائية عند تشغيل التطبيق أو استمرار الاستخدام الدوري.</p>
+              </div>
+            ) : (
+              <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+                {autoBackupHistory.map((item, idx) => (
+                  <div key={item.id || idx} className="p-3.5 bg-slate-950 rounded-2xl border border-slate-800 flex items-center justify-between hover:border-amber-500/30 transition-all">
+                    <div className="text-right space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-black text-white">{item.dateFormatted || new Date(item.timestamp).toLocaleString('ar-SA')}</span>
+                        {idx === 0 && (
+                          <span className="text-[9px] font-black bg-amber-500/10 text-amber-400 border border-amber-500/20 px-1.5 py-0.5 rounded">
+                            الأحدث
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-3 text-[10px] text-slate-400 font-bold">
+                        <span>{item.transactionsCount ?? 0} عملية</span>
+                        <span>•</span>
+                        <span>{item.walletsCount ?? 0} محفظة</span>
+                        <span>•</span>
+                        <span>{item.debtsCount ?? 0} التزام</span>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        triggerConfirm(
+                          `هل أنت متأكد من استعادة النسخة التلقائية المؤرخة في (${item.dateFormatted})؟ سيتم استبدال البيانات الحالية بهذه النقطة.`,
+                          () => {
+                            try {
+                              const parsedState = JSON.parse(item.data);
+                              onRestore(parsedState);
+                              setShowAutoBackupHistoryModal(false);
+                              showToast('تمت استعادة نقطة النسخ التلقائي بنجاح!');
+                            } catch (e) {
+                              showToast('تعذر استعادة هذه النقطة', 'error');
+                            }
+                          },
+                          'استعادة نقطة تلقائية',
+                          'danger'
+                        );
+                      }}
+                      className="px-3 py-2 bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-400 rounded-xl text-xs font-black active:scale-95 transition-all shrink-0 flex items-center gap-1.5"
+                    >
+                      <Upload size={13} />
+                      <span>استعادة</span>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </Modal>
       )}

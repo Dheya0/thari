@@ -105,8 +105,14 @@ export interface AppState {
   isDarkMode: boolean;
   pin: string | null;
   isLocked: boolean;
+  isBiometricEnabled?: boolean;
   isTravelMode: boolean;
   hasAcceptedTerms: boolean;
   showSeparateCurrencies: boolean; // Toggle for Travel Mode
   apiKey?: string; // User provided API Key for better security
+  userEmail?: string; // User email for backups & cloud copies
+  lastBackupDate?: string; // ISO date string of last backup taken
+  autoLockTime?: 'instant' | '1min' | '5min' | 'never'; // Auto-lock timeout
+  autoBackupFrequency?: 'on_open' | 'daily' | 'weekly' | 'disabled'; // Auto-backup frequency
+  lastAutoBackupTime?: string; // ISO date string of last automatic backup
 }

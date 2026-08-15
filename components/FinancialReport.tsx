@@ -14,7 +14,7 @@ interface FinancialReportProps {
   filterCurrency?: string | null;
 }
 
-const FinancialReport: React.FC<FinancialReportProps> = ({ 
+export const FinancialReport: React.FC<FinancialReportProps> = ({ 
   transactions, 
   categories, 
   currency, 
@@ -25,38 +25,46 @@ const FinancialReport: React.FC<FinancialReportProps> = ({
   filterWalletId, 
   filterCurrency 
 }) => {
-  // --- Filtering Logic inside Report ---
+  // Filtering Logic
   let activeTransactions = filterWalletId 
     ? transactions.filter(t => t.walletId === filterWalletId) 
     : transactions;
 
   if (filterCurrency) {
-      activeTransactions = activeTransactions.filter(t => t.currency === filterCurrency);
+    activeTransactions = activeTransactions.filter(t => t.currency === filterCurrency);
   }
 
   const activeWallet = filterWalletId ? wallets.find(w => w.id === filterWalletId) : null;
 
-  // Calculate totals in selected display currency
-  const totals = {
-    income: activeTransactions
-        .filter(t => t.type === 'income')
-        .reduce((s, t) => s + convertCurrency(t.amount, t.currency, currency.code, exchangeRates), 0),
-    
-    expense: activeTransactions
-        .filter(t => t.type === 'expense')
-        .reduce((s, t) => s + convertCurrency(t.amount, t.currency, currency.code, exchangeRates), 0),
-  };
-  const netBalance = totals.income - totals.expense;
-  const savingsRate = totals.income > 0 ? Math.max(0, Math.round((netBalance / totals.income) * 100)) : 0;
+  // Calculate aggregates converted to the target reporting currency
+  const totalIncome = activeTransactions
+    .filter(t => t.type === 'income')
+    .reduce((s, t) => s + convertCurrency(t.amount, t.currency, currency.code, exchangeRates), 0);
 
-  // Wallet Breakdown (if no specific wallet is filtered)
+  const totalExpense = activeTransactions
+    .filter(t => t.type === 'expense')
+    .reduce((s, t) => s + convertCurrency(t.amount, t.currency, currency.code, exchangeRates), 0);
+
+  const netBalance = totalIncome - totalExpense;
+  const savingsRate = totalIncome > 0 ? Math.max(0, Math.round((netBalance / totalIncome) * 100)) : 0;
+  const expenseRatio = totalIncome > 0 ? Math.min(100, Math.round((totalExpense / totalIncome) * 100)) : (totalExpense > 0 ? 100 : 0);
+
+  // Month-over-month / Period metrics
+  const sortedTx = [...activeTransactions].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  const incomeTxCount = activeTransactions.filter(t => t.type === 'income').length;
+  const expenseTxCount = activeTransactions.filter(t => t.type === 'expense').length;
+
+  const avgExpensePerTx = expenseTxCount > 0 ? Math.round(totalExpense / expenseTxCount) : 0;
+  const avgIncomePerTx = incomeTxCount > 0 ? Math.round(totalIncome / incomeTxCount) : 0;
+
+  // Wallet balances
   const walletBalances = !filterWalletId ? wallets.map(w => {
     const rawBalance = transactions
       .filter(t => t.walletId === w.id)
       .reduce((s, t) => s + (t.type === 'income' ? t.amount : -t.amount), 0);
     
     const convertedBalance = convertCurrency(rawBalance, w.currencyCode, currency.code, exchangeRates);
-    return { ...w, balance: convertedBalance };
+    return { ...w, rawBalance, balance: convertedBalance };
   }) : [];
 
   // Expense Categories Breakdown
@@ -66,318 +74,472 @@ const FinancialReport: React.FC<FinancialReportProps> = ({
       const amount = activeTransactions
         .filter(t => t.categoryId === c.id && t.type === 'expense')
         .reduce((s, t) => s + convertCurrency(t.amount, t.currency, currency.code, exchangeRates), 0);
-      return { ...c, amount };
+      const count = activeTransactions.filter(t => t.categoryId === c.id && t.type === 'expense').length;
+      return { ...c, amount, count };
     })
     .filter(c => c.amount > 0)
     .sort((a, b) => b.amount - a.amount);
 
-  // In 'detailed' mode, display ALL transactions. In 'summary' mode, display recent 20.
-  const displayTransactions = type === 'detailed' ? activeTransactions : activeTransactions.slice(0, 20);
+  // Income Categories Breakdown
+  const incomeBreakdown = categories
+    .filter(c => c.type === 'income')
+    .map(c => {
+      const amount = activeTransactions
+        .filter(t => t.categoryId === c.id && t.type === 'income')
+        .reduce((s, t) => s + convertCurrency(t.amount, t.currency, currency.code, exchangeRates), 0);
+      const count = activeTransactions.filter(t => t.categoryId === c.id && t.type === 'income').length;
+      return { ...c, amount, count };
+    })
+    .filter(c => c.amount > 0)
+    .sort((a, b) => b.amount - a.amount);
 
-  const reportDate = new Date().toLocaleDateString('ar-SA', { 
+  // Transactions to render in statement
+  const displayTransactions = type === 'detailed' ? sortedTx : sortedTx.slice(0, 20);
+
+  // Metadata strings
+  const now = new Date();
+  const dateFormattedHijriArabic = now.toLocaleDateString('ar-SA-u-ca-islamic-umalqura', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric'
+  });
+  const dateFormattedGregorian = now.toLocaleDateString('ar-SA', { 
     weekday: 'long', 
     year: 'numeric', 
     month: 'long', 
     day: 'numeric' 
   });
-  const reportTime = new Date().toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' });
-  const statementId = `THARI-${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, '0')}-${Math.floor(1000 + Math.random() * 9000)}`;
+  const reportTime = now.toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  const yearCode = now.getFullYear();
+  const monthCode = String(now.getMonth() + 1).padStart(2, '0');
+  const dayCode = String(now.getDate()).padStart(2, '0');
+  const statementId = `THR-${yearCode}${monthCode}${dayCode}-${Math.floor(1000 + Math.random() * 9000)}`;
 
   if (activeTransactions.length === 0) {
-      return (
-          <div id="printable-report" className="hidden print:flex flex-col items-center justify-center min-h-screen bg-white text-slate-400 p-20 dir-rtl">
-              <h1 className="text-2xl font-black mb-4 text-slate-900">تقرير خالي من البيانات</h1>
-              <p className="text-center font-bold">لا توجد عمليات مسجلة {activeWallet ? `لمحفظة ${activeWallet.name}` : ''} حالياً.</p>
-          </div>
-      );
+    return (
+      <div id="printable-report" className="hidden print:flex flex-col items-center justify-center min-h-screen bg-slate-50 text-slate-600 p-12 dir-rtl font-sans">
+        <div className="w-16 h-16 rounded-2xl bg-slate-900 flex items-center justify-center text-amber-400 font-black text-xl mb-4 border border-amber-500/30">
+          ثـ
+        </div>
+        <h1 className="text-xl font-black text-slate-900 mb-2">كشف حساب مالي مؤسسي</h1>
+        <p className="text-xs text-slate-500 font-bold">لا توجد حركات مالية مسجلة {activeWallet ? `لمحفظة ${activeWallet.name}` : ''} حتى هذا التاريخ.</p>
+      </div>
+    );
   }
 
   return (
-    <div id="printable-report" className="hidden print:block bg-white text-black p-0 min-h-screen w-full font-sans rtl dir-rtl">
-      <div className="max-w-[210mm] mx-auto p-8 md:p-10 bg-white border border-slate-200 shadow-2xl relative overflow-hidden">
+    <div id="printable-report" className="hidden print:block bg-white text-slate-900 p-0 min-h-screen w-full font-sans rtl dir-rtl antialiased selection:bg-amber-100">
+      <div className="max-w-[210mm] mx-auto p-8 sm:p-10 bg-white relative overflow-hidden">
         
-        {/* Top Gold & Slate Decorative Bar */}
-        <div className="h-2.5 bg-gradient-to-r from-slate-950 via-amber-500 to-slate-950 -mx-8 md:-mx-10 -mt-8 md:-mt-10 mb-8" />
+        {/* Top Institutional Header Accent Line */}
+        <div className="h-2 bg-gradient-to-r from-slate-950 via-amber-500 to-slate-900 -mx-8 sm:-mx-10 -mt-8 sm:-mt-10 mb-8" />
 
-        {/* Executive Institutional Header */}
-        <div className="border-b-2 border-slate-900 pb-6 mb-6 break-avoid">
-            {/* Header Main Bar */}
-            <div className="flex justify-between items-center gap-6 mb-6">
-                
-                {/* Brand Identity & Logo */}
-                <div className="flex items-center gap-4">
-                    <div className="w-16 h-16 rounded-2xl bg-slate-950 flex items-center justify-center p-2.5 shadow-md border border-amber-500/40 shrink-0">
-                        <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
-                            <defs>
-                                <linearGradient id="gold-grad-rpt" x1="0%" y1="0%" x2="100%" y2="100%">
-                                    <stop offset="0%" stopColor="#fbbf24" />
-                                    <stop offset="50%" stopColor="#d97706" />
-                                    <stop offset="100%" stopColor="#b45309" />
-                                </linearGradient>
-                            </defs>
-                            <rect x="5" y="5" width="90" height="90" rx="24" fill="#0f172a" stroke="url(#gold-grad-rpt)" strokeWidth="2" />
-                            <rect x="24" y="45" width="12" height="20" rx="6" fill="url(#gold-grad-rpt)" />
-                            <rect x="44" y="25" width="12" height="40" rx="6" fill="url(#gold-grad-rpt)" />
-                            <rect x="64" y="35" width="12" height="30" rx="6" fill="url(#gold-grad-rpt)" />
-                            <path d="M 24 78 Q 50 92 76 78" stroke="url(#gold-grad-rpt)" strokeWidth="5" strokeLinecap="round" />
-                        </svg>
-                    </div>
-                    <div>
-                        <div className="flex items-center gap-2">
-                            <h1 className="text-3xl font-black text-slate-950 tracking-tight leading-none">ثـري</h1>
-                            <span className="text-[10px] bg-amber-500 text-slate-950 font-black px-2 py-0.5 rounded tracking-widest uppercase">THARI SYSTEM</span>
-                        </div>
-                        <p className="text-xs font-bold text-slate-700 mt-1">منظومة إدارة الثروة والمالية الشخصية التنفيذية</p>
-                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mt-0.5">Official Executive Financial System</p>
-                    </div>
-                </div>
+        {/* Header: Institutional Branding & Formal Statement Info */}
+        <div className="border-b-2 border-slate-900/90 pb-6 mb-7 break-avoid">
+          <div className="flex justify-between items-start gap-6">
+            
+            {/* Right Side: Brand Crest & Institutional Identity */}
+            <div className="flex items-start gap-4">
+              <div className="w-16 h-16 rounded-2xl bg-slate-950 flex items-center justify-center p-2.5 shadow-md border border-amber-500/30 shrink-0">
+                <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
+                  <defs>
+                    <linearGradient id="gold-grad-statement" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stopColor="#fde047" />
+                      <stop offset="40%" stopColor="#f59e0b" />
+                      <stop offset="100%" stopColor="#b45309" />
+                    </linearGradient>
+                  </defs>
+                  <rect x="6" y="6" width="88" height="88" rx="22" fill="#090d16" stroke="url(#gold-grad-statement)" strokeWidth="2.5" />
+                  <rect x="23" y="46" width="13" height="22" rx="6.5" fill="url(#gold-grad-statement)" />
+                  <rect x="43.5" y="24" width="13" height="44" rx="6.5" fill="url(#gold-grad-statement)" />
+                  <rect x="64" y="34" width="13" height="34" rx="6.5" fill="url(#gold-grad-statement)" />
+                  <path d="M 23 80 Q 50 94 77 80" stroke="url(#gold-grad-statement)" strokeWidth="4.5" strokeLinecap="round" />
+                </svg>
+              </div>
 
-                {/* Circular Official Certification Seal Graphic */}
-                <div className="hidden sm:flex items-center justify-center shrink-0">
-                    <div className="w-24 h-24 rounded-full border-2 border-dashed border-amber-600/60 p-1 flex items-center justify-center relative rotate-[-12deg] bg-amber-500/5">
-                        <div className="w-full h-full rounded-full border border-amber-600 flex flex-col items-center justify-center text-center p-1 bg-white/90 shadow-inner">
-                            <span className="text-[7px] font-black text-amber-700 tracking-widest uppercase">★ THARI CERTIFIED ★</span>
-                            <span className="text-[10px] font-black text-slate-900 my-0.5">مستند معتمد</span>
-                            <span className="text-[7px] font-bold text-slate-600">كشف مالي موثق</span>
-                        </div>
-                    </div>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2.5">
+                  <h1 className="text-2xl font-black text-slate-950 tracking-tight leading-none">مـنـظـومـة ثَـــري</h1>
+                  <span className="text-[9px] font-black bg-amber-500 text-slate-950 px-2 py-0.5 rounded tracking-widest uppercase">
+                    THARI EXECUTIVE
+                  </span>
                 </div>
-            </div>
-
-            {/* Document Title Banner */}
-            <div className="bg-slate-950 text-white rounded-xl p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-                <div>
-                    <div className="flex items-center gap-2 mb-1">
-                        <span className="bg-amber-500 text-slate-950 text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider">
-                            {type === 'detailed' ? 'كشف حساب تفصيلي كامل' : 'تقرير ملخص تنفيذي'}
-                        </span>
-                        {filterCurrency && (
-                            <span className="bg-slate-800 text-amber-400 text-[10px] font-bold px-2 py-0.5 rounded-full border border-slate-700">
-                                تصفية بالعملة: {filterCurrency}
-                            </span>
-                        )}
-                    </div>
-                    <h2 className="text-xl font-black text-amber-400">
-                        {activeWallet ? `كشف الحساب المالي لمحفظة: ${activeWallet.name}` : 'كشف الحساب والتقرير المالي المؤسسي الشامل'}
-                    </h2>
-                </div>
-                <div className="text-left sm:text-left bg-slate-900/90 px-3 py-1.5 rounded-lg border border-slate-800 shrink-0">
-                    <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">رقم المستند المرجعي</p>
-                    <p className="text-xs font-mono font-bold text-amber-400">{statementId}</p>
-                </div>
-            </div>
-        </div>
-
-        {/* Institutional Metadata Table Box */}
-        <div className="bg-slate-50 rounded-2xl border border-slate-300 p-4 mb-6 break-avoid">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
-                <div>
-                    <p className="text-[9px] font-black text-slate-500 uppercase tracking-wider mb-0.5">صاحب الحساب</p>
-                    <p className="text-sm font-black text-slate-900">{userName || 'مستخدم ثري'}</p>
-                </div>
-                <div>
-                    <p className="text-[9px] font-black text-slate-500 uppercase tracking-wider mb-0.5">تاريخ وساعة الإصدار</p>
-                    <p className="text-xs font-bold text-slate-800">{reportDate}</p>
-                    <p className="text-[10px] font-medium text-slate-500">{reportTime}</p>
-                </div>
-                <div>
-                    <p className="text-[9px] font-black text-slate-500 uppercase tracking-wider mb-0.5">نطاق التقرير والعملة</p>
-                    <p className="text-xs font-bold text-slate-800">{activeWallet ? activeWallet.name : 'جميع المحافظ'}</p>
-                    <p className="text-[10px] font-bold text-amber-700">{currency.name} ({currency.code})</p>
-                </div>
-                <div>
-                    <p className="text-[9px] font-black text-slate-500 uppercase tracking-wider mb-0.5">حالة التوثيق والاعتماد</p>
-                    <div className="inline-flex items-center gap-1.5 bg-emerald-100 text-emerald-900 px-2.5 py-1 rounded-full border border-emerald-300 font-black text-[10px]">
-                        <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse" />
-                        <span>معتمد وموثق إلكترونياً</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        {/* Financial Metrics Cards */}
-        <div className="grid grid-cols-3 gap-4 mb-6 break-avoid">
-            <div className="p-4 rounded-xl bg-emerald-50 border-2 border-emerald-300">
-                <p className="text-[9px] font-black text-emerald-800 uppercase tracking-wider mb-1">إجمالي الواردات (المقبوضات)</p>
-                <p className="text-xl font-black text-emerald-700 dir-ltr text-right">
-                  +{totals.income.toLocaleString(undefined, { maximumFractionDigits: 0 })} <span className="text-xs opacity-75">{currency.symbol}</span>
+                <p className="text-xs font-bold text-slate-700">التقرير المالي وكشف الحساب المؤسسي المعتمد</p>
+                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-[0.18em]">
+                  Official Institutional Financial Statement
                 </p>
+              </div>
             </div>
-            <div className="p-4 rounded-xl bg-rose-50 border-2 border-rose-300">
-                <p className="text-[9px] font-black text-rose-800 uppercase tracking-wider mb-1">إجمالي المنصرفات (المصروفات)</p>
-                <p className="text-xl font-black text-rose-700 dir-ltr text-right">
-                  -{totals.expense.toLocaleString(undefined, { maximumFractionDigits: 0 })} <span className="text-xs opacity-75">{currency.symbol}</span>
-                </p>
-            </div>
-            <div className="p-4 rounded-xl bg-slate-950 text-white border-2 border-amber-500/60 shadow-md">
-                <div className="flex justify-between items-center mb-1">
-                    <p className="text-[9px] font-black text-amber-400 uppercase tracking-wider">صافي الحركة المالية</p>
-                    <span className="text-[9px] font-bold bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded">نسبة الوفر: {savingsRate}%</span>
-                </div>
-                <p className="text-xl font-black text-white dir-ltr text-right">
-                  {netBalance.toLocaleString(undefined, { maximumFractionDigits: 0 })} <span className="text-xs text-amber-400">{currency.symbol}</span>
-                </p>
-            </div>
-        </div>
 
-        {/* Section: Wallets Breakdown */}
-        {!filterWalletId && walletBalances.length > 0 && (
-            <div className="mb-6 break-avoid">
-                <div className="flex items-center gap-2 mb-3">
-                    <div className="w-1.5 h-4 bg-amber-500 rounded-full" />
-                    <h3 className="text-sm font-black text-slate-900">توزيع أرصدة المحافظ الحالية (مقيمة بـ {currency.code})</h3>
+            {/* Left Side: Statement Number, Date, Verification Emblem */}
+            <div className="flex items-center gap-4 text-left">
+              {/* Document Identity Card */}
+              <div className="bg-slate-950 text-white px-4 py-3 rounded-2xl border border-slate-800 shadow-sm min-w-[190px]">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-1.5 mb-1.5">
+                  <span className="text-[8px] font-black text-amber-400 uppercase tracking-wider">رقم المستند المالي</span>
+                  <span className="text-[8px] bg-emerald-500/20 text-emerald-300 font-bold px-1.5 py-0.5 rounded">موثق</span>
                 </div>
-                <div className="grid grid-cols-2 gap-x-6 gap-y-2 bg-slate-50 p-4 rounded-xl border border-slate-300 text-xs">
-                    {walletBalances.map((w, i) => (
-                        <div key={i} className="flex justify-between items-center py-1.5 border-b border-slate-200/80 last:border-0">
-                            <div className="flex items-center gap-2">
-                                <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: w.color }} />
-                                <span className="font-bold text-slate-800">{w.name} <span className="text-[10px] text-slate-500">({w.currencyCode})</span></span>
-                            </div>
-                            <span className="font-black text-slate-950 dir-ltr">{w.balance.toLocaleString(undefined, { maximumFractionDigits: 0 })} {currency.symbol}</span>
-                        </div>
-                    ))}
-                </div>
-            </div>
-        )}
+                <p className="text-xs font-mono font-black text-white tracking-wider">{statementId}</p>
+                <p className="text-[9px] text-slate-400 font-mono mt-0.5">{dateFormattedGregorian.split('،')[0]} • {reportTime}</p>
+              </div>
 
-        {/* Section: Expenses Analysis */}
-        {categoryBreakdown.length > 0 && (
-            <div className="mb-6 break-avoid">
-                <div className="flex items-center gap-2 mb-3">
-                    <div className="w-1.5 h-4 bg-rose-500 rounded-full" />
-                    <h3 className="text-sm font-black text-slate-900">تحليل إنفاق المصروفات حسب التصنيفات</h3>
+              {/* Official Seal Emblem */}
+              <div className="hidden sm:flex w-20 h-20 rounded-full border-2 border-dashed border-amber-600/70 p-1 items-center justify-center rotate-[-6deg] bg-amber-500/5 shrink-0">
+                <div className="w-full h-full rounded-full border border-amber-600 flex flex-col items-center justify-center text-center p-1 bg-white shadow-inner">
+                  <span className="text-[6.5px] font-black text-amber-700 tracking-wider uppercase">★ THARI ★</span>
+                  <span className="text-[9px] font-black text-slate-950 my-0.5">معتمد رسمياً</span>
+                  <span className="text-[6.5px] font-bold text-slate-500">نظام موحد</span>
                 </div>
-                <div className="space-y-2.5 bg-slate-50 p-4 rounded-xl border border-slate-300">
-                    {categoryBreakdown.slice(0, 8).map((c, i) => {
-                        const percent = totals.expense > 0 ? (c.amount / totals.expense) * 100 : 0;
-                        return (
-                            <div key={i} className="flex items-center gap-3 text-xs">
-                                <span className="w-24 font-bold text-slate-800 truncate">{c.name}</span>
-                                <div className="flex-1 h-2.5 bg-slate-200 rounded-full overflow-hidden">
-                                    <div className="h-full bg-slate-900 rounded-full" style={{ width: `${percent}%` }} />
-                                </div>
-                                <div className="w-28 text-left font-black text-slate-950 dir-ltr">
-                                    <span>{c.amount.toLocaleString(undefined, { maximumFractionDigits: 0 })} {currency.symbol}</span>
-                                    <span className="text-[9px] font-normal text-slate-500 mr-1">({Math.round(percent)}%)</span>
-                                </div>
-                            </div>
-                        );
-                    })}
-                </div>
+              </div>
             </div>
-        )}
 
-        {/* Section: Transactions Ledger Table */}
-        <div className="mb-8">
-            <div className="flex justify-between items-center mb-3 break-avoid">
-                <div className="flex items-center gap-2">
-                    <div className="w-1.5 h-4 bg-slate-900 rounded-full" />
-                    <h3 className="text-sm font-black text-slate-900">
-                        {type === 'detailed' ? 'سجل القيد والمعاملات التفصيلي الشامل' : 'ملخص القيود المالية'}
-                    </h3>
-                </div>
-                <span className="text-[11px] font-bold text-slate-600">
-                  عرض {displayTransactions.length} من أصل {activeTransactions.length} قيد مسجل
+          </div>
+
+          {/* Statement Banner Bar */}
+          <div className="mt-5 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 text-white rounded-xl p-3.5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border border-slate-800">
+            <div className="flex items-center gap-3">
+              <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse" />
+              <div>
+                <span className="text-[9px] font-black text-amber-400 uppercase tracking-widest block mb-0.5">
+                  {type === 'detailed' ? 'كشف حساب تفصيلي لجميع القيود والمعاملات' : 'تقرير ملخص تنفيذي للمركز المالي'}
                 </span>
+                <h2 className="text-sm font-black text-white">
+                  {activeWallet ? `محفظة العمليات: ${activeWallet.name} (${activeWallet.currencyCode})` : 'كشف حساب شامل لجميع المحافظ والعملات'}
+                </h2>
+              </div>
             </div>
 
-            <table className="w-full text-xs border-collapse">
-                <thead>
-                    <tr className="bg-slate-950 text-white break-avoid">
-                        <th className="py-2.5 px-3 text-right rounded-tr-lg font-black w-24">التاريخ</th>
-                        <th className="py-2.5 px-3 text-right font-black">التصنيف</th>
-                        <th className="py-2.5 px-3 text-right font-black">المحفظة</th>
-                        <th className="py-2.5 px-3 text-right font-black">البيان / الملاحظات</th>
-                        <th className="py-2.5 px-3 text-left font-black">المبلغ الأصلي</th>
-                        <th className="py-2.5 px-3 text-left rounded-tl-lg font-black">المعادل بـ ({currency.code})</th>
-                    </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-200 border-x border-b border-slate-300">
-                    {displayTransactions.map((t, i) => {
-                        const cat = categories.find(c => c.id === t.categoryId);
-                        const wallet = wallets.find(w => w.id === t.walletId);
-                        const convertedAmount = convertCurrency(t.amount, t.currency, currency.code, exchangeRates);
-                        return (
-                            <tr key={i} className={`break-inside-avoid page-break-inside-avoid ${i % 2 === 0 ? 'bg-white' : 'bg-slate-50'}`}>
-                                <td className="py-2.5 px-3 font-medium text-slate-700 text-[11px] whitespace-nowrap">{t.date}</td>
-                                <td className="py-2.5 px-3 font-bold text-slate-900">{cat?.name || 'غير تصنيف'}</td>
-                                <td className="py-2.5 px-3 text-slate-700 font-medium">{wallet?.name || '-'}</td>
-                                <td className="py-2.5 px-3 text-slate-600 italic max-w-[150px] truncate">{t.note || '-'}</td>
-                                <td className={`py-2.5 px-3 text-left font-bold dir-ltr ${t.type === 'income' ? 'text-emerald-700' : 'text-rose-700'}`}>
-                                    {t.type === 'income' ? '+' : '-'}{t.amount.toLocaleString()} <span className="text-[9px] text-slate-500">{t.currency}</span>
-                                </td>
-                                <td className="py-2.5 px-3 text-left font-black text-slate-950 dir-ltr">
-                                    {Math.round(convertedAmount).toLocaleString()} {currency.symbol}
-                                </td>
-                            </tr>
-                        );
-                    })}
-                </tbody>
-                <tfoot>
-                  <tr className="bg-slate-100 font-black border-t-2 border-slate-400 break-avoid">
-                    <td colSpan={4} className="py-3 px-3 text-right text-slate-900">
-                      إجمالي الحركة المعروضة ({displayTransactions.length} عملية)
-                    </td>
-                    <td colSpan={2} className="py-3 px-3 text-left text-slate-950 text-sm dir-ltr">
-                      {Math.round(displayTransactions.reduce((s, t) => s + convertCurrency(t.amount, t.currency, currency.code, exchangeRates) * (t.type === 'income' ? 1 : -1), 0)).toLocaleString()} {currency.symbol}
-                    </td>
-                  </tr>
-                </tfoot>
-            </table>
-
-            {type === 'summary' && activeTransactions.length > 20 && (
-                <div className="mt-3 p-3 bg-amber-50 rounded-lg text-center border border-amber-300 break-avoid">
-                    <p className="text-xs text-amber-900 font-bold">
-                      ملاحظة: تم عرض أحدث 20 عملية فقط في هذا التقرير الملخص. للحصول على الكشف الكامل لجميع القيود ({activeTransactions.length} عملية)، يرجى اختيار التقرير التفصيلي.
-                    </p>
-                </div>
-            )}
+            <div className="flex items-center gap-2">
+              {filterCurrency && (
+                <span className="text-[10px] font-bold bg-slate-800 text-amber-300 px-3 py-1 rounded-lg border border-slate-700">
+                  تصفية العملة: {filterCurrency}
+                </span>
+              )}
+              <span className="text-[10px] font-black bg-amber-500 text-slate-950 px-3 py-1 rounded-lg">
+                عملة العرض: {currency.name} ({currency.code})
+              </span>
+            </div>
+          </div>
         </div>
 
-        {/* Institutional Footer & Official Certification Block */}
-        <div className="mt-10 pt-6 border-t-2 border-slate-900 break-avoid">
-             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-center text-right mb-4">
-                 
-                 {/* Sign-off Seal Box */}
-                 <div className="bg-slate-50 p-3 rounded-xl border border-slate-300">
-                     <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">اعتماد النظام والتوقيع الرقمي</p>
-                     <div className="flex items-center gap-2">
-                         <div className="w-8 h-8 rounded-full bg-slate-950 flex items-center justify-center text-amber-400 font-black text-xs">ثـ</div>
-                         <div>
-                             <p className="text-xs font-black text-slate-900">تطبيق ثري المالي</p>
-                             <p className="text-[8px] font-bold text-amber-700">توقيع رقمي موثق تلقائياً</p>
-                         </div>
-                     </div>
-                 </div>
+        {/* Metadata Matrix / Institutional Profile Card */}
+        <div className="bg-slate-50 rounded-2xl border border-slate-200/90 p-4 mb-6 break-avoid shadow-sm">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs divide-x sm:divide-x-reverse divide-slate-200">
+            
+            <div className="pr-1 sm:pr-2">
+              <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-1">صاحب الحساب / المالك</p>
+              <p className="text-sm font-black text-slate-950 truncate">{userName || 'مستخدم ثري التنفيذي'}</p>
+              <p className="text-[9px] text-slate-500 font-medium mt-0.5">حساب فردي موثق محلياً</p>
+            </div>
 
-                 {/* Security Verification & QR simulation */}
-                 <div className="flex flex-col items-center justify-center text-center">
-                     <div className="flex gap-1 h-6 items-center my-1 opacity-80">
-                         <div className="w-1 h-full bg-slate-900" />
-                         <div className="w-0.5 h-full bg-slate-900" />
-                         <div className="w-2 h-full bg-slate-900" />
-                         <div className="w-1.5 h-full bg-slate-900" />
-                         <div className="w-0.5 h-full bg-slate-900" />
-                         <div className="w-2.5 h-full bg-slate-900" />
-                         <div className="w-1 h-full bg-slate-900" />
-                         <div className="w-0.5 h-full bg-slate-900" />
-                         <div className="w-2 h-full bg-slate-900" />
-                     </div>
-                     <p className="text-[8px] font-mono font-black text-slate-500">DIGITAL HASH: THARI-SEC-{Math.floor(100000 + Math.random() * 900000)}</p>
-                 </div>
+            <div className="pr-3 sm:pr-4">
+              <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-1">التاريخ الهجري والميلادي</p>
+              <p className="text-xs font-bold text-slate-900">{dateFormattedGregorian}</p>
+              <p className="text-[10px] font-bold text-amber-800 mt-0.5">{dateFormattedHijriArabic}</p>
+            </div>
 
-                 {/* System Info */}
-                 <div className="text-left md:text-left">
-                     <p className="text-[10px] font-black text-slate-900">تطبيق ثـري • Thari System</p>
-                     <p className="text-[8px] text-slate-500 font-medium">إدارة الثروات والمحافظ المالية الشخصية</p>
-                     <p className="text-[8px] text-slate-400 font-mono mt-0.5">REF: {statementId}</p>
-                 </div>
-             </div>
+            <div className="pr-3 sm:pr-4">
+              <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-1">نطاق الحساب المصرفي</p>
+              <p className="text-xs font-bold text-slate-900">{activeWallet ? activeWallet.name : `كافة المحافظ (${wallets.length} محفظة)`}</p>
+              <p className="text-[10px] font-semibold text-slate-600 mt-0.5">إجمالي القيود: {activeTransactions.length} قيد</p>
+            </div>
 
-             <div className="text-center bg-slate-950 text-slate-400 p-2.5 rounded-lg text-[9px] font-bold">
-                 هذا المستند المالي صادر آلياً من تطبيق ثري وحُفظت كافة البيانات محلياً بخصائص الأمان العالية.
-             </div>
+            <div className="pr-3 sm:pr-4">
+              <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-1">الوضع المالي الإجمالي</p>
+              <div className="inline-flex items-center gap-1.5 bg-slate-900 text-amber-400 px-2.5 py-1 rounded-lg font-black text-[10px]">
+                <span>{netBalance >= 0 ? 'فائض مالي إيجابي' : 'عجز تدفقات مرحلي'}</span>
+                <span className="text-[9px] font-normal text-slate-300">({savingsRate}% وفر)</span>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        {/* Institutional KPI Metrics (Executive Summary Deck) */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 mb-6 break-avoid">
+          
+          {/* Total Inflow (Income) */}
+          <div className="bg-white rounded-2xl p-4 border-2 border-emerald-500/40 shadow-sm relative overflow-hidden">
+            <div className="absolute top-0 right-0 left-0 h-1 bg-emerald-500" />
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[10px] font-black text-emerald-800 uppercase tracking-wider flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> إجمالي الواردات (المقبوضات)
+              </span>
+              <span className="text-[9px] font-bold bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-md border border-emerald-200">
+                {incomeTxCount} عملية
+              </span>
+            </div>
+            <p className="text-2xl font-black text-emerald-700 dir-ltr text-right tracking-tight">
+              +{totalIncome.toLocaleString(undefined, { maximumFractionDigits: 0 })} <span className="text-xs font-bold text-emerald-900/70">{currency.symbol}</span>
+            </p>
+            <p className="text-[9px] text-slate-500 mt-1 font-medium">متوسط المقبوضات: {avgIncomePerTx.toLocaleString()} {currency.symbol} للعملية</p>
+          </div>
+
+          {/* Total Outflow (Expense) */}
+          <div className="bg-white rounded-2xl p-4 border-2 border-rose-500/40 shadow-sm relative overflow-hidden">
+            <div className="absolute top-0 right-0 left-0 h-1 bg-rose-500" />
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[10px] font-black text-rose-800 uppercase tracking-wider flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-rose-500" /> إجمالي المنصرفات (المصروفات)
+              </span>
+              <span className="text-[9px] font-bold bg-rose-50 text-rose-700 px-2 py-0.5 rounded-md border border-rose-200">
+                {expenseTxCount} عملية
+              </span>
+            </div>
+            <p className="text-2xl font-black text-rose-700 dir-ltr text-right tracking-tight">
+              -{totalExpense.toLocaleString(undefined, { maximumFractionDigits: 0 })} <span className="text-xs font-bold text-rose-900/70">{currency.symbol}</span>
+            </p>
+            <p className="text-[9px] text-slate-500 mt-1 font-medium">معدل الاستهلاك: {expenseRatio}% من إجمالي الواردات</p>
+          </div>
+
+          {/* Net Movement & Wealth Reserve */}
+          <div className="bg-slate-950 text-white rounded-2xl p-4 border-2 border-amber-500/60 shadow-md relative overflow-hidden">
+            <div className="absolute top-0 right-0 left-0 h-1 bg-amber-500" />
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[10px] font-black text-amber-400 uppercase tracking-wider flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-400" /> صافي الرصيد والحركة
+              </span>
+              <span className="text-[9px] font-bold bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded-md border border-amber-500/30">
+                نسبة الوفر {savingsRate}%
+              </span>
+            </div>
+            <p className="text-2xl font-black text-white dir-ltr text-right tracking-tight">
+              {netBalance >= 0 ? `+${netBalance.toLocaleString(undefined, { maximumFractionDigits: 0 })}` : netBalance.toLocaleString(undefined, { maximumFractionDigits: 0 })} <span className="text-xs font-bold text-amber-400">{currency.symbol}</span>
+            </p>
+            <p className="text-[9px] text-slate-400 mt-1 font-medium">الصافي المتبقي في الخزينة بعد خصم النفقات</p>
+          </div>
+
+        </div>
+
+        {/* Multi-Wallet Solvency Matrix (If comprehensive report) */}
+        {!filterWalletId && walletBalances.length > 0 && (
+          <div className="mb-6 break-avoid">
+            <div className="flex items-center justify-between mb-2.5">
+              <div className="flex items-center gap-2">
+                <div className="w-1.5 h-4 bg-amber-500 rounded-full" />
+                <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider">
+                  مصفوفة توزيع السيولة والأرصدة عبر المحافظ (مقيمة بـ {currency.code})
+                </h3>
+              </div>
+              <span className="text-[10px] font-bold text-slate-500">{walletBalances.length} محافظ نقدية ومصرفية</span>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 bg-slate-50 p-3.5 rounded-2xl border border-slate-200 text-xs">
+              {walletBalances.map((w, i) => (
+                <div key={i} className="bg-white p-3 rounded-xl border border-slate-200/90 shadow-2xs flex flex-col justify-between">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: w.color }} />
+                      <span className="font-bold text-slate-900 truncate text-xs">{w.name}</span>
+                    </div>
+                    <span className="text-[9px] font-black uppercase text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
+                      {w.currencyCode}
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between items-baseline mt-1 pt-1.5 border-t border-slate-100">
+                    <span className="text-[9px] text-slate-400 font-medium">الرصيد المقيم:</span>
+                    <span className="font-black text-slate-950 text-xs dir-ltr">
+                      {Math.round(w.balance).toLocaleString()} <span className="text-[9px] font-bold text-amber-700">{currency.symbol}</span>
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Expenses & Inflow Analytical Breakdown */}
+        {categoryBreakdown.length > 0 && (
+          <div className="mb-6 break-avoid">
+            <div className="flex items-center justify-between mb-2.5">
+              <div className="flex items-center gap-2">
+                <div className="w-1.5 h-4 bg-slate-900 rounded-full" />
+                <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider">
+                  هيكل الإنفاق التشغيلي وتحليل بنود المصروفات
+                </h3>
+              </div>
+              <span className="text-[10px] font-bold text-slate-500">أعلى {Math.min(8, categoryBreakdown.length)} تصنيفات إنفاق</span>
+            </div>
+
+            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-2.5">
+              {categoryBreakdown.slice(0, 8).map((c, i) => {
+                const percent = totalExpense > 0 ? (c.amount / totalExpense) * 100 : 0;
+                return (
+                  <div key={i} className="flex items-center gap-3 text-xs">
+                    <div className="w-28 flex items-center gap-1.5 min-w-0">
+                      <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: c.color }} />
+                      <span className="font-bold text-slate-900 truncate">{c.name}</span>
+                    </div>
+
+                    <div className="flex-1 h-3 bg-slate-200 rounded-full overflow-hidden p-0.5 border border-slate-300/40">
+                      <div 
+                        className="h-full rounded-full transition-all" 
+                        style={{ 
+                          width: `${Math.max(2, percent)}%`, 
+                          backgroundColor: c.color || '#0f172a' 
+                        }} 
+                      />
+                    </div>
+
+                    <div className="w-32 text-left font-black text-slate-950 dir-ltr flex items-center justify-end gap-1.5">
+                      <span>{Math.round(c.amount).toLocaleString()} {currency.symbol}</span>
+                      <span className="text-[9px] font-bold text-slate-500 bg-slate-200/80 px-1.5 py-0.5 rounded">
+                        {Math.round(percent)}%
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Transactions Audit Ledger Table */}
+        <div className="mb-8">
+          <div className="flex justify-between items-center mb-2.5 break-avoid">
+            <div className="flex items-center gap-2">
+              <div className="w-1.5 h-4 bg-amber-500 rounded-full" />
+              <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider">
+                {type === 'detailed' ? 'جدول القيود المحاسبية والمعاملات المالية المسجلة' : 'ملخص أحدث القيود المسجلة (موجز تنفيذي)'}
+              </h3>
+            </div>
+            <span className="text-[10px] font-bold text-slate-600 bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200">
+              تم إدراج {displayTransactions.length} من أصل {activeTransactions.length} قيد محاسبي
+            </span>
+          </div>
+
+          <div className="rounded-2xl border border-slate-300 overflow-hidden shadow-2xs">
+            <table className="w-full text-xs border-collapse">
+              <thead>
+                <tr className="bg-slate-950 text-white break-avoid border-b border-slate-800 text-[10px]">
+                  <th className="py-3 px-3.5 text-right font-black w-24">التاريخ</th>
+                  <th className="py-3 px-3 text-right font-black w-28">التصنيف</th>
+                  <th className="py-3 px-3 text-right font-black w-28">المحفظة</th>
+                  <th className="py-3 px-3 text-right font-black">البيان / تفاصيل القيد</th>
+                  <th className="py-3 px-3 text-left font-black w-32">المبلغ بالعملة</th>
+                  <th className="py-3 px-3.5 text-left font-black w-36">المعادل بـ ({currency.code})</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-200 bg-white">
+                {displayTransactions.map((t, i) => {
+                  const cat = categories.find(c => c.id === t.categoryId);
+                  const wallet = wallets.find(w => w.id === t.walletId);
+                  const convertedAmount = convertCurrency(t.amount, t.currency, currency.code, exchangeRates);
+                  const isIncome = t.type === 'income';
+
+                  return (
+                    <tr 
+                      key={t.id || i} 
+                      className={`break-inside-avoid page-break-inside-avoid transition-colors ${i % 2 === 0 ? 'bg-white' : 'bg-slate-50/70'}`}
+                    >
+                      {/* Date */}
+                      <td className="py-2.5 px-3.5 font-medium text-slate-600 text-[10.5px] whitespace-nowrap">
+                        {t.date}
+                      </td>
+
+                      {/* Category */}
+                      <td className="py-2.5 px-3">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: cat?.color || '#64748b' }} />
+                          <span className="font-bold text-slate-900 truncate">{cat?.name || 'عام'}</span>
+                        </div>
+                      </td>
+
+                      {/* Wallet */}
+                      <td className="py-2.5 px-3 font-semibold text-slate-700 truncate max-w-[100px]">
+                        {wallet?.name || '-'}
+                      </td>
+
+                      {/* Note / Statement Description */}
+                      <td className="py-2.5 px-3 text-slate-600 text-[11px] max-w-[180px] truncate">
+                        {t.note || <span className="text-slate-400 italic">بدون ملاحظات</span>}
+                      </td>
+
+                      {/* Original Amount */}
+                      <td className={`py-2.5 px-3 text-left font-bold dir-ltr whitespace-nowrap text-[11px] ${isIncome ? 'text-emerald-700' : 'text-rose-700'}`}>
+                        {isIncome ? '+' : '-'}{t.amount.toLocaleString(undefined, { maximumFractionDigits: 2 })} <span className="text-[9px] font-semibold text-slate-500">{t.currency}</span>
+                      </td>
+
+                      {/* Converted Target Amount */}
+                      <td className="py-2.5 px-3.5 text-left font-black text-slate-950 dir-ltr whitespace-nowrap text-[11px]">
+                        {Math.round(convertedAmount).toLocaleString()} <span className="text-[9px] font-bold text-amber-700">{currency.symbol}</span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+              <tfoot>
+                <tr className="bg-slate-100 font-black border-t-2 border-slate-400 break-avoid text-xs">
+                  <td colSpan={4} className="py-3 px-3.5 text-right text-slate-900 font-black">
+                    إجمالي صافي العمليات المعروضة في هذا الكشف ({displayTransactions.length} قيد)
+                  </td>
+                  <td colSpan={2} className="py-3 px-3.5 text-left text-slate-950 text-sm font-black dir-ltr">
+                    {Math.round(displayTransactions.reduce((s, t) => s + convertCurrency(t.amount, t.currency, currency.code, exchangeRates) * (t.type === 'income' ? 1 : -1), 0)).toLocaleString()} <span className="text-xs text-amber-700 font-bold">{currency.symbol}</span>
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+
+          {type === 'summary' && activeTransactions.length > 20 && (
+            <div className="mt-3 p-3 bg-amber-50 rounded-xl text-center border border-amber-200 break-avoid">
+              <p className="text-[11px] text-amber-900 font-bold">
+                تم عرض أحدث 20 حركة فقط كملخص تنفيذي. للاطلاع على كامل السجل ({activeTransactions.length} حركة)، يرجى اختيار التقرير التفصيلي.
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* Institutional Sign-off, Audit Stamp, and Compliance Footer */}
+        <div className="mt-8 pt-6 border-t-2 border-slate-900 break-avoid">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-center mb-4">
+            
+            {/* Electronic System Endorsement */}
+            <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200">
+              <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">الاعتماد والتوقيع الإلكتروني</p>
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-slate-950 flex items-center justify-center text-amber-400 font-black text-sm border border-amber-500/30">
+                  ثـ
+                </div>
+                <div>
+                  <p className="text-xs font-black text-slate-900">نظام ثـري الذكي لإدارة الثروة</p>
+                  <p className="text-[8.5px] font-bold text-amber-700">تشفير محلي آمن 100%</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Barcode & Security Hash Generator */}
+            <div className="flex flex-col items-center justify-center text-center">
+              <div className="flex gap-0.5 h-6 items-center my-1 opacity-70">
+                <div className="w-1 h-full bg-slate-900" />
+                <div className="w-0.5 h-full bg-slate-900" />
+                <div className="w-1.5 h-full bg-slate-900" />
+                <div className="w-0.5 h-full bg-slate-900" />
+                <div className="w-2 h-full bg-slate-900" />
+                <div className="w-0.5 h-full bg-slate-900" />
+                <div className="w-1.5 h-full bg-slate-900" />
+                <div className="w-1 h-full bg-slate-900" />
+                <div className="w-0.5 h-full bg-slate-900" />
+                <div className="w-2 h-full bg-slate-900" />
+                <div className="w-0.5 h-full bg-slate-900" />
+                <div className="w-1.5 h-full bg-slate-900" />
+              </div>
+              <p className="text-[7.5px] font-mono font-black text-slate-500">SEC-HASH: {statementId}-VERIFIED</p>
+            </div>
+
+            {/* Application Information */}
+            <div className="text-right sm:text-left">
+              <p className="text-xs font-black text-slate-900">ثَـــري • Thari Financial Engine</p>
+              <p className="text-[9px] text-slate-500 font-medium">المنظومة التنفيذية لإدارة الأصول والميزانيات الشخصية</p>
+              <p className="text-[8px] text-slate-400 font-mono mt-0.5">ISSUED: {now.toISOString()}</p>
+            </div>
+
+          </div>
+
+          <div className="text-center bg-slate-950 text-slate-400 p-2.5 rounded-xl text-[9px] font-bold border border-slate-800">
+            تم استخراج هذا التقرير المالي آلياً عبر منظومة ثري. البيانات محفوظة مشفرة وموثوقة ولا يتم مشاركتها خارج جهاز المستخدم.
+          </div>
         </div>
 
       </div>

@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Plus, LayoutDashboard, History, Settings as SettingsIcon, BrainCircuit, HandCoins, Repeat, Coins, ArrowRight, Sparkles, Scale, Wallet as WalletIcon, Check, Plane, FileText, Download, ArrowUpRight, ArrowDownLeft, Calendar } from 'lucide-react';
 import { AppState, Transaction, Category, Debt } from './types';
@@ -35,6 +35,7 @@ import { Share } from '@capacitor/share';
 
 const INITIAL_STATE: AppState = {
   userName: 'مستخدم ثري',
+  userEmail: '',
   transactions: [],
   subscriptions: [],
   chatHistory: [],
@@ -56,12 +57,15 @@ const INITIAL_STATE: AppState = {
   showSeparateCurrencies: false,
   hasAcceptedTerms: false,
   apiKey: '', // Initialize empty
+  autoLockTime: 'instant',
+  autoBackupFrequency: 'daily',
+  lastAutoBackupTime: '',
 };
 
 const App: React.FC = () => {
   const [state, setState] = useState<AppState>(() => {
     try {
-      const saved = localStorage.getItem(STORAGE_KEY);
+      const saved = localStorage.getItem(STORAGE_KEY) || localStorage.getItem('thari_backup_snapshot');
       if (saved) {
           const parsed = JSON.parse(saved);
           
@@ -73,6 +77,10 @@ const App: React.FC = () => {
           
           if (!parsed.currencies || !Array.isArray(parsed.currencies)) {
               parsed.currencies = DEFAULT_CURRENCIES;
+          }
+
+          if (!parsed.userEmail) {
+              parsed.userEmail = '';
           }
           
           return { ...INITIAL_STATE, ...parsed, isLocked: !!parsed.pin };
@@ -93,12 +101,32 @@ const App: React.FC = () => {
   const [timePeriodFilter, setTimePeriodFilter] = useState<'all' | 'today' | 'week' | 'month'>('all');
   const [formDefaultType, setFormDefaultType] = useState<'expense' | 'income' | undefined>(undefined);
 
+  // Network Offline / Online State
+  const [isOnline, setIsOnline] = useState<boolean>(typeof navigator !== 'undefined' ? navigator.onLine : true);
+  const [showNetworkToast, setShowNetworkToast] = useState(false);
+
   // PWA states
   const [isUpdateAvailable, setIsUpdateAvailable] = useState(false);
   const [swRegistration, setSwRegistration] = useState<ServiceWorkerRegistration | null>(null);
   const [installPrompt, setInstallPrompt] = useState<any>(null);
 
+  const backgroundedAtRef = useRef<number | null>(null);
+
   useEffect(() => {
+    const handleOnline = () => {
+      setIsOnline(true);
+      setShowNetworkToast(true);
+      setTimeout(() => setShowNetworkToast(false), 3500);
+    };
+    const handleOffline = () => {
+      setIsOnline(false);
+      setShowNetworkToast(true);
+      setTimeout(() => setShowNetworkToast(false), 4500);
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
     const handleUpdate = (e: Event) => {
       console.log("Thari App: PWA update detected on client!");
       setIsUpdateAvailable(true);
@@ -117,14 +145,95 @@ const App: React.FC = () => {
     window.addEventListener('beforeinstallprompt', handleInstallPrompt);
 
     return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
       window.removeEventListener('pwa-update-available', handleUpdate);
       window.removeEventListener('beforeinstallprompt', handleInstallPrompt);
     };
   }, []);
 
+  // Dual Offline-Safe Persistence to LocalStorage
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    try {
+      const serialized = JSON.stringify(state);
+      localStorage.setItem(STORAGE_KEY, serialized);
+      localStorage.setItem('thari_backup_snapshot', serialized);
+    } catch (e) {
+      console.warn("Storage persistence warning:", e);
+    }
   }, [state]);
+
+  // Timed Auto-lock when user leaves or backgrounds the app
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        backgroundedAtRef.current = Date.now();
+        if (state.pin && (!state.autoLockTime || state.autoLockTime === 'instant')) {
+          setState(p => ({ ...p, isLocked: true }));
+        }
+      } else if (document.visibilityState === 'visible') {
+        if (state.pin && backgroundedAtRef.current && state.autoLockTime && state.autoLockTime !== 'never' && state.autoLockTime !== 'instant') {
+          const elapsedMs = Date.now() - backgroundedAtRef.current;
+          const thresholdMs = state.autoLockTime === '1min' ? 60000 : 300000;
+          if (elapsedMs >= thresholdMs) {
+            setState(p => ({ ...p, isLocked: true }));
+          }
+        }
+        backgroundedAtRef.current = null;
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [state.pin, state.autoLockTime]);
+
+  // Automated Periodic / On-Open Snapshot Backup Runner
+  useEffect(() => {
+    try {
+      const freq = state.autoBackupFrequency || 'daily';
+      if (freq === 'disabled') return;
+
+      const now = Date.now();
+      const lastBackupIso = state.lastAutoBackupTime;
+      const lastTime = lastBackupIso ? new Date(lastBackupIso).getTime() : 0;
+      const elapsedMs = now - lastTime;
+
+      let shouldBackup = false;
+      if (freq === 'on_open') {
+        shouldBackup = true;
+      } else if (freq === 'daily') {
+        shouldBackup = elapsedMs > 86400000; // 24 hours
+      } else if (freq === 'weekly') {
+        shouldBackup = elapsedMs > 7 * 86400000; // 7 days
+      }
+
+      if (shouldBackup) {
+        const timestampIso = new Date().toISOString();
+        const snapshotItem = {
+          id: `auto_${Date.now()}`,
+          timestamp: timestampIso,
+          dateFormatted: new Date().toLocaleDateString('ar-SA') + ' ' + new Date().toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' }),
+          transactionsCount: state.transactions.length,
+          walletsCount: state.wallets.length,
+          debtsCount: state.debts.length,
+          data: JSON.stringify(state)
+        };
+
+        const savedHistory = localStorage.getItem('thari_auto_backup_history');
+        let history = savedHistory ? JSON.parse(savedHistory) : [];
+        history = [snapshotItem, ...history.filter((h: any) => h.id !== snapshotItem.id)].slice(0, 5);
+        localStorage.setItem('thari_auto_backup_history', JSON.stringify(history));
+
+        setState(prev => ({
+          ...prev,
+          lastAutoBackupTime: timestampIso
+        }));
+      }
+    } catch (e) {
+      console.warn("Auto backup runner error:", e);
+    }
+  }, [state.autoBackupFrequency]);
 
   // --- Filtering Logic ---
   
@@ -437,7 +546,15 @@ const App: React.FC = () => {
   };
 
   if (!state.hasAcceptedTerms) return <WelcomeScreen onAccept={() => setState(p => ({ ...p, hasAcceptedTerms: true }))} onShowPrivacy={() => setShowPrivacyPolicy(true)} />;
-  if (state.pin && state.isLocked) return <LockScreen savedPin={state.pin} onUnlock={() => setState(p => ({ ...p, isLocked: false }))} />;
+  if (state.pin && state.isLocked) {
+    return (
+      <LockScreen 
+        savedPin={state.pin} 
+        isBiometricEnabled={state.isBiometricEnabled !== false} 
+        onUnlock={() => setState(p => ({ ...p, isLocked: false }))} 
+      />
+    );
+  }
 
   return (
     <div 
