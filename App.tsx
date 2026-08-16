@@ -53,6 +53,8 @@ const INITIAL_STATE: AppState = {
   isDarkMode: true,
   pin: null,
   isLocked: false,
+  isBiometricEnabled: true,
+  requireBiometricOnOpen: true,
   isTravelMode: false,
   showSeparateCurrencies: false,
   hasAcceptedTerms: false,
@@ -83,7 +85,8 @@ const App: React.FC = () => {
               parsed.userEmail = '';
           }
           
-          return { ...INITIAL_STATE, ...parsed, isLocked: !!parsed.pin };
+          const shouldLockOnOpen = !!parsed.pin && parsed.requireBiometricOnOpen !== false && parsed.autoLockTime !== 'never';
+          return { ...INITIAL_STATE, ...parsed, isLocked: shouldLockOnOpen };
       }
       return INITIAL_STATE;
     } catch { return INITIAL_STATE; }
@@ -166,6 +169,9 @@ const App: React.FC = () => {
   // Timed Auto-lock when user leaves or backgrounds the app
   useEffect(() => {
     const handleVisibilityChange = () => {
+      // If user disabled biometric/PIN lock on open/background
+      if (state.requireBiometricOnOpen === false) return;
+
       if (document.visibilityState === 'hidden') {
         backgroundedAtRef.current = Date.now();
         if (state.pin && (!state.autoLockTime || state.autoLockTime === 'instant')) {
@@ -186,7 +192,7 @@ const App: React.FC = () => {
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [state.pin, state.autoLockTime]);
+  }, [state.pin, state.autoLockTime, state.requireBiometricOnOpen]);
 
   // Automated Periodic / On-Open Snapshot Backup Runner
   useEffect(() => {

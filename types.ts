@@ -113,6 +113,7 @@ export interface AppState {
   userEmail?: string; // User email for backups & cloud copies
   lastBackupDate?: string; // ISO date string of last backup taken
   autoLockTime?: 'instant' | '1min' | '5min' | 'never'; // Auto-lock timeout
+  requireBiometricOnOpen?: boolean; // Require biometric / PIN on every app launch or background resume
   autoBackupFrequency?: 'on_open' | 'daily' | 'weekly' | 'disabled'; // Auto-backup frequency
   lastAutoBackupTime?: string; // ISO date string of last automatic backup
 }

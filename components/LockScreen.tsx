@@ -1,8 +1,8 @@
-
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { ShieldCheck, ChevronLeft, Fingerprint, ScanFace, AlertCircle, RefreshCw, CheckCircle2, Lock } from 'lucide-react';
 import Logo from './Logo';
 import { authenticateBiometrics, checkBiometricAvailable } from '../services/biometricService';
+import { App as CapApp } from '@capacitor/app';
 
 interface LockScreenProps {
   savedPin: string;
@@ -18,11 +18,22 @@ const LockScreen: React.FC<LockScreenProps> = ({ savedPin, isBiometricEnabled = 
   const [errorMessage, setErrorMessage] = useState('');
   const [biometricAvailable, setBiometricAvailable] = useState(false);
   const [biometricType, setBiometricType] = useState('Face ID / البصمة');
+  const [isFaceId, setIsFaceId] = useState(false);
   const [bioStatus, setBioStatus] = useState<BioStatus>('idle');
   const [bioFeedback, setBioFeedback] = useState<string>('');
 
-  const triggerBiometricAuth = useCallback(async () => {
-    if (bioStatus === 'scanning') return;
+  const isScanningRef = useRef(false);
+  const lastAttemptTimeRef = useRef(0);
+
+  const triggerBiometricAuth = useCallback(async (isAutoTrigger = false) => {
+    if (isScanningRef.current) return;
+    
+    // Prevent rapid re-triggers within 800ms
+    const now = Date.now();
+    if (isAutoTrigger && now - lastAttemptTimeRef.current < 800) return;
+    lastAttemptTimeRef.current = now;
+
+    isScanningRef.current = true;
     setBioStatus('scanning');
     setBioFeedback(`جاري المسح والتحقق عبر ${biometricType}...`);
     setErrorMessage('');
@@ -37,12 +48,20 @@ const LockScreen: React.FC<LockScreenProps> = ({ savedPin, isBiometricEnabled = 
         }
         setTimeout(onUnlock, 300);
       } else {
+        if (result.needsUserGesture || (isAutoTrigger && !result.isCancelled)) {
+          // On Web/Safari, silent gesture limitation
+          setBioStatus('idle');
+          setBioFeedback('');
+          isScanningRef.current = false;
+          return;
+        }
+
         if (result.isCancelled) {
           setBioStatus('cancelled');
-          setBioFeedback('تم إلغاء المسح. انقر أدناه لإعادة المحاولة أو أدخل الرمز');
+          setBioFeedback('تم إلغاء المسح. انقر للفتح أو أدخل الرمز');
         } else {
           setBioStatus('failed');
-          setBioFeedback(result.error || 'تعذر مطابقة البصمة، يرجى المحاولة ثانية');
+          setBioFeedback(result.error || 'تعذر مطابقة البصمة، يرجى إدخال رمز PIN');
         }
         if (typeof window !== 'undefined' && window.navigator.vibrate) {
           window.navigator.vibrate([100, 50, 100]);
@@ -50,11 +69,19 @@ const LockScreen: React.FC<LockScreenProps> = ({ savedPin, isBiometricEnabled = 
       }
     } catch (e) {
       console.warn('Biometric unlock error:', e);
-      setBioStatus('failed');
-      setBioFeedback('حدث خطأ غير متوقع أثناء المسح');
+      if (isAutoTrigger) {
+        setBioStatus('idle');
+        setBioFeedback('');
+      } else {
+        setBioStatus('failed');
+        setBioFeedback('تعذر فحص البصمة، يرجى إدخال رمز الدخول');
+      }
+    } finally {
+      isScanningRef.current = false;
     }
-  }, [bioStatus, biometricType, onUnlock]);
+  }, [biometricType, onUnlock]);
 
+  // Initial availability check & initial auto-trigger
   useEffect(() => {
     let isMounted = true;
     checkBiometricAvailable().then((res) => {
@@ -63,15 +90,65 @@ const LockScreen: React.FC<LockScreenProps> = ({ savedPin, isBiometricEnabled = 
         if (res.biometryType) {
           setBiometricType(res.biometryType);
         }
+        setIsFaceId(!!res.isFaceId);
+
         if (isBiometricEnabled) {
-          // Auto-trigger biometric prompt on screen load
+          // Auto-prompt on initial screen mount
           setTimeout(() => {
-            if (isMounted) triggerBiometricAuth();
-          }, 350);
+            if (isMounted) triggerBiometricAuth(true);
+          }, 400);
         }
       }
     });
     return () => { isMounted = false; };
+  }, [isBiometricEnabled, triggerBiometricAuth]);
+
+  // Biometric Wake-Up Handler on Resume / Foreground return
+  useEffect(() => {
+    if (!isBiometricEnabled) return;
+
+    let appListenerHandle: any = null;
+
+    // 1. Capacitor Native App State Change (Resumed to foreground)
+    try {
+      CapApp.addListener('appStateChange', (state) => {
+        if (state.isActive) {
+          setTimeout(() => {
+            triggerBiometricAuth(true);
+          }, 350);
+        }
+      }).then(handle => {
+        appListenerHandle = handle;
+      });
+    } catch (e) {
+      // Not in Capacitor environment
+    }
+
+    // 2. Web / Browser Visibility & Focus Wake-Up
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        setTimeout(() => {
+          triggerBiometricAuth(true);
+        }, 350);
+      }
+    };
+
+    const handleWindowFocus = () => {
+      setTimeout(() => {
+        triggerBiometricAuth(true);
+      }, 350);
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleWindowFocus);
+
+    return () => {
+      if (appListenerHandle && typeof appListenerHandle.remove === 'function') {
+        appListenerHandle.remove();
+      }
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleWindowFocus);
+    };
   }, [isBiometricEnabled, triggerBiometricAuth]);
 
   const handleKeyPress = (num: string) => {
@@ -102,6 +179,8 @@ const LockScreen: React.FC<LockScreenProps> = ({ savedPin, isBiometricEnabled = 
     }
   };
 
+  const BiometricIcon = isFaceId ? ScanFace : Fingerprint;
+
   return (
     <div className="fixed inset-0 bg-slate-950 z-[9999] flex flex-col items-center justify-center p-6 sm:p-8 animate-fade select-none overflow-y-auto">
       <div className="absolute inset-0 bg-gradient-to-b from-amber-500/10 via-transparent to-slate-950 pointer-events-none" />
@@ -126,7 +205,7 @@ const LockScreen: React.FC<LockScreenProps> = ({ savedPin, isBiometricEnabled = 
             {bioStatus === 'scanning' && (
               <div className="flex items-center justify-center gap-2.5 bg-emerald-950/40 border border-emerald-500/40 py-2.5 px-4 rounded-2xl shadow-[0_0_20px_rgba(16,185,129,0.15)] animate-pulse">
                 <div className="relative flex items-center justify-center">
-                  <Fingerprint size={22} className="text-emerald-400 animate-spin-slow" />
+                  <BiometricIcon size={22} className="text-emerald-400 animate-spin-slow" />
                   <span className="absolute -inset-1 rounded-full border-2 border-emerald-400/50 animate-ping opacity-60 pointer-events-none" />
                 </div>
                 <span className="text-xs font-bold text-emerald-300">{bioFeedback}</span>
@@ -143,7 +222,7 @@ const LockScreen: React.FC<LockScreenProps> = ({ savedPin, isBiometricEnabled = 
             {(bioStatus === 'failed' || bioStatus === 'cancelled') && (
               <button
                 type="button"
-                onClick={triggerBiometricAuth}
+                onClick={() => triggerBiometricAuth(false)}
                 className="w-full flex items-center justify-between bg-rose-950/40 border border-rose-500/40 py-2.5 px-4 rounded-2xl shadow-[0_0_15px_rgba(244,63,94,0.15)] active:scale-95 transition-transform group text-right"
               >
                 <div className="flex items-center gap-2 text-rose-300">
@@ -160,11 +239,11 @@ const LockScreen: React.FC<LockScreenProps> = ({ savedPin, isBiometricEnabled = 
             {bioStatus === 'idle' && (
               <button
                 type="button"
-                onClick={triggerBiometricAuth}
+                onClick={() => triggerBiometricAuth(false)}
                 className="w-full flex items-center justify-center gap-2 bg-slate-900/90 border border-emerald-500/30 hover:border-emerald-500/60 py-2.5 px-4 rounded-2xl text-emerald-400 active:scale-95 transition-all shadow-md group"
               >
-                <Fingerprint size={18} className="group-hover:scale-110 transition-transform" />
-                <span className="text-xs font-bold">الفتح السريع بـ {biometricType}</span>
+                <BiometricIcon size={18} className="group-hover:scale-110 transition-transform" />
+                <span className="text-xs font-bold">الفتح بـ {biometricType}</span>
               </button>
             )}
           </div>
@@ -201,7 +280,7 @@ const LockScreen: React.FC<LockScreenProps> = ({ savedPin, isBiometricEnabled = 
                 <button
                   key={idx}
                   type="button"
-                  onClick={triggerBiometricAuth}
+                  onClick={() => triggerBiometricAuth(false)}
                   disabled={isScanning}
                   title="الفتح بالبصمة أو Face ID"
                   className={`w-16 h-16 sm:w-18 sm:h-18 rounded-full border flex items-center justify-center transition-all active:scale-90 shadow-md mx-auto relative ${
@@ -212,7 +291,7 @@ const LockScreen: React.FC<LockScreenProps> = ({ savedPin, isBiometricEnabled = 
                       : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 active:bg-emerald-500 active:text-slate-950'
                   }`}
                 >
-                  <Fingerprint size={28} className={isScanning ? 'animate-pulse scale-110' : ''} />
+                  <BiometricIcon size={28} className={isScanning ? 'animate-pulse scale-110' : ''} />
                   {isScanning && (
                     <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-emerald-500 rounded-full animate-ping" />
                   )}
@@ -252,11 +331,11 @@ const LockScreen: React.FC<LockScreenProps> = ({ savedPin, isBiometricEnabled = 
         {biometricAvailable && isBiometricEnabled && bioStatus !== 'scanning' && (
           <button
             type="button"
-            onClick={triggerBiometricAuth}
+            onClick={() => triggerBiometricAuth(false)}
             className="w-full py-3 px-4 bg-emerald-500/10 border border-emerald-500/25 rounded-2xl text-emerald-400 font-black text-xs flex items-center justify-center gap-2 active:scale-95 transition-all shadow-md mt-2 hover:bg-emerald-500/20"
           >
-            <ScanFace size={18} />
-            <span>إعادة التحقق بـ {biometricType}</span>
+            <BiometricIcon size={18} />
+            <span>الفتح الفوري بـ {biometricType}</span>
           </button>
         )}
       </div>
@@ -265,4 +344,3 @@ const LockScreen: React.FC<LockScreenProps> = ({ savedPin, isBiometricEnabled = 
 };
 
 export default LockScreen;
-

@@ -1,112 +1,261 @@
-import { NativeBiometric } from 'capacitor-native-biometric';
+import { BiometricAuth, BiometryType, CheckBiometryResult } from '@aparajita/capacitor-biometric-auth';
+import { Capacitor } from '@capacitor/core';
 
 export interface BiometricAvailability {
   isAvailable: boolean;
   biometryType?: string;
-}
-
-/**
- * Checks if Biometric authentication (Fingerprint / Face ID) is supported on the current device.
- */
-export async function checkBiometricAvailable(): Promise<BiometricAvailability> {
-  try {
-    const res = await NativeBiometric.isAvailable();
-    return {
-      isAvailable: !!res.isAvailable,
-      biometryType: res.biometryType ? String(res.biometryType) : 'Face ID / البصمة',
-    };
-  } catch (e) {
-    // In Web browser or PWA with platform authenticator support (TouchID/FaceID)
-    if (typeof window !== 'undefined' && window.PublicKeyCredential) {
-      try {
-        const isWebAuthnAvailable = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
-        return {
-          isAvailable: isWebAuthnAvailable,
-          biometryType: 'Touch ID / Face ID',
-        };
-      } catch {
-        return { isAvailable: false };
-      }
-    }
-    return { isAvailable: false };
-  }
+  isFaceId?: boolean;
+  isNative?: boolean;
 }
 
 export interface BiometricAuthResult {
   success: boolean;
   error?: string;
   isCancelled?: boolean;
+  needsUserGesture?: boolean;
+}
+
+const WEBAUTHN_CRED_STORAGE_KEY = 'thari_webauthn_cred_id';
+
+// Helper: Convert ArrayBuffer to Base64
+function arrayBufferToBase64(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  for (let i = 0; i < bytes.byteLength; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return window.btoa(binary);
+}
+
+// Helper: Convert Base64 to Uint8Array
+function base64ToUint8Array(base64: string): Uint8Array {
+  const binary = window.atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes;
 }
 
 /**
- * Prompts the user for biometric authentication (Face ID / Fingerprint).
- * Returns BiometricAuthResult with status details.
+ * Checks if Biometric authentication (Face ID / Touch ID / Fingerprint) is supported on iPhone / Android / Web.
  */
-export async function authenticateBiometrics(
-  reason = 'يرجى تأكيد الهوية بالبصمة أو Face ID لدخول تطبيق ثري'
-): Promise<BiometricAuthResult> {
-  try {
-    // 1. Try Native Capacitor Biometric first (iOS & Android)
+export async function checkBiometricAvailable(): Promise<BiometricAvailability> {
+  const isNative = Capacitor.isNativePlatform();
+
+  // 1. Native Capacitor Check via @aparajita/capacitor-biometric-auth (iOS & Android)
+  if (isNative) {
     try {
-      const status = await NativeBiometric.isAvailable();
-      if (status && status.isAvailable) {
-        await NativeBiometric.verifyIdentity({
-          reason: reason,
-          title: 'فتح تطبيق ثري بالبصمة',
-          subtitle: 'تأكيد الأمان والحماية',
-          description: 'استخدم بصمة الإبهام أو الوجه (Face ID) للفتح السريع',
-        });
-        return { success: true };
+      const res: CheckBiometryResult = await BiometricAuth.checkBiometry();
+      if (res.isAvailable) {
+        let typeName = 'بصمة الإصبع / Face ID';
+        let isFace = false;
+
+        if (res.biometryType === BiometryType.faceId || res.biometryType === BiometryType.faceAuthentication) {
+          typeName = 'بصمة الوجه (Face ID)';
+          isFace = true;
+        } else if (res.biometryType === BiometryType.touchId) {
+          typeName = 'بصمة الإصبع (Touch ID)';
+          isFace = false;
+        } else if (res.biometryType === BiometryType.fingerprintAuthentication) {
+          typeName = 'بصمة الإصبع';
+          isFace = false;
+        } else if (res.biometryType === BiometryType.irisAuthentication) {
+          typeName = 'بصمة العين (Iris)';
+          isFace = true;
+        }
+
+        return {
+          isAvailable: true,
+          biometryType: typeName,
+          isFaceId: isFace,
+          isNative: true,
+        };
       }
-    } catch (nativeErr: any) {
-      console.warn('Native Biometrics prompt result:', nativeErr);
-      const isCancel = nativeErr?.message?.toLowerCase().includes('cancel') || 
-                       nativeErr?.code === 'USER_CANCELED' ||
-                       nativeErr?.message?.includes('User canceled') ||
-                       nativeErr?.message?.includes('13'); // Android cancellation code
-      return { 
-        success: false, 
-        isCancelled: isCancel,
-        error: isCancel ? 'تم إلغاء المسح بواسطة المستخدم' : 'تعذر التحقق من البصمة'
-      };
+    } catch (e) {
+      console.warn('BiometricAuth.checkBiometry error:', e);
+    }
+  }
+
+  // 2. Web / PWA WebAuthn Platform Authenticator (iOS Safari / Mac / Android Chrome)
+  if (typeof window !== 'undefined' && window.PublicKeyCredential) {
+    try {
+      const isPlatformAvailable = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
+      if (isPlatformAvailable) {
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
+                      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+        
+        return {
+          isAvailable: true,
+          biometryType: isIOS ? 'بصمة الوجه (Face ID) أو الإصبع' : 'بصمة الجهاز (WebAuthn)',
+          isFaceId: isIOS,
+          isNative: false,
+        };
+      }
+    } catch (e) {
+      console.warn('WebAuthn platform check error:', e);
+    }
+  }
+
+  return { isAvailable: false, isNative: false };
+}
+
+/**
+ * Registers / Enrolls Biometrics via WebAuthn on iOS Safari / Web
+ */
+export async function registerWebBiometrics(): Promise<BiometricAuthResult> {
+  if (typeof window === 'undefined' || !window.PublicKeyCredential || !window.crypto) {
+    return { success: false, error: 'المستشعر الحيوي غير مدعوم في هذا المتصفح' };
+  }
+
+  try {
+    const challenge = new Uint8Array(32);
+    window.crypto.getRandomValues(challenge);
+
+    const hostname = window.location.hostname || 'localhost';
+    const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
+
+    const credential = await navigator.credentials.create({
+      publicKey: {
+        challenge,
+        rp: {
+          name: 'تطبيق ثري المالي',
+          id: isLocalhost ? undefined : hostname,
+        },
+        user: {
+          id: Uint8Array.from('thari_secure_user_id', c => c.charCodeAt(0)),
+          name: 'user@thari.app',
+          displayName: 'مستخدم ثري',
+        },
+        pubKeyCredParams: [
+          { alg: -7, type: 'public-key' },  // ES256
+          { alg: -257, type: 'public-key' }, // RS256
+        ],
+        authenticatorSelection: {
+          authenticatorAttachment: 'platform',
+          userVerification: 'required',
+          residentKey: 'preferred',
+        },
+        timeout: 60000,
+        attestation: 'none',
+      },
+    }) as PublicKeyCredential | null;
+
+    if (credential && credential.rawId) {
+      const b64Id = arrayBufferToBase64(credential.rawId);
+      localStorage.setItem(WEBAUTHN_CRED_STORAGE_KEY, b64Id);
+      return { success: true };
     }
 
-    // 2. WebAuthn Platform Authenticator for Mobile Safari / Chrome if registered
-    if (typeof window !== 'undefined' && window.PublicKeyCredential) {
-      try {
-        const isAvailable = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
-        if (isAvailable) {
+    return { success: false, error: 'لم يتم حفظ البصمة' };
+  } catch (err: any) {
+    console.warn('WebAuthn registration error:', err);
+    const msg = String(err?.message || '');
+    if (msg.includes('not allowed') || err?.name === 'NotAllowedError') {
+      return { success: false, isCancelled: true, error: 'تم إلغاء تسجيل البصمة أو لم يتم النقر مباشرة على الشاشة' };
+    }
+    return { success: false, error: err?.message || 'فشل إعداد بصمة الجهاز' };
+  }
+}
+
+/**
+ * Authenticates user via Face ID / Touch ID using @aparajita/capacitor-biometric-auth on Native
+ * or WebAuthn on Web / iOS Safari.
+ */
+export async function authenticateBiometrics(
+  reason = 'تأكيد الهوية لفتح تطبيق ثري'
+): Promise<BiometricAuthResult> {
+  const isNative = Capacitor.isNativePlatform();
+
+  // 1. Native Capacitor Biometric Auth (@aparajita/capacitor-biometric-auth)
+  if (isNative) {
+    try {
+      await BiometricAuth.authenticate({
+        reason: reason,
+        cancelTitle: 'إلغاء',
+        iosFallbackTitle: 'إدخال رمز PIN',
+        androidTitle: 'تطبيق ثري - تأكيد الهوية',
+        androidSubtitle: 'استخدم Face ID أو بصمة الإصبع للمتابعة',
+        androidConfirmationRequired: false,
+      });
+      return { success: true };
+    } catch (nativeErr: any) {
+      console.warn('BiometricAuth.authenticate error:', nativeErr);
+      
+      const errMsg = String(nativeErr?.message || nativeErr?.code || '').toLowerCase();
+      const isCancel = errMsg.includes('cancel') || 
+                       errMsg.includes('user_canceled') ||
+                       errMsg.includes('usercanceled') ||
+                       errMsg.includes('13');
+
+      if (isCancel) {
+        return { success: false, isCancelled: true, error: 'تم إلغاء التحقق بالبصمة' };
+      }
+
+      return { 
+        success: false, 
+        isCancelled: false, 
+        error: nativeErr?.message || 'تعذر مطابقة البصمة، يرجى إدخال رمز PIN' 
+      };
+    }
+  }
+
+  // 2. Web / PWA WebAuthn Authentication (iOS Safari / Web)
+  if (typeof window !== 'undefined' && window.PublicKeyCredential && window.crypto) {
+    try {
+      const isAvailable = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
+      if (!isAvailable) {
+        return { success: false, error: 'مستشعر البصمة غير متاح على هذا المتصفح' };
+      }
+
+      const storedCredId = localStorage.getItem(WEBAUTHN_CRED_STORAGE_KEY);
+      const hostname = window.location.hostname || 'localhost';
+      const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
+
+      if (storedCredId) {
+        try {
           const challenge = new Uint8Array(32);
-          if (window.crypto) {
-            window.crypto.getRandomValues(challenge);
-          }
+          window.crypto.getRandomValues(challenge);
+
           const credential = await navigator.credentials.get({
             publicKey: {
               challenge,
-              timeout: 30000,
+              timeout: 60000,
               userVerification: 'required',
-              rpId: window.location.hostname || 'localhost',
-              allowCredentials: [],
-            }
-          }).catch((err) => {
-            console.warn('WebAuthn get error:', err);
-            return null;
+              rpId: isLocalhost ? undefined : hostname,
+              allowCredentials: [
+                {
+                  id: base64ToUint8Array(storedCredId),
+                  type: 'public-key',
+                  transports: ['internal'],
+                },
+              ],
+            },
           });
 
           if (credential) {
             return { success: true };
           }
-          return { success: false, error: 'لم تكتمل عملية التحقق' };
+        } catch (getErr: any) {
+          console.warn('WebAuthn get failed, fallback to fresh registration:', getErr);
         }
-      } catch (webErr: any) {
-        console.warn('WebAuthn verification:', webErr);
-        return { success: false, error: 'حدث خطأ أثناء فحص البصمة' };
       }
-    }
 
-    return { success: false, error: 'المستشعر الحيوي غير متاح حالياً' };
-  } catch (err: any) {
-    console.error('Biometric authentication error:', err);
-    return { success: false, error: err?.message || 'فشل التحقق الحيوي' };
+      // If no stored credential or invalid, register & authenticate
+      const regResult = await registerWebBiometrics();
+      return regResult;
+    } catch (webErr: any) {
+      console.warn('WebAuthn authenticate error:', webErr);
+      if (webErr?.name === 'NotAllowedError') {
+        return { 
+          success: false, 
+          needsUserGesture: true,
+          error: 'انقر على زر Face ID / البصمة للتحقق المباشر' 
+        };
+      }
+      return { success: false, error: 'تعذر التحقق من البصمة' };
+    }
   }
+
+  return { success: false, error: 'المستشعر الحيوي غير مدعوم على هذا الجهاز' };
 }

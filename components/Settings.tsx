@@ -153,6 +153,7 @@ const Settings: React.FC<SettingsProps> = ({
   const [localPin, setLocalPin] = useState(pin || '');
   const [localApiKey, setLocalApiKey] = useState(apiKey || '');
   const [localAutoLockTime, setLocalAutoLockTime] = useState<'instant' | '1min' | '5min' | 'never'>(appState?.autoLockTime || 'instant');
+  const [localRequireBiometricOnOpen, setLocalRequireBiometricOnOpen] = useState<boolean>(appState?.requireBiometricOnOpen !== false);
   const [localAutoBackupFreq, setLocalAutoBackupFreq] = useState<'on_open' | 'daily' | 'weekly' | 'disabled'>(appState?.autoBackupFrequency || 'daily');
   const [showAutoBackupHistoryModal, setShowAutoBackupHistoryModal] = useState(false);
   const [autoBackupHistory, setAutoBackupHistory] = useState<any[]>([]);
@@ -557,6 +558,7 @@ const Settings: React.FC<SettingsProps> = ({
       userEmail: localUserEmail,
       pin: finalPin, 
       isBiometricEnabled, 
+      requireBiometricOnOpen: localRequireBiometricOnOpen,
       apiKey: localApiKey,
       autoLockTime: localAutoLockTime,
       autoBackupFrequency: localAutoBackupFreq
@@ -573,6 +575,7 @@ const Settings: React.FC<SettingsProps> = ({
     onUpdateSettings({ 
       pin: finalPin, 
       isBiometricEnabled: isBiometricEnabled,
+      requireBiometricOnOpen: localRequireBiometricOnOpen,
       autoLockTime: localAutoLockTime,
       isLocked: lockNow && !!finalPin 
     });
@@ -1098,6 +1101,38 @@ const Settings: React.FC<SettingsProps> = ({
                             showToast(nextBio ? 'تم تفعيل الفتح بالبصمة' : 'تم تعطيل الفتح بالبصمة');
                         }}>
                             <div className={`w-4 h-4 bg-white rounded-full shadow-md transition-transform ${isBiometricEnabled ? 'translate-x-6' : 'translate-x-0'}`} />
+                        </div>
+                    </div>
+                </div>
+
+                {/* Toggle: Require Biometrics / PIN on Every App Launch */}
+                <div className="pt-2 space-y-2">
+                    <div className="flex justify-between items-center bg-slate-950/40 p-3.5 rounded-2xl border border-white/5">
+                        <div className="space-y-0.5 text-right pr-1">
+                            <label className="text-xs font-black text-white flex items-center gap-2">
+                                <ScanFace size={15} className="text-amber-400" />
+                                <span>طلب البصمة عند كل فتح للتطبيق</span>
+                            </label>
+                            <p className="text-[10px] text-slate-400 font-bold">
+                                {localRequireBiometricOnOpen 
+                                  ? 'يتم قفل التطبيق تلقائياً عند فتحه أو العودة إليه لطلب البصمة/الرمز' 
+                                  : 'التطبيق يفتح مباشرة دون طلب البصمة، مع بقاء الرمز للعمليات الحساسة'}
+                            </p>
+                        </div>
+                        <div 
+                            dir="ltr" 
+                            className={`w-12 h-6 rounded-full p-1 cursor-pointer transition-all shrink-0 ${localRequireBiometricOnOpen ? 'bg-amber-500' : 'bg-slate-700'}`} 
+                            onClick={() => {
+                                const nextVal = !localRequireBiometricOnOpen;
+                                setLocalRequireBiometricOnOpen(nextVal);
+                                onUpdateSettings({ 
+                                  requireBiometricOnOpen: nextVal,
+                                  isLocked: nextVal ? false : false // Ensure app is not locked unexpectedly
+                                });
+                                showToast(nextVal ? 'تم تفعيل طلب البصمة عند فتح التطبيق' : 'تم تعطيل قفل التطبيق عند الفتح');
+                            }}
+                        >
+                            <div className={`w-4 h-4 bg-white rounded-full shadow-md transition-transform ${localRequireBiometricOnOpen ? 'translate-x-6' : 'translate-x-0'}`} />
                         </div>
                     </div>
                 </div>
