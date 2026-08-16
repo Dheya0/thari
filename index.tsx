@@ -15,39 +15,28 @@ const startApp = () => {
   
   console.info("Thari App: Successfully Initialized.");
 
-  // Progressive Web App (PWA) Service Worker Registration
-  if ('serviceWorker' in navigator) {
-    let refreshing = false;
-    navigator.serviceWorker.addEventListener('controllerchange', () => {
-      if (!refreshing) {
-        refreshing = true;
-        window.location.reload();
-      }
-    });
-
-    navigator.serviceWorker.register('/sw.js')
-      .then((reg) => {
-        console.info('Thari SW: Service Worker registered, scope:', reg.scope);
-        
-        reg.onupdatefound = () => {
-          const installingWorker = reg.installing;
-          if (installingWorker) {
-            installingWorker.onstatechange = () => {
-              if (installingWorker.state === 'installed') {
-                if (navigator.serviceWorker.controller) {
-                  console.info('Thari SW: New update found. Will display notice.');
+  // Progressive Web App (PWA) Service Worker Registration (Only in standalone/top window)
+  if ('serviceWorker' in navigator && window.self === window.top && window.location.protocol.startsWith('http')) {
+    try {
+      navigator.serviceWorker.register('/sw.js')
+        .then((reg) => {
+          reg.onupdatefound = () => {
+            const installingWorker = reg.installing;
+            if (installingWorker) {
+              installingWorker.onstatechange = () => {
+                if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
                   window.dispatchEvent(new CustomEvent('pwa-update-available', { detail: reg }));
-                } else {
-                  console.info('Thari SW: Offline caching complete!');
                 }
-              }
-            };
-          }
-        };
-      })
-      .catch((err) => {
-        console.error('Thari SW: Registration failed:', err);
-      });
+              };
+            }
+          };
+        })
+        .catch(() => {
+          // Silent catch for sandboxed environments
+        });
+    } catch {
+      // Ignored
+    }
   }
 };
 
