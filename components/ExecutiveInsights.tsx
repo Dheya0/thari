@@ -13,7 +13,7 @@ interface ExecutiveInsightsProps {
 const ExecutiveInsights: React.FC<ExecutiveInsightsProps> = ({ transactions, budgets, debts, totalBalance, currencySymbol }) => {
   const calculations = useMemo(() => {
     // 30 days of transactions for active burn rate calculation
-    const currentDate = new Date('2026-06-21T01:39:51-07:00'); // Let's use the local context ISO or realistic calculations
+    const currentDate = new Date();
     const last30Days = transactions.filter(t => {
       const transDate = new Date(t.date);
       const diffTime = Math.abs(currentDate.getTime() - transDate.getTime());
