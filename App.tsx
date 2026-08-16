@@ -8,6 +8,10 @@ import jsPDF from 'jspdf';
 import { INITIAL_CATEGORIES, DEFAULT_CURRENCIES, DEFAULT_EXCHANGE_RATES, convertCurrency } from './constants';
 import { generateAndSharePDF, generateAndShareCSV, buildExecutiveCSVContent, exportAndShareExecutiveCSV } from './utils/exportHelper';
 import { saveSecureState, loadSecureState } from './utils/secureStorage';
+import { Capacitor } from '@capacitor/core';
+import { App as CapApp } from '@capacitor/app';
+import { Filesystem, Directory } from '@capacitor/filesystem';
+import { Share } from '@capacitor/share';
 import BalanceCard from './components/BalanceCard';
 import TransactionForm from './components/TransactionForm';
 import TransactionList from './components/TransactionList';
@@ -29,11 +33,6 @@ import ExecutiveInsights from './components/ExecutiveInsights';
 import CashflowSankey from './components/CashflowSankey';
 
 const STORAGE_KEY = 'thari_app_v4';
-
-import { Capacitor } from '@capacitor/core';
-import { App as CapApp } from '@capacitor/app';
-import { Filesystem, Directory } from '@capacitor/filesystem';
-import { Share } from '@capacitor/share';
 
 const INITIAL_STATE: AppState = {
   userName: 'مستخدم ثري',

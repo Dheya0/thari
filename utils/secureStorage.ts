@@ -1,10 +1,6 @@
 /**
  * Secure Storage Engine for Thari Financial App
- * Features:
- * - Obfuscated & Encrypted local persistence (prevents casual DevTools data extraction)
- * - Multi-slot rotating recovery snapshots (thari_snap_1, thari_snap_2, thari_snap_3)
- * - Native Capacitor Filesystem fallback backup for iOS & Android
- * - Backward compatibility with legacy unencrypted localStorage
+ * UTF-8 Safe Obfuscation and Multi-Slot Recovery
  */
 
 import { Capacitor } from '@capacitor/core';
@@ -14,21 +10,55 @@ const STORAGE_SECRET_SALT = 'THARI_SECURE_VAULT_v4_2026';
 const SNAPSHOT_KEYS = ['thari_vault_snap_a', 'thari_vault_snap_b', 'thari_vault_snap_c'];
 
 /**
- * Scramble / Obfuscate payload with XOR key and Base64 wrapping
+ * UTF-8 Safe Base64 Encoding
+ */
+function utf8ToBase64(str: string): string {
+  try {
+    const bytes = new TextEncoder().encode(str);
+    let binary = '';
+    for (let i = 0; i < bytes.byteLength; i++) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    return btoa(binary);
+  } catch (e) {
+    return btoa(unescape(encodeURIComponent(str)));
+  }
+}
+
+/**
+ * UTF-8 Safe Base64 Decoding
+ */
+function base64ToUtf8(base64: string): string {
+  try {
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    return new TextDecoder().decode(bytes);
+  } catch (e) {
+    return decodeURIComponent(escape(atob(base64)));
+  }
+}
+
+/**
+ * Scramble / Obfuscate payload with XOR key and UTF-8 Base64 wrapping
  */
 export function obfuscateData(dataString: string): string {
   try {
     const saltLength = STORAGE_SECRET_SALT.length;
+    // Step 1: convert text to safe base64
+    const b64 = utf8ToBase64(dataString);
+    // Step 2: XOR scramble the base64 ascii chars
     let xorResult = '';
-    for (let i = 0; i < dataString.length; i++) {
-      const charCode = dataString.charCodeAt(i) ^ STORAGE_SECRET_SALT.charCodeAt(i % saltLength);
+    for (let i = 0; i < b64.length; i++) {
+      const charCode = b64.charCodeAt(i) ^ STORAGE_SECRET_SALT.charCodeAt(i % saltLength);
       xorResult += String.fromCharCode(charCode);
     }
-    // Encode to UTF-8 safe base64
-    return 'THR4_' + btoa(encodeURIComponent(xorResult));
+    return 'THR4_' + btoa(xorResult);
   } catch (e) {
     // Fallback if encoding fails
-    return 'RAW_' + btoa(encodeURIComponent(dataString));
+    return 'RAW_' + utf8ToBase64(dataString);
   }
 }
 
@@ -38,24 +68,26 @@ export function obfuscateData(dataString: string): string {
 export function deobfuscateData(encodedString: string): string | null {
   try {
     if (encodedString.startsWith('THR4_')) {
-      const base64Str = encodedString.slice(5);
-      const xorStr = decodeURIComponent(atob(base64Str));
+      const xorStr = atob(encodedString.slice(5));
       const saltLength = STORAGE_SECRET_SALT.length;
-      let originalStr = '';
+      let b64 = '';
       for (let i = 0; i < xorStr.length; i++) {
         const charCode = xorStr.charCodeAt(i) ^ STORAGE_SECRET_SALT.charCodeAt(i % saltLength);
-        originalStr += String.fromCharCode(charCode);
+        b64 += String.fromCharCode(charCode);
       }
-      return originalStr;
+      return base64ToUtf8(b64);
     } else if (encodedString.startsWith('RAW_')) {
-      return decodeURIComponent(atob(encodedString.slice(4)));
+      return base64ToUtf8(encodedString.slice(4));
     } else if (encodedString.startsWith('{') || encodedString.startsWith('[')) {
       // Legacy unencrypted JSON
       return encodedString;
     }
     return null;
   } catch (e) {
-    console.warn('SecureStorage: Decoding failed, attempting raw parse', e);
+    // Graceful fallback: try parsing as raw json
+    if (encodedString.startsWith('{') || encodedString.startsWith('[')) {
+      return encodedString;
+    }
     return null;
   }
 }
@@ -72,7 +104,7 @@ export async function saveSecureState(primaryKey: string, stateObj: any): Promis
     localStorage.setItem(primaryKey, encryptedData);
 
     // 2. Rotating Snapshot
-    const snapIndex = Math.floor(Date.now() / (1000 * 60 * 60)) % SNAPSHOT_KEYS.length; // Rotates every hour
+    const snapIndex = Math.floor(Date.now() / (1000 * 60 * 60)) % SNAPSHOT_KEYS.length;
     const targetSnapKey = SNAPSHOT_KEYS[snapIndex];
     localStorage.setItem(targetSnapKey, encryptedData);
     localStorage.setItem('thari_last_save_ts', Date.now().toString());
@@ -105,7 +137,9 @@ export function loadSecureState(primaryKey: string): any | null {
     if (primaryData) {
       const decoded = deobfuscateData(primaryData);
       if (decoded) {
-        return JSON.parse(decoded);
+        try {
+          return JSON.parse(decoded);
+        } catch {}
       }
     }
 
@@ -115,8 +149,9 @@ export function loadSecureState(primaryKey: string): any | null {
       if (snapData) {
         const decoded = deobfuscateData(snapData);
         if (decoded) {
-          console.info('SecureStorage: Recovered state from backup snapshot', snapKey);
-          return JSON.parse(decoded);
+          try {
+            return JSON.parse(decoded);
+          } catch {}
         }
       }
     }
@@ -130,7 +165,11 @@ export function loadSecureState(primaryKey: string): any | null {
           return JSON.parse(legacyData);
         } catch {
           const decoded = deobfuscateData(legacyData);
-          if (decoded) return JSON.parse(decoded);
+          if (decoded) {
+            try {
+              return JSON.parse(decoded);
+            } catch {}
+          }
         }
       }
     }

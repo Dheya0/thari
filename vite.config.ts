@@ -7,8 +7,7 @@ export default defineConfig(({ mode }) => {
   const isProd = mode === 'production';
 
   return {
-    // Relative base path is crucial for Capacitor apps to load assets from local file system on iOS & Android
-    base: './',
+    base: '/',
     plugins: [react()],
     define: {
       'process.env.API_KEY': JSON.stringify(apiKey)
@@ -23,12 +22,12 @@ export default defineConfig(({ mode }) => {
     },
     server: {
       port: 3000,
-      host: true
+      host: '0.0.0.0'
     },
     build: {
       outDir: 'dist',
       emptyOutDir: true,
-      sourcemap: false, // Disables source maps entirely to prevent reverse engineering
+      sourcemap: false,
       minify: 'esbuild',
       target: 'es2020',
       cssMinify: true,
@@ -56,10 +55,9 @@ export default defineConfig(({ mode }) => {
               return 'th_vendor';
             }
           },
-          // Obfuscate generated asset and chunk names
-          entryFileNames: 'assets/[hash].js',
-          chunkFileNames: 'assets/[hash].js',
-          assetFileNames: 'assets/[hash].[ext]'
+          entryFileNames: 'assets/[name]-[hash].js',
+          chunkFileNames: 'assets/[name]-[hash].js',
+          assetFileNames: 'assets/[name]-[hash].[ext]'
         }
       }
     }
