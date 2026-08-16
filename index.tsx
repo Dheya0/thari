@@ -1,48 +1,46 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
+import ErrorBoundary from './components/ErrorBoundary';
 
-const startApp = () => {
+const mountApp = () => {
   const rootElement = document.getElementById('root');
   if (!rootElement) return;
 
   const root = createRoot(rootElement);
   root.render(
-    <React.StrictMode>
+    <ErrorBoundary>
       <App />
-    </React.StrictMode>
+    </ErrorBoundary>
   );
-  
-  console.info("Thari App: Successfully Initialized.");
 
-  // Progressive Web App (PWA) Service Worker Registration (Only in standalone/top window)
-  if ('serviceWorker' in navigator && window.self === window.top && window.location.protocol.startsWith('http')) {
-    try {
-      navigator.serviceWorker.register('/sw.js')
-        .then((reg) => {
-          reg.onupdatefound = () => {
-            const installingWorker = reg.installing;
-            if (installingWorker) {
-              installingWorker.onstatechange = () => {
-                if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                  window.dispatchEvent(new CustomEvent('pwa-update-available', { detail: reg }));
-                }
-              };
-            }
-          };
-        })
-        .catch(() => {
-          // Silent catch for sandboxed environments
-        });
-    } catch {
-      // Ignored
-    }
-  }
+  console.info("Thari App: Successfully Mounted.");
 };
 
-// Start app instantly to ensure minimal delays
-if (document.readyState === 'complete' || document.readyState === 'interactive') {
-  startApp();
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', mountApp);
 } else {
-  document.addEventListener('DOMContentLoaded', startApp);
+  mountApp();
+}
+
+// Progressive Web App (PWA) Service Worker Registration (Only on standard http/https standalone)
+if ('serviceWorker' in navigator && window.location.protocol.startsWith('http')) {
+  try {
+    navigator.serviceWorker.register('/sw.js')
+      .then((reg) => {
+        reg.onupdatefound = () => {
+          const installingWorker = reg.installing;
+          if (installingWorker) {
+            installingWorker.onstatechange = () => {
+              if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                window.dispatchEvent(new CustomEvent('pwa-update-available', { detail: reg }));
+              }
+            };
+          }
+        };
+      })
+      .catch(() => {
+        // Silent catch for sandboxed previews
+      });
+  } catch {}
 }

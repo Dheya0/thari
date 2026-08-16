@@ -69,26 +69,55 @@ const App: React.FC = () => {
   const [state, setState] = useState<AppState>(() => {
     try {
       const parsed = loadSecureState(STORAGE_KEY);
-      if (parsed) {
+      if (parsed && typeof parsed === 'object') {
           // Migration: if currency is a string, convert it to an object
-          if (typeof parsed.currency === 'string') {
-              const matchedCurrency = DEFAULT_CURRENCIES.find(c => c.code === parsed.currency) || DEFAULT_CURRENCIES[0];
-              parsed.currency = matchedCurrency;
+          let activeCurrency = parsed.currency;
+          if (typeof activeCurrency === 'string') {
+              activeCurrency = DEFAULT_CURRENCIES.find(c => c.code === activeCurrency) || DEFAULT_CURRENCIES[0];
+          } else if (!activeCurrency || !activeCurrency.code) {
+              activeCurrency = DEFAULT_CURRENCIES[0];
           }
           
-          if (!parsed.currencies || !Array.isArray(parsed.currencies)) {
-              parsed.currencies = DEFAULT_CURRENCIES;
-          }
+          const currencies = (parsed.currencies && Array.isArray(parsed.currencies) && parsed.currencies.length > 0)
+              ? parsed.currencies
+              : DEFAULT_CURRENCIES;
 
-          if (!parsed.userEmail) {
-              parsed.userEmail = '';
-          }
-          
+          const categories = (parsed.categories && Array.isArray(parsed.categories) && parsed.categories.length > 0)
+              ? parsed.categories
+              : INITIAL_CATEGORIES;
+
+          const wallets = (parsed.wallets && Array.isArray(parsed.wallets) && parsed.wallets.length > 0)
+              ? parsed.wallets
+              : INITIAL_STATE.wallets;
+
+          const exchangeRates = (parsed.exchangeRates && typeof parsed.exchangeRates === 'object')
+              ? { ...DEFAULT_EXCHANGE_RATES, ...parsed.exchangeRates }
+              : DEFAULT_EXCHANGE_RATES;
+
           const shouldLockOnOpen = !!parsed.pin && parsed.requireBiometricOnOpen !== false && parsed.autoLockTime !== 'never';
-          return { ...INITIAL_STATE, ...parsed, isLocked: shouldLockOnOpen };
+          
+          return {
+            ...INITIAL_STATE,
+            ...parsed,
+            currency: activeCurrency,
+            currencies: currencies,
+            categories: categories,
+            wallets: wallets,
+            transactions: Array.isArray(parsed.transactions) ? parsed.transactions : [],
+            subscriptions: Array.isArray(parsed.subscriptions) ? parsed.subscriptions : [],
+            debts: Array.isArray(parsed.debts) ? parsed.debts : [],
+            goals: Array.isArray(parsed.goals) ? parsed.goals : [],
+            budgets: Array.isArray(parsed.budgets) ? parsed.budgets : [],
+            exchangeRates: exchangeRates,
+            userEmail: parsed.userEmail || '',
+            userName: parsed.userName || 'مستخدم ثري',
+            isLocked: shouldLockOnOpen
+          };
       }
       return INITIAL_STATE;
-    } catch { return INITIAL_STATE; }
+    } catch { 
+      return INITIAL_STATE; 
+    }
   });
 
   const [activeTab, setActiveTab] = useState<'dashboard' | 'transactions' | 'debts' | 'chat' | 'subscriptions' | 'settings' | 'budgets' | 'goals' | 'zakat'>('dashboard');
