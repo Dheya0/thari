@@ -1,21 +1,22 @@
 import React, { useMemo, useState } from 'react';
-import { Download, Printer, FileText, TrendingUp, TrendingDown, Minus, Filter, Sparkles, PieChart as PieChartIcon, BarChart3, ShieldCheck, ArrowUpRight, ArrowDownLeft, Wallet as WalletIcon, Layers } from 'lucide-react';
+import { Download, Printer, FileText, TrendingUp, TrendingDown, Minus, Filter, Sparkles, PieChart as PieChartIcon, BarChart3, Wallet as WalletIcon, Layers, Coins, Merge, Split } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
-import { Transaction, Category, Wallet } from '../types';
-import { convertCurrency } from '../constants';
+import { Transaction, Category, Wallet, Currency } from '../types';
+import { convertCurrency, DEFAULT_CURRENCIES } from '../constants';
 import { buildExecutiveCSVContent, exportAndShareExecutiveCSV } from '../utils/exportHelper';
 
 interface AnalyticsProps {
   transactions: Transaction[];
   categories: Category[];
   currencySymbol: string;
-  onPrint: (type: 'summary' | 'detailed') => void;
+  onPrint: (type: 'summary' | 'detailed', walletId?: string | null, currencyCode?: string | null) => void;
   currentCurrencyCode?: string; 
   exchangeRates: Record<string, number>;
   wallets: Wallet[];
   initialWalletId?: string | null;
   onFilterChange: (walletId: string | null) => void;
   userName?: string;
+  currencies?: Currency[];
 }
 
 const Analytics: React.FC<AnalyticsProps> = ({ 
@@ -28,16 +29,42 @@ const Analytics: React.FC<AnalyticsProps> = ({
   wallets, 
   initialWalletId, 
   onFilterChange, 
-  userName = 'مستخدم ثري' 
+  userName = 'مستخدم ثري',
+  currencies = DEFAULT_CURRENCIES
 }) => {
   const [chartView, setChartView] = useState<'donut' | 'bar'>('donut');
+  
+  // Reporting scope state: 'merged' (all wallets & currencies), 'by-wallet', 'by-currency'
+  const [reportMode, setReportMode] = useState<'merged' | 'by-wallet' | 'by-currency'>('merged');
+  const [selectedReportWallet, setSelectedReportWallet] = useState<string>(initialWalletId || '');
+  const [selectedReportCurrency, setSelectedReportCurrency] = useState<string>('');
+
+  // Extract unique currencies in transactions
+  const uniqueCurrenciesInTx = useMemo(() => {
+    const set = new Set<string>();
+    transactions.forEach(t => {
+      if (t.currency) set.add(t.currency);
+    });
+    return Array.from(set);
+  }, [transactions]);
+
+  // Active transactions for Analytics view
+  const activeAnalyticsTxs = useMemo(() => {
+    if (reportMode === 'by-wallet' && selectedReportWallet) {
+      return transactions.filter(t => t.walletId === selectedReportWallet);
+    }
+    if (reportMode === 'by-currency' && selectedReportCurrency) {
+      return transactions.filter(t => t.currency === selectedReportCurrency);
+    }
+    return transactions;
+  }, [transactions, reportMode, selectedReportWallet, selectedReportCurrency]);
 
   const stats = useMemo(() => {
-    const totalIncome = transactions
+    const totalIncome = activeAnalyticsTxs
       .filter(t => t.type === 'income')
       .reduce((s, t) => s + convertCurrency(t.amount, t.currency, currentCurrencyCode, exchangeRates), 0);
     
-    const totalExpense = transactions
+    const totalExpense = activeAnalyticsTxs
       .filter(t => t.type === 'expense')
       .reduce((s, t) => s + convertCurrency(t.amount, t.currency, currentCurrencyCode, exchangeRates), 0);
     
@@ -45,7 +72,7 @@ const Analytics: React.FC<AnalyticsProps> = ({
     const savingsRatio = totalIncome > 0 ? Math.max(0, Math.round((netSavings / totalIncome) * 100)) : 0;
         
     return { totalIncome, totalExpense, netSavings, savingsRatio };
-  }, [transactions, currentCurrencyCode, exchangeRates]);
+  }, [activeAnalyticsTxs, currentCurrencyCode, exchangeRates]);
 
   const momStats = useMemo(() => {
     const now = new Date();
@@ -55,7 +82,7 @@ const Analytics: React.FC<AnalyticsProps> = ({
     const prevYear = currentMonth === 0 ? currentYear - 1 : currentYear;
 
     const getMonthlyTotal = (month: number, year: number, type: 'income' | 'expense') => {
-      return transactions.filter(t => {
+      return activeAnalyticsTxs.filter(t => {
         const d = new Date(t.date);
         return d.getMonth() === month && d.getFullYear() === year && t.type === type;
       }).reduce((s, t) => s + convertCurrency(t.amount, t.currency, currentCurrencyCode, exchangeRates), 0);
@@ -76,10 +103,10 @@ const Analytics: React.FC<AnalyticsProps> = ({
       prevInc,
       prevExp
     };
-  }, [transactions, currentCurrencyCode, exchangeRates]);
+  }, [activeAnalyticsTxs, currentCurrencyCode, exchangeRates]);
 
   const expenseData = useMemo(() => {
-    const expenses = transactions.filter(t => t.type === 'expense');
+    const expenses = activeAnalyticsTxs.filter(t => t.type === 'expense');
     const categoryTotals: Record<string, number> = {};
     
     expenses.forEach(t => { 
@@ -95,9 +122,19 @@ const Analytics: React.FC<AnalyticsProps> = ({
         color: cat?.color || '#f59e0b' 
       };
     }).sort((a, b) => b.value - a.value);
-  }, [transactions, categories, currentCurrencyCode, exchangeRates]);
+  }, [activeAnalyticsTxs, categories, currentCurrencyCode, exchangeRates]);
+
+  // Handle report triggers with selected scopes
+  const handleTriggerPrint = (type: 'summary' | 'detailed') => {
+    const walletId = reportMode === 'by-wallet' ? (selectedReportWallet || null) : null;
+    const currencyCode = reportMode === 'by-currency' ? (selectedReportCurrency || null) : null;
+    onPrint(type, walletId, currencyCode);
+  };
 
   const handleExportCSV = () => {
+    const walletId = reportMode === 'by-wallet' ? (selectedReportWallet || null) : null;
+    const currencyCode = reportMode === 'by-currency' ? (selectedReportCurrency || null) : null;
+
     const csvContent = buildExecutiveCSVContent({
       transactions,
       categories,
@@ -106,7 +143,8 @@ const Analytics: React.FC<AnalyticsProps> = ({
       currency: { code: currentCurrencyCode, symbol: currencySymbol, name: currentCurrencyCode, icon: '' },
       exchangeRates,
       type: 'detailed',
-      filterWalletId: initialWalletId,
+      filterWalletId: walletId,
+      filterCurrency: currencyCode
     });
 
     const fileName = `Thari_Executive_Report_${new Date().toISOString().split('T')[0]}.csv`;
@@ -116,20 +154,9 @@ const Analytics: React.FC<AnalyticsProps> = ({
   if (transactions.length === 0) {
     return (
       <div className="space-y-4 animate-fade">
-        <div className="bg-slate-900/80 backdrop-blur-xl p-4.5 rounded-3xl border border-white/10 flex items-center justify-between shadow-lg">
-          <span className="text-xs font-black text-slate-400 uppercase tracking-widest px-2">نطاق التقرير</span>
-          <select 
-            value={initialWalletId || ''} 
-            onChange={(e) => onFilterChange(e.target.value || null)}
-            className="bg-slate-950 text-white font-bold p-3 rounded-2xl border border-slate-800 outline-none text-xs"
-          >
-            <option value="">كل المحافظ (تقرير شامل)</option>
-            {wallets.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
-          </select>
-        </div>
         <div className="text-center py-16 bg-slate-900/40 rounded-3xl border border-white/5">
           <Layers className="w-12 h-12 text-slate-700 mx-auto mb-3" />
-          <p className="text-slate-400 text-xs font-bold">لا توجد بيانات متاحة لهذا النطاق حالياً.</p>
+          <p className="text-slate-400 text-xs font-bold">لا توجد بيانات مالية مسجلة للتحليل حالياً.</p>
         </div>
       </div>
     );
@@ -147,12 +174,18 @@ const Analytics: React.FC<AnalyticsProps> = ({
             </div>
             <div>
               <p className="text-xs font-black text-white">المركز المالي والمؤشرات التنفيذية</p>
-              <p className="text-[10px] text-slate-400 font-bold">مقيمة بالعملة المعيارية: {currentCurrencyCode}</p>
+              <p className="text-[10px] text-slate-400 font-bold">
+                {reportMode === 'merged' 
+                  ? `كافة المحافظ مدمجة • التقييم المعياري بـ ${currentCurrencyCode}`
+                  : reportMode === 'by-wallet' 
+                    ? `مفصول حسب محفظة محددة`
+                    : `مفصول حسب عملة: ${selectedReportCurrency || 'محددة'}`}
+              </p>
             </div>
           </div>
           <div className="text-left">
             <span className="text-[9px] font-black text-amber-400 bg-amber-500/10 px-2.5 py-1 rounded-full border border-amber-500/20">
-              وفر شهري {stats.savingsRatio}%
+              وفر {stats.savingsRatio}%
             </span>
           </div>
         </div>
@@ -162,11 +195,10 @@ const Analytics: React.FC<AnalyticsProps> = ({
           <div className="bg-slate-950/60 p-4 rounded-2xl border border-white/5">
             <div className="flex items-center justify-between mb-1.5">
               <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1">
-                <ArrowUpRight size={13} className="text-emerald-400" /> واردات الشهر
+                <TrendingUp size={13} className="text-emerald-400" /> واردات الشهر
               </span>
               <div className={`flex items-center text-[9px] font-black px-1.5 py-0.5 rounded ${momStats.incomeChange >= 0 ? 'bg-emerald-500/15 text-emerald-400' : 'bg-rose-500/15 text-rose-400'}`}>
-                {momStats.incomeChange > 0 ? <TrendingUp size={10} className="mr-0.5" /> : momStats.incomeChange < 0 ? <TrendingDown size={10} className="mr-0.5" /> : <Minus size={10} className="mr-0.5" />}
-                {Math.abs(momStats.incomeChange).toFixed(1)}%
+                {momStats.incomeChange > 0 ? '+' : ''}{momStats.incomeChange.toFixed(1)}%
               </div>
             </div>
             <p className="text-base sm:text-lg font-black text-white dir-ltr text-right">
@@ -178,11 +210,10 @@ const Analytics: React.FC<AnalyticsProps> = ({
           <div className="bg-slate-950/60 p-4 rounded-2xl border border-white/5">
             <div className="flex items-center justify-between mb-1.5">
               <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1">
-                <ArrowDownLeft size={13} className="text-rose-400" /> منصرفات الشهر
+                <TrendingDown size={13} className="text-rose-400" /> منصرفات الشهر
               </span>
               <div className={`flex items-center text-[9px] font-black px-1.5 py-0.5 rounded ${momStats.expenseChange <= 0 ? 'bg-emerald-500/15 text-emerald-400' : 'bg-rose-500/15 text-rose-400'}`}>
-                {momStats.expenseChange > 0 ? <TrendingUp size={10} className="mr-0.5" /> : momStats.expenseChange < 0 ? <TrendingDown size={10} className="mr-0.5" /> : <Minus size={10} className="mr-0.5" />}
-                {Math.abs(momStats.expenseChange).toFixed(1)}%
+                {momStats.expenseChange > 0 ? '+' : ''}{momStats.expenseChange.toFixed(1)}%
               </div>
             </div>
             <p className="text-base sm:text-lg font-black text-white dir-ltr text-right">
@@ -192,40 +223,126 @@ const Analytics: React.FC<AnalyticsProps> = ({
         </div>
       </div>
 
-      {/* Scope Selector and Document Export Deck */}
-      <div className="space-y-3.5">
-        <div className="bg-slate-900/80 p-3.5 sm:p-4 rounded-2xl border border-white/10 flex items-center gap-3.5 shadow-md">
-          <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-400 shrink-0 border border-amber-500/20">
-            <Filter size={18} />
+      {/* Report Generator Controls Deck (دمج المحافظ وفصل العملات في التقارير) */}
+      <div className="bg-slate-900/90 p-4 sm:p-5 rounded-3xl border border-white/10 shadow-xl space-y-4">
+        <div>
+          <div className="flex items-center gap-2 mb-1">
+            <FileText size={16} className="text-amber-400" />
+            <h3 className="text-sm font-black text-white">إعدادات ونطاق التقرير المالي وكشف الحساب</h3>
           </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">نطاق التقرير واستخراج الكشف</p>
-            <select 
-              value={initialWalletId || ''} 
-              onChange={(e) => onFilterChange(e.target.value || null)}
-              className="w-full bg-transparent text-white font-bold outline-none text-xs cursor-pointer truncate"
-            >
-              <option value="" className="bg-slate-900 text-white">كافة المحافظ (كشف مالي شامل)</option>
-              {wallets.map(w => (
-                <option key={w.id} value={w.id} className="bg-slate-900 text-white">
-                  محفظة: {w.name} ({w.currencyCode})
-                </option>
-              ))}
-            </select>
-          </div>
+          <p className="text-[10px] text-slate-400 font-bold">
+            اختر خيار دمج كافة المحافظ والعملات معاً، أو فصل كل محفظة وعملة بشكل مستقل في التقارير
+          </p>
         </div>
 
-        {/* Action Buttons with Institutional Finish */}
-        <div className="grid grid-cols-2 gap-3">
+        {/* Mode Selector Tabs */}
+        <div className="grid grid-cols-3 gap-1.5 bg-slate-950 p-1 rounded-2xl border border-white/5">
+          <button
+            onClick={() => { setReportMode('merged'); onFilterChange(null); }}
+            className={`py-2 px-2 rounded-xl text-[11px] font-black flex items-center justify-center gap-1.5 transition-all ${
+              reportMode === 'merged' 
+                ? 'bg-amber-500 text-slate-950 shadow-md' 
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <Merge size={13} />
+            <span>دمج شامل</span>
+          </button>
+
+          <button
+            onClick={() => { 
+              setReportMode('by-wallet'); 
+              if (!selectedReportWallet && wallets[0]) {
+                setSelectedReportWallet(wallets[0].id);
+                onFilterChange(wallets[0].id);
+              }
+            }}
+            className={`py-2 px-2 rounded-xl text-[11px] font-black flex items-center justify-center gap-1.5 transition-all ${
+              reportMode === 'by-wallet' 
+                ? 'bg-amber-500 text-slate-950 shadow-md' 
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <WalletIcon size={13} />
+            <span>فصل المحافظ</span>
+          </button>
+
+          <button
+            onClick={() => { 
+              setReportMode('by-currency'); 
+              if (!selectedReportCurrency && uniqueCurrenciesInTx[0]) {
+                setSelectedReportCurrency(uniqueCurrenciesInTx[0]);
+              }
+            }}
+            className={`py-2 px-2 rounded-xl text-[11px] font-black flex items-center justify-center gap-1.5 transition-all ${
+              reportMode === 'by-currency' 
+                ? 'bg-amber-500 text-slate-950 shadow-md' 
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <Coins size={13} />
+            <span>فصل العملات</span>
+          </button>
+        </div>
+
+        {/* Sub-selector based on active mode */}
+        {reportMode === 'by-wallet' && (
+          <div className="bg-slate-950/80 p-3 rounded-2xl border border-white/5 flex items-center gap-3">
+            <WalletIcon size={16} className="text-amber-400 shrink-0" />
+            <div className="flex-1 min-w-0">
+              <label className="text-[9px] font-black text-slate-400 block mb-0.5">اختر المحفظة المستهدفة في التقرير:</label>
+              <select
+                value={selectedReportWallet}
+                onChange={(e) => {
+                  setSelectedReportWallet(e.target.value);
+                  onFilterChange(e.target.value || null);
+                }}
+                className="w-full bg-transparent text-white font-bold outline-none text-xs cursor-pointer"
+              >
+                {wallets.map(w => (
+                  <option key={w.id} value={w.id} className="bg-slate-900 text-white">
+                    {w.name} (عملتها الأساسية: {w.currencyCode})
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+        )}
+
+        {reportMode === 'by-currency' && (
+          <div className="bg-slate-950/80 p-3 rounded-2xl border border-white/5 flex items-center gap-3">
+            <Coins size={16} className="text-amber-400 shrink-0" />
+            <div className="flex-1 min-w-0">
+              <label className="text-[9px] font-black text-slate-400 block mb-0.5">اختر العملة المراد استخراج تقريرها المستقل:</label>
+              <select
+                value={selectedReportCurrency}
+                onChange={(e) => setSelectedReportCurrency(e.target.value)}
+                className="w-full bg-transparent text-white font-bold outline-none text-xs cursor-pointer"
+              >
+                {uniqueCurrenciesInTx.map(code => {
+                  const cObj = (currencies || DEFAULT_CURRENCIES).find(c => c.code === code);
+                  return (
+                    <option key={code} value={code} className="bg-slate-900 text-white">
+                      {cObj?.name || code} ({code})
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
+          </div>
+        )}
+
+        {/* Action Buttons for Print & Export */}
+        <div className="grid grid-cols-2 gap-3 pt-1">
           <button 
-            onClick={() => onPrint('summary')}
+            onClick={() => handleTriggerPrint('summary')}
             className="flex items-center justify-center gap-2 py-3.5 px-4 bg-amber-500 text-slate-950 font-black rounded-2xl text-xs uppercase transition-all active:scale-95 shadow-lg shadow-amber-500/20 hover:bg-amber-400"
           >
             <Printer size={16} /> <span>طباعة ملخص تنفيذي</span>
           </button>
           
           <button 
-            onClick={() => onPrint('detailed')}
+            onClick={() => handleTriggerPrint('detailed')}
             className="flex items-center justify-center gap-2 py-3.5 px-4 bg-slate-800 text-white font-bold rounded-2xl text-xs uppercase transition-all active:scale-95 border border-white/10 hover:bg-slate-700"
           >
             <FileText size={16} className="text-amber-400" /> <span>كشف حساب تفصيلي</span>
@@ -234,9 +351,9 @@ const Analytics: React.FC<AnalyticsProps> = ({
 
         <button 
           onClick={handleExportCSV}
-          className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-slate-900/90 border border-white/10 text-slate-300 rounded-2xl text-xs font-bold uppercase transition-all active:scale-95 hover:text-white hover:border-emerald-500/40"
+          className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-slate-950/80 border border-white/10 text-slate-300 rounded-2xl text-xs font-bold uppercase transition-all active:scale-95 hover:text-white hover:border-emerald-500/40"
         >
-          <Download size={15} className="text-emerald-400" /> <span>تصدير جدول البيانات المؤسسي Excel (CSV)</span>
+          <Download size={15} className="text-emerald-400" /> <span>تصدير كشف حساب جدول البيانات Excel (CSV)</span>
         </button>
       </div>
 

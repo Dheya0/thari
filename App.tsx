@@ -97,6 +97,7 @@ const App: React.FC = () => {
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [showPrivacyPolicy, setShowPrivacyPolicy] = useState(false);
   const [printType, setPrintType] = useState<'summary' | 'detailed'>('summary');
+  const [printWalletFilter, setPrintWalletFilter] = useState<string | null>(null);
   const [printCurrencyFilter, setPrintCurrencyFilter] = useState<string | null>(null);
   
   // Wallet Filter State (null = All Wallets)
@@ -327,8 +328,9 @@ const App: React.FC = () => {
       }
   };
 
-  const handlePrint = (type: 'summary' | 'detailed', currencyFilter?: string | null) => {
+  const handlePrint = (type: 'summary' | 'detailed', walletId?: string | null, currencyFilter?: string | null) => {
     setPrintType(type);
+    setPrintWalletFilter(walletId !== undefined ? walletId : selectedWalletId);
     setPrintCurrencyFilter(currencyFilter || null);
     // Give React time to update state and re-render FinancialReport before opening print dialog
     setTimeout(() => { 
@@ -336,8 +338,9 @@ const App: React.FC = () => {
     }, 600);
   };
 
-  const handleShare = async (type: 'summary' | 'detailed', currencyFilter?: string | null) => {
+  const handleShare = async (type: 'summary' | 'detailed', walletId?: string | null, currencyFilter?: string | null) => {
     setPrintType(type);
+    setPrintWalletFilter(walletId !== undefined ? walletId : selectedWalletId);
     setPrintCurrencyFilter(currencyFilter || null);
     
     setTimeout(async () => {
@@ -581,7 +584,7 @@ const App: React.FC = () => {
         wallets={state.wallets} 
         type={printType} 
         exchangeRates={state.exchangeRates}
-        filterWalletId={selectedWalletId} 
+        filterWalletId={printWalletFilter} 
         filterCurrency={printCurrencyFilter}
       />
       
@@ -752,7 +755,17 @@ const App: React.FC = () => {
                             <h3 className="text-[10px] font-black text-slate-400 uppercase flex items-center gap-2 tracking-[0.15em]"><History size={13} /> {selectedWalletId ? 'سجل المحفظة المختارة' : 'أحدث العمليات'}</h3>
                             <button onClick={() => setActiveTab('transactions')} className="text-amber-500 text-[10px] font-black uppercase flex items-center gap-1 hover:text-amber-400 transition-colors">عرض الكل <ArrowRight size={11} className="rotate-180" /></button>
                           </div>
-                          <TransactionList transactions={filteredTransactions.slice(0, 3)} categories={state.categories} wallets={state.wallets} onDelete={(id) => setState(p => ({ ...p, transactions: p.transactions.filter(t => t.id !== id) }))} onEdit={handleEditTransaction} currencySymbol={state.currency.symbol} />
+                          <TransactionList 
+                            transactions={filteredTransactions.slice(0, 3)} 
+                            categories={state.categories} 
+                            wallets={state.wallets} 
+                            onDelete={(id) => setState(p => ({ ...p, transactions: p.transactions.filter(t => t.id !== id) }))} 
+                            onEdit={handleEditTransaction} 
+                            currencySymbol={state.currency.symbol}
+                            currentCurrencyCode={state.currency.code}
+                            currencies={state.currencies}
+                            exchangeRates={state.exchangeRates}
+                          />
                         </section>
                     </div>
                   </div>
@@ -778,9 +791,21 @@ const App: React.FC = () => {
                             initialWalletId={selectedWalletId} 
                             onFilterChange={handleSelectWallet} 
                             userName={state.userName}
+                            currencies={state.currencies}
                         />
                         
-                        <TransactionList transactions={filteredTransactions} categories={state.categories} wallets={state.wallets} onDelete={(id) => setState(p => ({...p, transactions: p.transactions.filter(t => t.id !== id)}))} onEdit={handleEditTransaction} currencySymbol={state.currency.symbol} showFilters />
+                        <TransactionList 
+                            transactions={filteredTransactions} 
+                            categories={state.categories} 
+                            wallets={state.wallets} 
+                            onDelete={(id) => setState(p => ({...p, transactions: p.transactions.filter(t => t.id !== id)}))} 
+                            onEdit={handleEditTransaction} 
+                            currencySymbol={state.currency.symbol}
+                            currentCurrencyCode={state.currency.code}
+                            currencies={state.currencies}
+                            exchangeRates={state.exchangeRates}
+                            showFilters 
+                        />
                     </div>
                 )}
                 

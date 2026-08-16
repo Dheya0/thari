@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Transaction, Category, Currency, Wallet } from '../types';
-import { convertCurrency } from '../constants';
+import { convertCurrency, DEFAULT_CURRENCIES } from '../constants';
 
 interface FinancialReportProps {
   transactions: Transaction[];
@@ -12,6 +12,7 @@ interface FinancialReportProps {
   exchangeRates: Record<string, number>;
   filterWalletId?: string | null;
   filterCurrency?: string | null;
+  isMergedReport?: boolean;
 }
 
 export const FinancialReport: React.FC<FinancialReportProps> = ({ 
@@ -23,7 +24,8 @@ export const FinancialReport: React.FC<FinancialReportProps> = ({
   type, 
   exchangeRates, 
   filterWalletId, 
-  filterCurrency 
+  filterCurrency,
+  isMergedReport = true
 }) => {
   // Filtering Logic
   let activeTransactions = filterWalletId 
@@ -49,13 +51,46 @@ export const FinancialReport: React.FC<FinancialReportProps> = ({
   const savingsRate = totalIncome > 0 ? Math.max(0, Math.round((netBalance / totalIncome) * 100)) : 0;
   const expenseRatio = totalIncome > 0 ? Math.min(100, Math.round((totalExpense / totalIncome) * 100)) : (totalExpense > 0 ? 100 : 0);
 
-  // Month-over-month / Period metrics
+  // Sorting
   const sortedTx = [...activeTransactions].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   const incomeTxCount = activeTransactions.filter(t => t.type === 'income').length;
   const expenseTxCount = activeTransactions.filter(t => t.type === 'expense').length;
 
   const avgExpensePerTx = expenseTxCount > 0 ? Math.round(totalExpense / expenseTxCount) : 0;
   const avgIncomePerTx = incomeTxCount > 0 ? Math.round(totalIncome / incomeTxCount) : 0;
+
+  // Per-Currency Breakdown (Separated currencies calculation)
+  const currencyBreakdown = useMemo(() => {
+    const map: Record<string, { income: number; expense: number; count: number }> = {};
+    activeTransactions.forEach(t => {
+      const code = t.currency || 'SAR';
+      if (!map[code]) {
+        map[code] = { income: 0, expense: 0, count: 0 };
+      }
+      map[code].count += 1;
+      if (t.type === 'income') {
+        map[code].income += t.amount;
+      } else {
+        map[code].expense += t.amount;
+      }
+    });
+
+    return Object.entries(map).map(([code, data]) => {
+      const net = data.income - data.expense;
+      const convertedNet = convertCurrency(net, code, currency.code, exchangeRates);
+      const currObj = DEFAULT_CURRENCIES.find(c => c.code === code);
+      return {
+        code,
+        name: currObj?.name || code,
+        symbol: currObj?.symbol || code,
+        income: data.income,
+        expense: data.expense,
+        net,
+        count: data.count,
+        convertedNet
+      };
+    });
+  }, [activeTransactions, currency.code, exchangeRates]);
 
   // Wallet balances
   const walletBalances = !filterWalletId ? wallets.map(w => {
@@ -138,15 +173,15 @@ export const FinancialReport: React.FC<FinancialReportProps> = ({
         <div className="border-b-2 border-slate-900/90 pb-6 mb-7 break-avoid">
           <div className="flex justify-between items-start gap-6">
             
-            {/* Right Side: Brand Crest & Institutional Identity */}
-            <div className="flex items-start gap-4">
-              <div className="w-16 h-16 rounded-2xl bg-slate-950 flex items-center justify-center p-2.5 shadow-md border border-amber-500/30 shrink-0">
-                <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
+            {/* Right Side: Official Brand & Title */}
+            <div className="flex items-center gap-4">
+              <div className="w-16 h-16 rounded-2xl bg-slate-950 flex items-center justify-center border-2 border-amber-500/40 shadow-sm shrink-0">
+                <svg viewBox="0 0 100 100" className="w-12 h-12" fill="none">
                   <defs>
                     <linearGradient id="gold-grad-statement" x1="0%" y1="0%" x2="100%" y2="100%">
-                      <stop offset="0%" stopColor="#fde047" />
-                      <stop offset="40%" stopColor="#f59e0b" />
-                      <stop offset="100%" stopColor="#b45309" />
+                      <stop offset="0%" stopColor="#f59e0b" />
+                      <stop offset="50%" stopColor="#fbbf24" />
+                      <stop offset="100%" stopColor="#d97706" />
                     </linearGradient>
                   </defs>
                   <rect x="6" y="6" width="88" height="88" rx="22" fill="#090d16" stroke="url(#gold-grad-statement)" strokeWidth="2.5" />
@@ -204,7 +239,11 @@ export const FinancialReport: React.FC<FinancialReportProps> = ({
                   {type === 'detailed' ? 'كشف حساب تفصيلي لجميع القيود والمعاملات' : 'تقرير ملخص تنفيذي للمركز المالي'}
                 </span>
                 <h2 className="text-sm font-black text-white">
-                  {activeWallet ? `محفظة العمليات: ${activeWallet.name} (${activeWallet.currencyCode})` : 'كشف حساب شامل لجميع المحافظ والعملات'}
+                  {activeWallet 
+                    ? `محفظة العمليات: ${activeWallet.name} (${activeWallet.currencyCode})` 
+                    : filterCurrency 
+                      ? `كشف حساب مخصص لعملة: ${filterCurrency}`
+                      : 'كشف حساب شامل ومدمج لكافة المحافظ والعملات'}
                 </h2>
               </div>
             </div>
@@ -216,7 +255,7 @@ export const FinancialReport: React.FC<FinancialReportProps> = ({
                 </span>
               )}
               <span className="text-[10px] font-black bg-amber-500 text-slate-950 px-3 py-1 rounded-lg">
-                عملة العرض: {currency.name} ({currency.code})
+                عملة التقييم والمعادلة: {currency.name} ({currency.code})
               </span>
             </div>
           </div>
@@ -239,13 +278,13 @@ export const FinancialReport: React.FC<FinancialReportProps> = ({
             </div>
 
             <div className="pr-3 sm:pr-4">
-              <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-1">نطاق الحساب المصرفي</p>
+              <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-1">نطاق الحساب والمحافظ</p>
               <p className="text-xs font-bold text-slate-900">{activeWallet ? activeWallet.name : `كافة المحافظ (${wallets.length} محفظة)`}</p>
               <p className="text-[10px] font-semibold text-slate-600 mt-0.5">إجمالي القيود: {activeTransactions.length} قيد</p>
             </div>
 
             <div className="pr-3 sm:pr-4">
-              <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-1">الوضع المالي الإجمالي</p>
+              <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-1">المركز المالي الإجمالي</p>
               <div className="inline-flex items-center gap-1.5 bg-slate-900 text-amber-400 px-2.5 py-1 rounded-lg font-black text-[10px]">
                 <span>{netBalance >= 0 ? 'فائض مالي إيجابي' : 'عجز تدفقات مرحلي'}</span>
                 <span className="text-[9px] font-normal text-slate-300">({savingsRate}% وفر)</span>
@@ -299,49 +338,108 @@ export const FinancialReport: React.FC<FinancialReportProps> = ({
               <span className="text-[10px] font-black text-amber-400 uppercase tracking-wider flex items-center gap-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-amber-400" /> صافي الرصيد والحركة
               </span>
-              <span className="text-[9px] font-bold bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded-md border border-amber-500/30">
-                نسبة الوفر {savingsRate}%
+              <span className="text-[9px] font-black bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded-md border border-amber-500/30">
+                {savingsRate}% وفر
               </span>
             </div>
-            <p className="text-2xl font-black text-white dir-ltr text-right tracking-tight">
-              {netBalance >= 0 ? `+${netBalance.toLocaleString(undefined, { maximumFractionDigits: 0 })}` : netBalance.toLocaleString(undefined, { maximumFractionDigits: 0 })} <span className="text-xs font-bold text-amber-400">{currency.symbol}</span>
+            <p className={`text-2xl font-black dir-ltr text-right tracking-tight ${netBalance >= 0 ? 'text-amber-400' : 'text-rose-400'}`}>
+              {netBalance >= 0 ? '+' : ''}{netBalance.toLocaleString(undefined, { maximumFractionDigits: 0 })} <span className="text-xs font-bold text-slate-300">{currency.symbol}</span>
             </p>
-            <p className="text-[9px] text-slate-400 mt-1 font-medium">الصافي المتبقي في الخزينة بعد خصم النفقات</p>
+            <p className="text-[9px] text-slate-400 mt-1 font-medium">
+              المركز المالي المحاسبي الموحد المعادل
+            </p>
           </div>
 
         </div>
 
-        {/* Multi-Wallet Solvency Matrix (If comprehensive report) */}
-        {!filterWalletId && walletBalances.length > 0 && (
+        {/* Multi-Currency Balances & Breakdown Table (فصل العملات في التقرير) */}
+        {currencyBreakdown.length > 0 && (
           <div className="mb-6 break-avoid">
-            <div className="flex items-center justify-between mb-2.5">
+            <div className="flex justify-between items-center mb-2">
               <div className="flex items-center gap-2">
                 <div className="w-1.5 h-4 bg-amber-500 rounded-full" />
                 <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider">
-                  مصفوفة توزيع السيولة والأرصدة عبر المحافظ (مقيمة بـ {currency.code})
+                  تفصيل حركة وأرصدة العملات بشكل مستقل (فصل العملات)
                 </h3>
               </div>
-              <span className="text-[10px] font-bold text-slate-500">{walletBalances.length} محافظ نقدية ومصرفية</span>
+              <span className="text-[10px] font-bold text-slate-500">
+                {currencyBreakdown.length} عملة مسجلة
+              </span>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 bg-slate-50 p-3.5 rounded-2xl border border-slate-200 text-xs">
-              {walletBalances.map((w, i) => (
-                <div key={i} className="bg-white p-3 rounded-xl border border-slate-200/90 shadow-2xs flex flex-col justify-between">
+            <div className="rounded-2xl border border-slate-300 overflow-hidden shadow-2xs">
+              <table className="w-full text-xs border-collapse">
+                <thead>
+                  <tr className="bg-slate-900 text-white text-[10px]">
+                    <th className="py-2.5 px-3 text-right font-black">رمز واسم العملة</th>
+                    <th className="py-2.5 px-3 text-left font-black">الواردات بالعملة (+)</th>
+                    <th className="py-2.5 px-3 text-left font-black">المنصرفات بالعملة (-)</th>
+                    <th className="py-2.5 px-3 text-left font-black">صافي الحركة بالعملة</th>
+                    <th className="py-2.5 px-3 text-left font-black">المعادل بـ ({currency.code})</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200 bg-white">
+                  {currencyBreakdown.map((c, i) => (
+                    <tr key={c.code} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50/70'}>
+                      <td className="py-2.5 px-3 font-bold text-slate-900">
+                        <div className="flex items-center gap-1.5">
+                          <span className="px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/20 text-amber-700 font-black text-[10px]">
+                            {c.code}
+                          </span>
+                          <span className="text-slate-700 text-[11px]">{c.name}</span>
+                        </div>
+                      </td>
+                      <td className="py-2.5 px-3 text-left font-bold text-emerald-700 dir-ltr text-[11px]">
+                        +{c.income.toLocaleString(undefined, { maximumFractionDigits: 2 })} {c.symbol}
+                      </td>
+                      <td className="py-2.5 px-3 text-left font-bold text-rose-700 dir-ltr text-[11px]">
+                        -{c.expense.toLocaleString(undefined, { maximumFractionDigits: 2 })} {c.symbol}
+                      </td>
+                      <td className={`py-2.5 px-3 text-left font-black dir-ltr text-[11px] ${c.net >= 0 ? 'text-slate-950' : 'text-rose-700'}`}>
+                        {c.net >= 0 ? '+' : ''}{c.net.toLocaleString(undefined, { maximumFractionDigits: 2 })} {c.symbol}
+                      </td>
+                      <td className="py-2.5 px-3 text-left font-black text-slate-950 dir-ltr text-[11px]">
+                        {Math.round(c.convertedNet).toLocaleString()} <span className="text-[9px] font-bold text-amber-700">{currency.symbol}</span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* Wallets Breakdown Matrix (فصل المحافظ في التقرير) */}
+        {walletBalances.length > 1 && !filterWalletId && (
+          <div className="mb-6 break-avoid">
+            <div className="flex justify-between items-center mb-2">
+              <div className="flex items-center gap-2">
+                <div className="w-1.5 h-4 bg-slate-900 rounded-full" />
+                <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider">
+                  توزيع الأرصدة والمحافظ المالية (فصل المحافظ)
+                </h3>
+              </div>
+              <span className="text-[10px] font-bold text-slate-500">
+                {walletBalances.length} محافظ نقدية ومصرفية
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+              {walletBalances.map((w) => (
+                <div key={w.id} className="bg-slate-50 border border-slate-200 p-3 rounded-xl flex flex-col justify-between">
                   <div className="flex items-center justify-between mb-1.5">
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: w.color }} />
-                      <span className="font-bold text-slate-900 truncate text-xs">{w.name}</span>
-                    </div>
-                    <span className="text-[9px] font-black uppercase text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
+                    <span className="text-xs font-black text-slate-900 truncate">{w.name}</span>
+                    <span className="text-[8.5px] font-mono font-bold bg-slate-200 text-slate-700 px-1.5 py-0.5 rounded">
                       {w.currencyCode}
                     </span>
                   </div>
-
-                  <div className="flex justify-between items-baseline mt-1 pt-1.5 border-t border-slate-100">
-                    <span className="text-[9px] text-slate-400 font-medium">الرصيد المقيم:</span>
-                    <span className="font-black text-slate-950 text-xs dir-ltr">
-                      {Math.round(w.balance).toLocaleString()} <span className="text-[9px] font-bold text-amber-700">{currency.symbol}</span>
-                    </span>
+                  <div>
+                    <p className="text-xs font-bold text-slate-600 dir-ltr text-right">
+                      {w.rawBalance.toLocaleString(undefined, { maximumFractionDigits: 1 })} {w.currencyCode}
+                    </p>
+                    <p className="text-sm font-black text-slate-950 dir-ltr text-right mt-0.5">
+                      ≈ {Math.round(w.balance).toLocaleString()} <span className="text-[9px] font-bold text-slate-500">{currency.symbol}</span>
+                    </p>
                   </div>
                 </div>
               ))}
@@ -349,54 +447,75 @@ export const FinancialReport: React.FC<FinancialReportProps> = ({
           </div>
         )}
 
-        {/* Expenses & Inflow Analytical Breakdown */}
-        {categoryBreakdown.length > 0 && (
-          <div className="mb-6 break-avoid">
-            <div className="flex items-center justify-between mb-2.5">
-              <div className="flex items-center gap-2">
-                <div className="w-1.5 h-4 bg-slate-900 rounded-full" />
-                <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider">
-                  هيكل الإنفاق التشغيلي وتحليل بنود المصروفات
-                </h3>
+        {/* Categories Analysis (Inflow and Outflow Breakdown side by side) */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6 break-avoid">
+          
+          {/* Top Expense Categories */}
+          <div className="bg-slate-50 rounded-2xl border border-slate-200 p-4">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-2 mb-3">
+              <span className="text-[10px] font-black text-rose-800 uppercase tracking-wider">
+                تحليل المصروفات حسب التصنيف
+              </span>
+              <span className="text-[9px] font-bold text-slate-500">{categoryBreakdown.length} بنود</span>
+            </div>
+            
+            {categoryBreakdown.length === 0 ? (
+              <p className="text-xs text-slate-400 text-center py-4">لا توجد مصروفات مسجلة</p>
+            ) : (
+              <div className="space-y-2">
+                {categoryBreakdown.slice(0, 5).map((cat) => {
+                  const pct = totalExpense > 0 ? Math.round((cat.amount / totalExpense) * 100) : 0;
+                  return (
+                    <div key={cat.id} className="space-y-1">
+                      <div className="flex justify-between text-xs font-bold">
+                        <span className="text-slate-800 truncate max-w-[150px]">{cat.name} ({cat.count})</span>
+                        <span className="text-slate-950 dir-ltr">{Math.round(cat.amount).toLocaleString()} {currency.symbol} <span className="text-slate-400 font-normal">({pct}%)</span></span>
+                      </div>
+                      <div className="h-1.5 w-full bg-slate-200 rounded-full overflow-hidden">
+                        <div className="h-full bg-rose-500 rounded-full" style={{ width: `${pct}%` }} />
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-              <span className="text-[10px] font-bold text-slate-500">أعلى {Math.min(8, categoryBreakdown.length)} تصنيفات إنفاق</span>
-            </div>
-
-            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-2.5">
-              {categoryBreakdown.slice(0, 8).map((c, i) => {
-                const percent = totalExpense > 0 ? (c.amount / totalExpense) * 100 : 0;
-                return (
-                  <div key={i} className="flex items-center gap-3 text-xs">
-                    <div className="w-28 flex items-center gap-1.5 min-w-0">
-                      <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: c.color }} />
-                      <span className="font-bold text-slate-900 truncate">{c.name}</span>
-                    </div>
-
-                    <div className="flex-1 h-3 bg-slate-200 rounded-full overflow-hidden p-0.5 border border-slate-300/40">
-                      <div 
-                        className="h-full rounded-full transition-all" 
-                        style={{ 
-                          width: `${Math.max(2, percent)}%`, 
-                          backgroundColor: c.color || '#0f172a' 
-                        }} 
-                      />
-                    </div>
-
-                    <div className="w-32 text-left font-black text-slate-950 dir-ltr flex items-center justify-end gap-1.5">
-                      <span>{Math.round(c.amount).toLocaleString()} {currency.symbol}</span>
-                      <span className="text-[9px] font-bold text-slate-500 bg-slate-200/80 px-1.5 py-0.5 rounded">
-                        {Math.round(percent)}%
-                      </span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+            )}
           </div>
-        )}
 
-        {/* Transactions Audit Ledger Table */}
-        <div className="mb-8">
+          {/* Top Income Categories */}
+          <div className="bg-slate-50 rounded-2xl border border-slate-200 p-4">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-2 mb-3">
+              <span className="text-[10px] font-black text-emerald-800 uppercase tracking-wider">
+                تحليل مصادر الدخل والواردات
+              </span>
+              <span className="text-[9px] font-bold text-slate-500">{incomeBreakdown.length} بنود</span>
+            </div>
+            
+            {incomeBreakdown.length === 0 ? (
+              <p className="text-xs text-slate-400 text-center py-4">لا توجد مصادر دخل مسجلة</p>
+            ) : (
+              <div className="space-y-2">
+                {incomeBreakdown.slice(0, 5).map((cat) => {
+                  const pct = totalIncome > 0 ? Math.round((cat.amount / totalIncome) * 100) : 0;
+                  return (
+                    <div key={cat.id} className="space-y-1">
+                      <div className="flex justify-between text-xs font-bold">
+                        <span className="text-slate-800 truncate max-w-[150px]">{cat.name} ({cat.count})</span>
+                        <span className="text-slate-950 dir-ltr">{Math.round(cat.amount).toLocaleString()} {currency.symbol} <span className="text-slate-400 font-normal">({pct}%)</span></span>
+                      </div>
+                      <div className="h-1.5 w-full bg-slate-200 rounded-full overflow-hidden">
+                        <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${pct}%` }} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+        </div>
+
+        {/* Detailed Transactions Ledger Table */}
+        <div className="mb-6">
           <div className="flex justify-between items-center mb-2.5 break-avoid">
             <div className="flex items-center gap-2">
               <div className="w-1.5 h-4 bg-amber-500 rounded-full" />
@@ -413,10 +532,11 @@ export const FinancialReport: React.FC<FinancialReportProps> = ({
             <table className="w-full text-xs border-collapse">
               <thead>
                 <tr className="bg-slate-950 text-white break-avoid border-b border-slate-800 text-[10px]">
-                  <th className="py-3 px-3.5 text-right font-black w-24">التاريخ</th>
+                  <th className="py-3 px-3 text-right font-black w-24">التاريخ</th>
                   <th className="py-3 px-3 text-right font-black w-28">التصنيف</th>
                   <th className="py-3 px-3 text-right font-black w-28">المحفظة</th>
                   <th className="py-3 px-3 text-right font-black">البيان / تفاصيل القيد</th>
+                  <th className="py-3 px-3 text-center font-black w-20">العملة</th>
                   <th className="py-3 px-3 text-left font-black w-32">المبلغ بالعملة</th>
                   <th className="py-3 px-3.5 text-left font-black w-36">المعادل بـ ({currency.code})</th>
                 </tr>
@@ -434,7 +554,7 @@ export const FinancialReport: React.FC<FinancialReportProps> = ({
                       className={`break-inside-avoid page-break-inside-avoid transition-colors ${i % 2 === 0 ? 'bg-white' : 'bg-slate-50/70'}`}
                     >
                       {/* Date */}
-                      <td className="py-2.5 px-3.5 font-medium text-slate-600 text-[10.5px] whitespace-nowrap">
+                      <td className="py-2.5 px-3 font-medium text-slate-600 text-[10.5px] whitespace-nowrap">
                         {t.date}
                       </td>
 
@@ -456,6 +576,13 @@ export const FinancialReport: React.FC<FinancialReportProps> = ({
                         {t.note || <span className="text-slate-400 italic">بدون ملاحظات</span>}
                       </td>
 
+                      {/* Currency Badge */}
+                      <td className="py-2.5 px-3 text-center">
+                        <span className="px-1.5 py-0.5 rounded bg-slate-100 border border-slate-300 text-slate-800 font-mono font-bold text-[9.5px]">
+                          {t.currency}
+                        </span>
+                      </td>
+
                       {/* Original Amount */}
                       <td className={`py-2.5 px-3 text-left font-bold dir-ltr whitespace-nowrap text-[11px] ${isIncome ? 'text-emerald-700' : 'text-rose-700'}`}>
                         {isIncome ? '+' : '-'}{t.amount.toLocaleString(undefined, { maximumFractionDigits: 2 })} <span className="text-[9px] font-semibold text-slate-500">{t.currency}</span>
@@ -471,7 +598,7 @@ export const FinancialReport: React.FC<FinancialReportProps> = ({
               </tbody>
               <tfoot>
                 <tr className="bg-slate-100 font-black border-t-2 border-slate-400 break-avoid text-xs">
-                  <td colSpan={4} className="py-3 px-3.5 text-right text-slate-900 font-black">
+                  <td colSpan={5} className="py-3 px-3.5 text-right text-slate-900 font-black">
                     إجمالي صافي العمليات المعروضة في هذا الكشف ({displayTransactions.length} قيد)
                   </td>
                   <td colSpan={2} className="py-3 px-3.5 text-left text-slate-950 text-sm font-black dir-ltr">
