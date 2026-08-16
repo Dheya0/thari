@@ -4,9 +4,22 @@ import { Transaction, Category, ChatMessage, Goal } from "../types";
 
 // Helper to get AI instance with user provided key
 const getAI = (userKey?: string) => {
-  // STRICT CHECK: Use ONLY the userKey if provided, or process.env as fallback if strictly available.
-  // In the context of the requested change, we prioritize the userKey.
-  const apiKey = userKey || process.env.API_KEY;
+  let envKey = '';
+  try {
+    if (typeof process !== 'undefined' && process.env) {
+      envKey = process.env.GEMINI_API_KEY || process.env.API_KEY || '';
+    }
+  } catch (e) {}
+
+  if (!envKey) {
+    try {
+      if (typeof import.meta !== 'undefined' && (import.meta as any).env) {
+        envKey = (import.meta as any).env.VITE_GEMINI_API_KEY || (import.meta as any).env.VITE_API_KEY || '';
+      }
+    } catch (e) {}
+  }
+
+  const apiKey = (userKey && userKey.trim() !== '') ? userKey.trim() : envKey;
   
   if (!apiKey || apiKey.trim() === '') {
     return null; 

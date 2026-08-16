@@ -3,24 +3,30 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, (process as any).cwd(), '');
-  const apiKey = env.API_KEY || env.GEMINI_API_KEY || process.env.API_KEY || process.env.GEMINI_API_KEY;
+  const apiKey = env.VITE_GEMINI_API_KEY || env.VITE_API_KEY || env.GEMINI_API_KEY || env.API_KEY || process.env.VITE_GEMINI_API_KEY || process.env.VITE_API_KEY || process.env.GEMINI_API_KEY || process.env.API_KEY || '';
   const isProd = mode === 'production';
 
   return {
     base: '/',
     plugins: [react()],
     define: {
-      'process.env.API_KEY': JSON.stringify(apiKey)
+      'process.env.API_KEY': JSON.stringify(apiKey),
+      'process.env.GEMINI_API_KEY': JSON.stringify(apiKey),
+      'process.env.NODE_ENV': JSON.stringify(mode),
+      'global': 'window'
     },
     esbuild: {
-      // Strip console and debugger statements in production builds to prevent code inspection
-      drop: isProd ? ['console', 'debugger'] : [],
+      drop: isProd ? ['debugger'] : [],
       legalComments: 'none',
       minifyIdentifiers: true,
       minifySyntax: true,
       minifyWhitespace: true,
     },
     server: {
+      port: 3000,
+      host: '0.0.0.0'
+    },
+    preview: {
       port: 3000,
       host: '0.0.0.0'
     },
@@ -32,7 +38,7 @@ export default defineConfig(({ mode }) => {
       target: 'es2020',
       cssMinify: true,
       reportCompressedSize: false,
-      chunkSizeWarningLimit: 1000,
+      chunkSizeWarningLimit: 1500,
       rollupOptions: {
         output: {
           manualChunks(id) {

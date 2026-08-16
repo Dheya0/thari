@@ -5,15 +5,21 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="theme-color" content="#020617">
+    <!-- PWA & Mobile Web Capabilities -->
+    <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="ثري">
     
     <!-- PWA Manifest -->
-    <link rel="manifest" href="manifest.json">
+    <link rel="manifest" href="/manifest.json">
     
-    <!-- Favicon -->
-    <link rel="icon" type="image/svg+xml" href="logo.svg">
-    <link rel="apple-touch-icon" href="thari_icon.jpg">
+    <!-- Favicon & iOS Touch Icons -->
+    <link rel="icon" type="image/svg+xml" href="/logo.svg">
+    <link rel="apple-touch-icon" href="/logo.svg">
+    <link rel="apple-touch-icon" sizes="180x180" href="/logo.svg">
+    <link rel="apple-touch-icon" sizes="152x152" href="/logo.svg">
+    <link rel="apple-touch-icon" sizes="167x167" href="/logo.svg">
     
     <title>Thari - ثري</title>
     
@@ -413,7 +419,9 @@
     <script>
         function updateViewportHeight() {
             var vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
-            document.documentElement.style.setProperty('--vh', vh + 'px');
+            if (vh && vh > 200) {
+                document.documentElement.style.setProperty('--vh', vh + 'px');
+            }
         }
         if (window.visualViewport) {
             window.visualViewport.addEventListener('resize', updateViewportHeight);
@@ -422,6 +430,9 @@
             window.addEventListener('resize', updateViewportHeight);
         }
         window.addEventListener('DOMContentLoaded', updateViewportHeight);
+        window.addEventListener('load', updateViewportHeight);
+        setTimeout(updateViewportHeight, 200);
+        setTimeout(updateViewportHeight, 1000);
     </script>
 </head>
 <body>
