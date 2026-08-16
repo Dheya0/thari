@@ -1,22 +1,25 @@
-
 import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 
 export default defineConfig(({ mode }) => {
-  // Load env file based on `mode` in the current working directory.
-  // Set the third parameter to '' to load all env regardless of the `VITE_` prefix.
-  // Fix: Cast process to any to avoid "Property 'cwd' does not exist on type 'Process'" error
   const env = loadEnv(mode, (process as any).cwd(), '');
-  
-  // Prioritize API_KEY, fallback to GEMINI_API_KEY (common in some hosting providers)
   const apiKey = env.API_KEY || env.GEMINI_API_KEY || process.env.API_KEY || process.env.GEMINI_API_KEY;
+  const isProd = mode === 'production';
 
   return {
-    // Relative base path is crucial for Capacitor apps to load assets from local file system
+    // Relative base path is crucial for Capacitor apps to load assets from local file system on iOS & Android
     base: './',
     plugins: [react()],
     define: {
       'process.env.API_KEY': JSON.stringify(apiKey)
+    },
+    esbuild: {
+      // Strip console and debugger statements in production builds to prevent code inspection
+      drop: isProd ? ['console', 'debugger'] : [],
+      legalComments: 'none',
+      minifyIdentifiers: true,
+      minifySyntax: true,
+      minifyWhitespace: true,
     },
     server: {
       port: 3000,
@@ -25,13 +28,38 @@ export default defineConfig(({ mode }) => {
     build: {
       outDir: 'dist',
       emptyOutDir: true,
-      sourcemap: false,
+      sourcemap: false, // Disables source maps entirely to prevent reverse engineering
+      minify: 'esbuild',
+      target: 'es2020',
+      cssMinify: true,
+      reportCompressedSize: false,
+      chunkSizeWarningLimit: 1000,
       rollupOptions: {
         output: {
-          manualChunks: {
-            vendor: ['react', 'react-dom', 'lucide-react', 'recharts'],
-            genai: ['@google/genai']
-          }
+          manualChunks(id) {
+            if (id.includes('node_modules')) {
+              if (id.includes('react') || id.includes('react-dom')) {
+                return 'th_core';
+              }
+              if (id.includes('lucide-react')) {
+                return 'th_icons';
+              }
+              if (id.includes('recharts') || id.includes('d3')) {
+                return 'th_charts';
+              }
+              if (id.includes('jspdf') || id.includes('html2canvas')) {
+                return 'th_reports';
+              }
+              if (id.includes('@capacitor')) {
+                return 'th_native';
+              }
+              return 'th_vendor';
+            }
+          },
+          // Obfuscate generated asset and chunk names
+          entryFileNames: 'assets/[hash].js',
+          chunkFileNames: 'assets/[hash].js',
+          assetFileNames: 'assets/[hash].[ext]'
         }
       }
     }

@@ -1,12 +1,13 @@
 
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Plus, LayoutDashboard, History, Settings as SettingsIcon, BrainCircuit, HandCoins, Repeat, Coins, ArrowRight, Sparkles, Scale, Wallet as WalletIcon, Check, Plane, FileText, Download, ArrowUpRight, ArrowDownLeft, Calendar } from 'lucide-react';
+import { Plus, LayoutDashboard, History, Settings as SettingsIcon, Briefcase, HandCoins, Repeat, Coins, ArrowRight, Sparkles, Scale, Wallet as WalletIcon, Check, Plane, FileText, Download, ArrowUpRight, ArrowDownLeft, Calendar } from 'lucide-react';
 import { AppState, Transaction, Category, Debt } from './types';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import { INITIAL_CATEGORIES, DEFAULT_CURRENCIES, DEFAULT_EXCHANGE_RATES, convertCurrency } from './constants';
 import { generateAndSharePDF, generateAndShareCSV, buildExecutiveCSVContent, exportAndShareExecutiveCSV } from './utils/exportHelper';
+import { saveSecureState, loadSecureState } from './utils/secureStorage';
 import BalanceCard from './components/BalanceCard';
 import TransactionForm from './components/TransactionForm';
 import TransactionList from './components/TransactionList';
@@ -30,6 +31,7 @@ import CashflowSankey from './components/CashflowSankey';
 const STORAGE_KEY = 'thari_app_v4';
 
 import { Capacitor } from '@capacitor/core';
+import { App as CapApp } from '@capacitor/app';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
 
@@ -67,10 +69,8 @@ const INITIAL_STATE: AppState = {
 const App: React.FC = () => {
   const [state, setState] = useState<AppState>(() => {
     try {
-      const saved = localStorage.getItem(STORAGE_KEY) || localStorage.getItem('thari_backup_snapshot');
-      if (saved) {
-          const parsed = JSON.parse(saved);
-          
+      const parsed = loadSecureState(STORAGE_KEY);
+      if (parsed) {
           // Migration: if currency is a string, convert it to an object
           if (typeof parsed.currency === 'string') {
               const matchedCurrency = DEFAULT_CURRENCIES.find(c => c.code === parsed.currency) || DEFAULT_CURRENCIES[0];
@@ -156,15 +156,33 @@ const App: React.FC = () => {
     };
   }, []);
 
-  // Dual Offline-Safe Persistence to LocalStorage
+  // Android Hardware Back Button Handler for Native Capacitor App
   useEffect(() => {
-    try {
-      const serialized = JSON.stringify(state);
-      localStorage.setItem(STORAGE_KEY, serialized);
-      localStorage.setItem('thari_backup_snapshot', serialized);
-    } catch (e) {
-      console.warn("Storage persistence warning:", e);
+    let backButtonListener: any = null;
+    if (Capacitor.isNativePlatform()) {
+      CapApp.addListener('backButton', ({ canGoBack }) => {
+        if (showAddForm) {
+          setShowAddForm(false);
+          setEditingTransaction(null);
+        } else if (showPrivacyPolicy) {
+          setShowPrivacyPolicy(false);
+        } else if (activeTab !== 'dashboard') {
+          setActiveTab('dashboard');
+        } else {
+          CapApp.exitApp();
+        }
+      }).then(l => { backButtonListener = l; });
     }
+    return () => {
+      if (backButtonListener && backButtonListener.remove) {
+        backButtonListener.remove();
+      }
+    };
+  }, [showAddForm, showPrivacyPolicy, activeTab]);
+
+  // Dual Encrypted Offline-Safe Persistence to LocalStorage & Filesystem
+  useEffect(() => {
+    saveSecureState(STORAGE_KEY, state);
   }, [state]);
 
   // Timed Auto-lock when user leaves or backgrounds the app
@@ -593,7 +611,7 @@ const App: React.FC = () => {
           <div className="flex justify-between items-center max-w-6xl mx-auto w-full">
             <Logo size={28} showText />
             <div className="flex gap-2">
-              <button onClick={() => setActiveTab('chat')} className={`p-2 rounded-xl border border-white/10 transition-all ${activeTab === 'chat' ? 'bg-amber-500 text-slate-950 shadow-[0_0_20px_rgba(245,158,11,0.4)]' : 'text-slate-400 bg-white/5 hover:bg-white/10'}`} title="المساعد الذكي"><BrainCircuit size={16} /></button>
+              <button onClick={() => setActiveTab('chat')} className={`p-2 rounded-xl border border-white/10 transition-all ${activeTab === 'chat' ? 'bg-amber-500 text-slate-950 shadow-[0_0_20px_rgba(245,158,11,0.4)]' : 'text-slate-400 bg-white/5 hover:bg-white/10'}`} title="المستشار المالي"><Briefcase size={16} /></button>
               <button onClick={() => setActiveTab('settings')} className="flex items-center justify-center w-9 h-9 rounded-xl bg-slate-800/50 border border-slate-700 text-slate-500 hover:text-amber-500 hover:border-amber-500/50 transition-all shrink-0 active:scale-95 backdrop-blur-md" title="الإعدادات"><SettingsIcon size={16} /></button>
             </div>
           </div>

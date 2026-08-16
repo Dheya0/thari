@@ -977,7 +977,7 @@ const Settings: React.FC<SettingsProps> = ({
                 </div>
 
                 <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2 block">مفتاح الذكاء الاصطناعي Gemini (اختياري)</label>
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2 block">مفتاح الاستشارات الموسعة (Gemini Pro - اختياري)</label>
                     <input 
                       type="password" 
                       value={localApiKey} 
