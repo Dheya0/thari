@@ -225,7 +225,7 @@ export async function authenticateBiometrics(
               rpId: isLocalhost ? undefined : hostname,
               allowCredentials: [
                 {
-                  id: base64ToUint8Array(storedCredId),
+                  id: base64ToUint8Array(storedCredId) as unknown as BufferSource,
                   type: 'public-key',
                   transports: ['internal'],
                 },

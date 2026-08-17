@@ -1857,7 +1857,7 @@ const Settings: React.FC<SettingsProps> = ({
 
             <button
               type="button"
-              onClick={handleSendEmailBackup}
+              onClick={() => handleSendEmailBackup(null)}
               className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-black active:scale-95 transition-all shadow-lg shadow-indigo-600/20 flex items-center justify-center gap-2"
             >
               <Send size={15} />

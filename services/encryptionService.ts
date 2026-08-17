@@ -59,10 +59,10 @@ const deriveKey = async (password: string, salt: Uint8Array): Promise<CryptoKey>
         ["deriveKey"]
     );
     
-    return await window.crypto.subtle.deriveKey(
+        return await window.crypto.subtle.deriveKey(
         {
             name: "PBKDF2",
-            salt: salt,
+            salt: salt as unknown as BufferSource,
             iterations: 100000, // معيار قوي للأمان
             hash: "SHA-256"
         },
@@ -104,7 +104,7 @@ export const encryptData = async (data: string, password: string): Promise<strin
         ]);
 
         // 5. التحويل إلى Base64 للحفظ
-        return "THARI_AES_GCM:" + bufferToBase64(finalBuffer.buffer);
+        return "THARI_AES_GCM:" + bufferToBase64(finalBuffer.buffer as unknown as ArrayBuffer);
 
     } catch (e) {
         console.error("AES Encryption Failed:", e);

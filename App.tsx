@@ -3,10 +3,8 @@ import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'motion/react';
 import { Plus, LayoutDashboard, History, Settings as SettingsIcon, Briefcase, HandCoins, Repeat, Coins, ArrowRight, Sparkles, Scale, Wallet as WalletIcon, Check, Plane, FileText, Download, ArrowUpRight, ArrowDownLeft, Calendar } from 'lucide-react';
 import { AppState, Transaction, Category, Debt } from './types';
-import html2canvas from 'html2canvas';
-import jsPDF from 'jspdf';
 import { INITIAL_CATEGORIES, DEFAULT_CURRENCIES, DEFAULT_EXCHANGE_RATES, convertCurrency } from './constants';
-import { generateAndSharePDF, generateAndShareCSV, buildExecutiveCSVContent, exportAndShareExecutiveCSV } from './utils/exportHelper';
+import { generateAndShareCSV, buildExecutiveCSVContent, exportAndShareExecutiveCSV } from './utils/exportHelper';
 import { saveSecureState, loadSecureState } from './utils/secureStorage';
 import { Capacitor } from '@capacitor/core';
 import { App as CapApp } from '@capacitor/app';
@@ -389,96 +387,12 @@ const App: React.FC = () => {
     setPrintWalletFilter(walletId !== undefined ? walletId : selectedWalletId);
     setPrintCurrencyFilter(currencyFilter || null);
     
-    setTimeout(async () => {
-        try {
-            const original = document.getElementById('printable-report');
-            if (!original) return;
-            
-            // Clone offscreen for standard 210mm A4 rendering
-            const clone = original.cloneNode(true) as HTMLElement;
-            clone.classList.remove('hidden', 'print:block');
-            clone.classList.add('block');
-            clone.style.position = 'absolute';
-            clone.style.top = '-9999px';
-            clone.style.left = '0';
-            clone.style.width = '794px'; // A4 width at 96 DPI
-            clone.style.height = 'auto';
-            clone.style.backgroundColor = '#ffffff';
-            clone.style.color = '#000000';
-            document.body.appendChild(clone);
-            
-            const canvas = await html2canvas(clone, { 
-                scale: 2,
-                useCORS: true,
-                logging: false,
-                windowWidth: 794 
-            });
-            
-            document.body.removeChild(clone);
-            
-            const imgData = canvas.toDataURL('image/png');
-            const pdf = new jsPDF('p', 'mm', 'a4');
-            const pdfWidth = 210; // A4 width in mm
-            const pdfPageHeight = 297; // A4 height in mm
-            const imgHeight = (canvas.height * pdfWidth) / canvas.width; // Total height of report image in mm
-            
-            let heightLeft = imgHeight;
-            let position = 0;
-
-            // Render first page
-            pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, imgHeight);
-            heightLeft -= pdfPageHeight;
-
-            // Add additional pages if content spans across multiple pages
-            while (heightLeft > 0) {
-                position -= pdfPageHeight;
-                pdf.addPage();
-                pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, imgHeight);
-                heightLeft -= pdfPageHeight;
-            }
-            
-            const fileName = `Thari_Financial_Report_${type}_${new Date().toISOString().split('T')[0]}.pdf`;
-
-            const blob = pdf.output('blob');
-            const blobUrl = URL.createObjectURL(blob);
-            
-            // Try Web Share API first
-            let shared = false;
-            if (navigator.share && navigator.canShare) {
-                try {
-                    const file = new File([blob], fileName, { type: 'application/pdf' });
-                    if (navigator.canShare({ files: [file] })) {
-                        await navigator.share({
-                            files: [file],
-                            title: 'كشف حساب ثري المالي',
-                            text: 'تقرير مالي من تطبيق ثري'
-                        });
-                        shared = true;
-                    }
-                } catch (e) {
-                    console.log("Web Share API failed, falling back to download");
-                }
-            }
-
-            if (!shared) {
-                // Direct PDF download fallback
-                const link = document.createElement('a');
-                link.href = blobUrl;
-                link.download = fileName;
-                link.style.display = 'none';
-                document.body.appendChild(link);
-                link.click();
-                
-                setTimeout(() => {
-                    document.body.removeChild(link);
-                    URL.revokeObjectURL(blobUrl);
-                }, 1000);
-            }
-
-        } catch (e) {
-            console.error("Share failed", e);
-            alert("فشل إنشاء ملف PDF. يرجى المحاولة مرة أخرى.");
-        }
+    // Fallback to native print dialog which accurately renders Arabic text into PDFs
+    // For mobile platforms, we trigger print where the user can save as PDF and share.
+    setTimeout(() => { 
+        window.print();
+        // Show a brief tip to the user about saving as PDF
+        alert("لطباعة التقرير أو حفظه كملف PDF، يرجى استخدام خيار (حفظ كـ PDF) من نافذة الطباعة الخاصة بجهازك للحفاظ على جودة اللغة العربية.");
     }, 600);
   };
 

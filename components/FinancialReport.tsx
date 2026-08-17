@@ -96,8 +96,13 @@ export const FinancialReport: React.FC<FinancialReportProps> = ({
   const walletBalances = !filterWalletId ? wallets.map(w => {
     const rawBalance = transactions
       .filter(t => t.walletId === w.id)
-      .reduce((s, t) => s + (t.type === 'income' ? t.amount : -t.amount), 0);
+      .reduce((s, t) => {
+        // Convert the transaction amount to the WALLET's native currency
+        const amountInWalletCurrency = convertCurrency(t.amount, t.currency || 'SAR', w.currencyCode, exchangeRates);
+        return s + (t.type === 'income' ? amountInWalletCurrency : -amountInWalletCurrency);
+      }, 0);
     
+    // Then convert the wallet's total raw balance to the REPORT's target currency
     const convertedBalance = convertCurrency(rawBalance, w.currencyCode, currency.code, exchangeRates);
     return { ...w, rawBalance, balance: convertedBalance };
   }) : [];
@@ -164,10 +169,10 @@ export const FinancialReport: React.FC<FinancialReportProps> = ({
 
   return (
     <div id="printable-report" className="hidden print:block bg-white text-slate-900 p-0 min-h-screen w-full font-sans rtl dir-rtl antialiased selection:bg-amber-100">
-      <div className="max-w-[210mm] mx-auto p-8 sm:p-10 bg-white relative overflow-hidden">
+      <div className="max-w-[210mm] mx-auto p-8 sm:p-10 print:p-10 bg-white relative overflow-hidden">
         
         {/* Top Institutional Header Accent Line */}
-        <div className="h-2 bg-gradient-to-r from-slate-950 via-amber-500 to-slate-900 -mx-8 sm:-mx-10 -mt-8 sm:-mt-10 mb-8" />
+        <div className="h-2 bg-gradient-to-r from-slate-950 via-amber-500 to-slate-900 -mx-8 sm:-mx-10 print:-mx-10 -mt-8 sm:-mt-10 print:-mt-10 mb-8" />
 
         {/* Header: Institutional Branding & Formal Statement Info */}
         <div className="border-b-2 border-slate-900/90 pb-6 mb-7 break-avoid">
@@ -219,7 +224,7 @@ export const FinancialReport: React.FC<FinancialReportProps> = ({
               </div>
 
               {/* Official Seal Emblem */}
-              <div className="hidden sm:flex w-20 h-20 rounded-full border-2 border-dashed border-amber-600/70 p-1 items-center justify-center rotate-[-6deg] bg-amber-500/5 shrink-0">
+              <div className="hidden sm:flex print:flex w-20 h-20 rounded-full border-2 border-dashed border-amber-600/70 p-1 items-center justify-center rotate-[-6deg] bg-amber-500/5 shrink-0">
                 <div className="w-full h-full rounded-full border border-amber-600 flex flex-col items-center justify-center text-center p-1 bg-white shadow-inner">
                   <span className="text-[6.5px] font-black text-amber-700 tracking-wider uppercase">★ THARI ★</span>
                   <span className="text-[9px] font-black text-slate-950 my-0.5">معتمد رسمياً</span>
@@ -231,7 +236,7 @@ export const FinancialReport: React.FC<FinancialReportProps> = ({
           </div>
 
           {/* Statement Banner Bar */}
-          <div className="mt-5 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 text-white rounded-xl p-3.5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border border-slate-800">
+          <div className="mt-5 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 text-white rounded-xl p-3.5 flex flex-col sm:flex print:flex-row print:flex-row justify-between items-start sm:items-center print:items-center gap-3 border border-slate-800">
             <div className="flex items-center gap-3">
               <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse" />
               <div>
@@ -263,27 +268,27 @@ export const FinancialReport: React.FC<FinancialReportProps> = ({
 
         {/* Metadata Matrix / Institutional Profile Card */}
         <div className="bg-slate-50 rounded-2xl border border-slate-200/90 p-4 mb-6 break-avoid shadow-sm">
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs divide-x sm:divide-x-reverse divide-slate-200">
+          <div className="grid grid-cols-2 sm:grid-cols-4 print:grid-cols-4 gap-4 text-xs divide-x sm:divide-x-reverse print:divide-x-reverse divide-slate-200">
             
-            <div className="pr-1 sm:pr-2">
+            <div className="pr-1 sm:pr-2 print:pr-2">
               <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-1">صاحب الحساب / المالك</p>
               <p className="text-sm font-black text-slate-950 truncate">{userName || 'مستخدم ثري التنفيذي'}</p>
               <p className="text-[9px] text-slate-500 font-medium mt-0.5">حساب فردي موثق محلياً</p>
             </div>
 
-            <div className="pr-3 sm:pr-4">
+            <div className="pr-3 sm:pr-4 print:pr-4">
               <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-1">التاريخ الهجري والميلادي</p>
               <p className="text-xs font-bold text-slate-900">{dateFormattedGregorian}</p>
               <p className="text-[10px] font-bold text-amber-800 mt-0.5">{dateFormattedHijriArabic}</p>
             </div>
 
-            <div className="pr-3 sm:pr-4">
+            <div className="pr-3 sm:pr-4 print:pr-4">
               <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-1">نطاق الحساب والمحافظ</p>
               <p className="text-xs font-bold text-slate-900">{activeWallet ? activeWallet.name : `كافة المحافظ (${wallets.length} محفظة)`}</p>
               <p className="text-[10px] font-semibold text-slate-600 mt-0.5">إجمالي القيود: {activeTransactions.length} قيد</p>
             </div>
 
-            <div className="pr-3 sm:pr-4">
+            <div className="pr-3 sm:pr-4 print:pr-4">
               <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-1">المركز المالي الإجمالي</p>
               <div className="inline-flex items-center gap-1.5 bg-slate-900 text-amber-400 px-2.5 py-1 rounded-lg font-black text-[10px]">
                 <span>{netBalance >= 0 ? 'فائض مالي إيجابي' : 'عجز تدفقات مرحلي'}</span>
@@ -295,7 +300,7 @@ export const FinancialReport: React.FC<FinancialReportProps> = ({
         </div>
 
         {/* Institutional KPI Metrics (Executive Summary Deck) */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 mb-6 break-avoid">
+        <div className="grid grid-cols-1 sm:grid-cols-3 print:grid-cols-3 gap-3.5 mb-6 break-avoid">
           
           {/* Total Inflow (Income) */}
           <div className="bg-white rounded-2xl p-4 border-2 border-emerald-500/40 shadow-sm relative overflow-hidden">
@@ -424,7 +429,7 @@ export const FinancialReport: React.FC<FinancialReportProps> = ({
               </span>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+            <div className="grid grid-cols-2 sm:grid-cols-4 print:grid-cols-4 gap-2.5">
               {walletBalances.map((w) => (
                 <div key={w.id} className="bg-slate-50 border border-slate-200 p-3 rounded-xl flex flex-col justify-between">
                   <div className="flex items-center justify-between mb-1.5">
@@ -448,7 +453,7 @@ export const FinancialReport: React.FC<FinancialReportProps> = ({
         )}
 
         {/* Categories Analysis (Inflow and Outflow Breakdown side by side) */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6 break-avoid">
+        <div className="grid grid-cols-1 sm:grid-cols-2 print:grid-cols-2 gap-4 mb-6 break-avoid">
           
           {/* Top Expense Categories */}
           <div className="bg-slate-50 rounded-2xl border border-slate-200 p-4">
@@ -620,7 +625,7 @@ export const FinancialReport: React.FC<FinancialReportProps> = ({
 
         {/* Institutional Sign-off, Audit Stamp, and Compliance Footer */}
         <div className="mt-8 pt-6 border-t-2 border-slate-900 break-avoid">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-center mb-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 print:grid-cols-3 gap-4 items-center mb-4">
             
             {/* Electronic System Endorsement */}
             <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200">

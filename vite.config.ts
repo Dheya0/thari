@@ -11,15 +11,14 @@ export default defineConfig(({ mode }) => {
     plugins: [react()],
     define: {
       'process.env.API_KEY': JSON.stringify(apiKey),
-      'process.env.GEMINI_API_KEY': JSON.stringify(apiKey),
-      'process.env.NODE_ENV': JSON.stringify(mode)
+      'process.env.GEMINI_API_KEY': JSON.stringify(apiKey)
+    },
+    resolve: {
+      dedupe: ['react', 'react-dom']
     },
     esbuild: {
-      drop: isProd ? ['debugger'] : [],
+      drop: isProd ? ['console', 'debugger'] : [],
       legalComments: 'none',
-      minifyIdentifiers: true,
-      minifySyntax: true,
-      minifyWhitespace: true,
     },
     server: {
       port: 3000,
