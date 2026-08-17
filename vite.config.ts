@@ -12,8 +12,7 @@ export default defineConfig(({ mode }) => {
     define: {
       'process.env.API_KEY': JSON.stringify(apiKey),
       'process.env.GEMINI_API_KEY': JSON.stringify(apiKey),
-      'process.env.NODE_ENV': JSON.stringify(mode),
-      'global': 'window'
+      'process.env.NODE_ENV': JSON.stringify(mode)
     },
     esbuild: {
       drop: isProd ? ['debugger'] : [],
@@ -41,26 +40,6 @@ export default defineConfig(({ mode }) => {
       chunkSizeWarningLimit: 1500,
       rollupOptions: {
         output: {
-          manualChunks(id) {
-            if (id.includes('node_modules')) {
-              if (id.includes('react') || id.includes('react-dom')) {
-                return 'th_core';
-              }
-              if (id.includes('lucide-react')) {
-                return 'th_icons';
-              }
-              if (id.includes('recharts') || id.includes('d3')) {
-                return 'th_charts';
-              }
-              if (id.includes('jspdf') || id.includes('html2canvas')) {
-                return 'th_reports';
-              }
-              if (id.includes('@capacitor')) {
-                return 'th_native';
-              }
-              return 'th_vendor';
-            }
-          },
           entryFileNames: 'assets/[name]-[hash].js',
           chunkFileNames: 'assets/[name]-[hash].js',
           assetFileNames: 'assets/[name]-[hash].[ext]'
