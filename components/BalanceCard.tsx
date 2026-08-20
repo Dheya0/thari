@@ -4,10 +4,10 @@ import { Wallet, Sparkles, TrendingUp, Plane, Coins, Layers } from 'lucide-react
 import { DEFAULT_CURRENCIES } from '../constants';
 
 interface BalanceCardProps {
-  totalBalance: number;
-  totalIncome: number;
-  totalExpense: number;
-  symbol: string;
+  totalBalance?: number;
+  totalIncome?: number;
+  totalExpense?: number;
+  symbol?: string;
   balances?: Record<string, number>;
   expenseBreakdown?: Record<string, number>; // Breakdown of expenses per currency
   isTravelMode?: boolean;
@@ -15,10 +15,10 @@ interface BalanceCardProps {
 }
 
 const BalanceCard: React.FC<BalanceCardProps> = ({ 
-  totalBalance, 
-  totalIncome, 
-  totalExpense, 
-  symbol, 
+  totalBalance = 0, 
+  totalIncome = 0, 
+  totalExpense = 0, 
+  symbol = 'ر.س', 
   balances = {}, 
   expenseBreakdown = {}, 
   isTravelMode,
@@ -26,7 +26,10 @@ const BalanceCard: React.FC<BalanceCardProps> = ({
 }) => {
   const [viewMode, setViewMode] = useState<'consolidated' | 'separated'>(showSeparateCurrencies ? 'separated' : 'consolidated');
 
-  const currencyEntries = Object.entries(balances);
+  const currencyEntries = Object.entries(balances || {});
+  const safeTotalBalance = typeof totalBalance === 'number' && !isNaN(totalBalance) ? totalBalance : 0;
+  const safeTotalIncome = typeof totalIncome === 'number' && !isNaN(totalIncome) ? totalIncome : 0;
+  const safeTotalExpense = typeof totalExpense === 'number' && !isNaN(totalExpense) ? totalExpense : 0;
 
   return (
     <motion.div 
@@ -49,7 +52,7 @@ const BalanceCard: React.FC<BalanceCardProps> = ({
             {/* Big Balance Display */}
             <div className="flex items-baseline gap-1.5 overflow-hidden">
               <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-white tracking-tight truncate">
-                {totalBalance.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                {safeTotalBalance.toLocaleString(undefined, { maximumFractionDigits: 0 })}
               </h2>
               <span className="text-sm sm:text-lg text-slate-400 font-bold shrink-0">{symbol}</span>
             </div>
@@ -122,7 +125,7 @@ const BalanceCard: React.FC<BalanceCardProps> = ({
                       <span className="text-[9px] font-bold text-slate-400">{cSymbol}</span>
                     </div>
                     <span className={`text-sm sm:text-base font-black dir-ltr ${isNegative ? 'text-rose-400' : 'text-white'}`}>
-                      {val.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                      {(Number(val) || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}
                     </span>
                   </div>
                 );
@@ -138,7 +141,7 @@ const BalanceCard: React.FC<BalanceCardProps> = ({
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> التدفقات (الواردات)
             </span>
             <p className="text-base sm:text-lg font-black text-white dir-ltr text-right">
-              +{totalIncome.toLocaleString(undefined, { maximumFractionDigits: 0 })} <span className="text-[10px] font-bold text-slate-400">{symbol}</span>
+              +{safeTotalIncome.toLocaleString(undefined, { maximumFractionDigits: 0 })} <span className="text-[10px] font-bold text-slate-400">{symbol}</span>
             </p>
           </div>
           
@@ -147,7 +150,7 @@ const BalanceCard: React.FC<BalanceCardProps> = ({
               <span className="w-1.5 h-1.5 rounded-full bg-rose-500" /> الالتزامات (المصروفات)
             </span>
             <p className="text-base sm:text-lg font-black text-white dir-ltr text-right">
-              -{totalExpense.toLocaleString(undefined, { maximumFractionDigits: 0 })} <span className="text-[10px] font-bold text-slate-400">{symbol}</span>
+              -{safeTotalExpense.toLocaleString(undefined, { maximumFractionDigits: 0 })} <span className="text-[10px] font-bold text-slate-400">{symbol}</span>
             </p>
           </div>
         </div>

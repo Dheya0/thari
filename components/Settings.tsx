@@ -13,6 +13,7 @@ import { encryptData, decryptData } from '../services/encryptionService';
 import { authenticateBiometrics, checkBiometricAvailable } from '../services/biometricService';
 import { getIcon, DEFAULT_EXCHANGE_RATES } from '../constants';
 import { buildExecutiveCSVContent, exportAndShareExecutiveCSV } from '../utils/exportHelper';
+import { ReleaseAuditModal } from './ReleaseAuditModal';
 
 const COLORS = ['#f59e0b', '#10b981', '#3b82f6', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16', '#f43f5e', '#64748b'];
 const ICONS = ['Utensils', 'Car', 'Home', 'Receipt', 'Film', 'HeartPulse', 'GraduationCap', 'Briefcase', 'Wallet', 'CreditCard', 'ShoppingBag', 'Gift', 'PiggyBank', 'Coffee', 'Zap', 'Bus', 'Plane', 'Smartphone', 'ShieldCheck'];
@@ -218,6 +219,7 @@ const Settings: React.FC<SettingsProps> = ({
   }, []);
   
   const [showRatingModal, setShowRatingModal] = useState(false);
+  const [showReleaseAuditModal, setShowReleaseAuditModal] = useState(false);
   const [userRating, setUserRating] = useState(5);
   const [ratingComment, setRatingComment] = useState('');
 
@@ -1174,6 +1176,16 @@ const Settings: React.FC<SettingsProps> = ({
                       <span>{bioTestStatus === 'testing' ? 'جاري فحص المستشعر...' : 'اختبار فحص بصمة الجهاز الآن'}</span>
                     </button>
 
+                    {/* Release Candidate Audit Verification Button */}
+                    <button
+                      type="button"
+                      onClick={() => setShowReleaseAuditModal(true)}
+                      className="w-full py-3 bg-gradient-to-r from-amber-500/20 via-indigo-500/20 to-emerald-500/20 hover:from-amber-500/30 hover:to-emerald-500/30 border border-amber-500/40 text-amber-300 rounded-xl text-xs font-black active:scale-95 transition-all flex items-center justify-center gap-2 shadow-lg shadow-amber-500/5"
+                    >
+                      <ShieldCheck size={16} className="text-amber-400" />
+                      <span>تشغيل تدقيق الجاهزية للإنتاج (Release Candidate Audit)</span>
+                    </button>
+
                     {bioTestFeedback && (
                       <div className={`p-2.5 rounded-xl border text-[11px] font-bold flex items-center gap-2 ${bioTestStatus === 'success' ? 'bg-emerald-950/40 border-emerald-500/30 text-emerald-300' : 'bg-rose-950/40 border-rose-500/30 text-rose-300'}`}>
                         {bioTestStatus === 'success' ? <CheckCircle2 size={16} className="shrink-0 text-emerald-400" /> : <AlertCircle size={16} className="shrink-0 text-rose-400" />}
@@ -1933,6 +1945,10 @@ const Settings: React.FC<SettingsProps> = ({
             )}
           </div>
         </Modal>
+      )}
+
+      {showReleaseAuditModal && (
+        <ReleaseAuditModal onClose={() => setShowReleaseAuditModal(false)} />
       )}
 
       <ToastNotification toast={toast} />

@@ -1,11 +1,13 @@
 
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Plus, LayoutDashboard, History, Settings as SettingsIcon, Briefcase, HandCoins, Repeat, Coins, ArrowRight, Sparkles, Scale, Wallet as WalletIcon, Check, Plane, FileText, Download, ArrowUpRight, ArrowDownLeft, Calendar } from 'lucide-react';
-import { AppState, Transaction, Category, Debt } from './types';
+import { Plus, LayoutDashboard, History, Settings as SettingsIcon, Briefcase, HandCoins, Repeat, Coins, ArrowRight, Sparkles, Scale, Wallet as WalletIcon, Check, Plane, FileText, Download, ArrowUpRight, ArrowDownLeft, Calendar, ArrowLeftRight, Trash2, Wifi, WifiOff } from 'lucide-react';
+import { AppState, Transaction, Category, Debt, Account, RecurringRule, AuditLog } from './types';
 import { INITIAL_CATEGORIES, DEFAULT_CURRENCIES, DEFAULT_EXCHANGE_RATES, convertCurrency } from './constants';
 import { generateAndShareCSV, buildExecutiveCSVContent, exportAndShareExecutiveCSV } from './utils/exportHelper';
 import { saveSecureState, loadSecureState } from './utils/secureStorage';
+import { calculateConsolidatedPosition, calculateWalletBalances } from './services/balanceEngine';
+import { processDueRecurringRules } from './services/recurringService';
 import { Capacitor } from '@capacitor/core';
 import { App as CapApp } from '@capacitor/app';
 import { Filesystem, Directory } from '@capacitor/filesystem';
@@ -25,6 +27,10 @@ import WelcomeScreen from './components/WelcomeScreen';
 import LockScreen from './components/LockScreen';
 import Logo from './components/Logo';
 import FinancialReport from './components/FinancialReport';
+import { ReportModal } from './components/reports/ReportModal';
+import { TrashModal } from './components/TrashModal';
+import { RecurringManagerModal } from './components/RecurringManagerModal';
+import { SystemDiagnosticsModal } from './components/SystemDiagnosticsModal';
 import SmartAlerts from './components/SmartAlerts';
 import ZakatCalculator from './components/ZakatCalculator';
 import ExecutiveInsights from './components/ExecutiveInsights';
@@ -32,10 +38,25 @@ import CashflowSankey from './components/CashflowSankey';
 
 const STORAGE_KEY = 'thari_app_v4';
 
+const DEFAULT_ACCOUNTS: Account[] = [
+  {
+    id: 'acc-main',
+    name: 'الحساب الشخصي',
+    type: 'personal',
+    description: 'الحساب المالي الأساسي لإدارة المصاريف والدخل اليومي',
+    status: 'active',
+    createdAt: new Date().toISOString()
+  }
+];
+
 const INITIAL_STATE: AppState = {
+  accounts: DEFAULT_ACCOUNTS,
+  activeAccountId: 'acc-main',
   userName: 'مستخدم ثري',
   userEmail: '',
   transactions: [],
+  trashTransactions: [],
+  recurringRules: [],
   subscriptions: [],
   chatHistory: [],
   categories: INITIAL_CATEGORIES,
@@ -49,6 +70,7 @@ const INITIAL_STATE: AppState = {
   currency: DEFAULT_CURRENCIES[0], // Default to SAR
   currencies: DEFAULT_CURRENCIES,
   exchangeRates: DEFAULT_EXCHANGE_RATES,
+  auditLogs: [],
   isDarkMode: true,
   pin: null,
   isLocked: false,
@@ -61,6 +83,7 @@ const INITIAL_STATE: AppState = {
   autoLockTime: 'instant',
   autoBackupFrequency: 'daily',
   lastAutoBackupTime: '',
+  syncStatus: 'SYNCED',
 };
 
 const App: React.FC = () => {
@@ -88,6 +111,10 @@ const App: React.FC = () => {
               ? parsed.wallets
               : INITIAL_STATE.wallets;
 
+          const accounts = (parsed.accounts && Array.isArray(parsed.accounts) && parsed.accounts.length > 0)
+              ? parsed.accounts
+              : DEFAULT_ACCOUNTS;
+
           const exchangeRates = (parsed.exchangeRates && typeof parsed.exchangeRates === 'object')
               ? { ...DEFAULT_EXCHANGE_RATES, ...parsed.exchangeRates }
               : DEFAULT_EXCHANGE_RATES;
@@ -97,15 +124,20 @@ const App: React.FC = () => {
           return {
             ...INITIAL_STATE,
             ...parsed,
+            accounts: accounts,
+            activeAccountId: parsed.activeAccountId || accounts[0]?.id || 'acc-main',
             currency: activeCurrency,
             currencies: currencies,
             categories: categories,
             wallets: wallets,
             transactions: Array.isArray(parsed.transactions) ? parsed.transactions : [],
+            trashTransactions: Array.isArray(parsed.trashTransactions) ? parsed.trashTransactions : [],
+            recurringRules: Array.isArray(parsed.recurringRules) ? parsed.recurringRules : [],
             subscriptions: Array.isArray(parsed.subscriptions) ? parsed.subscriptions : [],
             debts: Array.isArray(parsed.debts) ? parsed.debts : [],
             goals: Array.isArray(parsed.goals) ? parsed.goals : [],
             budgets: Array.isArray(parsed.budgets) ? parsed.budgets : [],
+            auditLogs: Array.isArray(parsed.auditLogs) ? parsed.auditLogs : [],
             exchangeRates: exchangeRates,
             userEmail: parsed.userEmail || '',
             userName: parsed.userName || 'مستخدم ثري',
@@ -125,11 +157,17 @@ const App: React.FC = () => {
   const [printType, setPrintType] = useState<'summary' | 'detailed'>('summary');
   const [printWalletFilter, setPrintWalletFilter] = useState<string | null>(null);
   const [printCurrencyFilter, setPrintCurrencyFilter] = useState<string | null>(null);
+  const [printStartDate, setPrintStartDate] = useState<string | null>(null);
+  const [printEndDate, setPrintEndDate] = useState<string | null>(null);
+  const [showReportModal, setShowReportModal] = useState<boolean>(false);
+  const [showTrashModal, setShowTrashModal] = useState<boolean>(false);
+  const [showRecurringModal, setShowRecurringModal] = useState<boolean>(false);
+  const [showDiagnosticsModal, setShowDiagnosticsModal] = useState<boolean>(false);
   
   // Wallet Filter State (null = All Wallets)
   const [selectedWalletId, setSelectedWalletId] = useState<string | null>(null);
   const [timePeriodFilter, setTimePeriodFilter] = useState<'all' | 'today' | 'week' | 'month'>('all');
-  const [formDefaultType, setFormDefaultType] = useState<'expense' | 'income' | undefined>(undefined);
+  const [formDefaultType, setFormDefaultType] = useState<'expense' | 'income' | 'transfer' | undefined>(undefined);
 
   // Network Offline / Online State
   const [isOnline, setIsOnline] = useState<boolean>(typeof navigator !== 'undefined' ? navigator.onLine : true);
@@ -141,6 +179,23 @@ const App: React.FC = () => {
   const [installPrompt, setInstallPrompt] = useState<any>(null);
 
   const backgroundedAtRef = useRef<number | null>(null);
+
+  // Check and process due recurring transactions on initial mount
+  useEffect(() => {
+    if (state.recurringRules && state.recurringRules.length > 0) {
+      const { newTransactions, updatedRules } = processDueRecurringRules(
+        state.recurringRules,
+        state.transactions
+      );
+      if (newTransactions.length > 0) {
+        setState(prev => ({
+          ...prev,
+          transactions: [...newTransactions, ...prev.transactions],
+          recurringRules: updatedRules
+        }));
+      }
+    }
+  }, []);
 
   useEffect(() => {
     const handleOnline = () => {
@@ -311,52 +366,16 @@ const App: React.FC = () => {
       return list;
   }, [state.transactions, selectedWalletId, timePeriodFilter]);
 
-  // 2. Calculate Totals and Multi-Currency Breakdown
+  // 2. Calculate Totals and Multi-Currency Breakdown via Balance Engine
   const totals = useMemo(() => {
-    const txSource = filteredTransactions;
-    
-    // Calculate breakdowns per currency
-    const currencyBreakdown: Record<string, number> = {};
-    const expenseBreakdown: Record<string, number> = {};
-    
-    // Initialize currencies from wallets to ensure they appear even if 0
-    if (selectedWalletId) {
-        const w = state.wallets.find(w => w.id === selectedWalletId);
-        if (w) currencyBreakdown[w.currencyCode] = 0;
-    } else {
-        state.wallets.forEach(w => {
-            currencyBreakdown[w.currencyCode] = 0;
-        });
-    }
-
-    txSource.forEach(t => {
-        const currentVal = currencyBreakdown[t.currency] || 0;
-        const change = t.type === 'income' ? t.amount : -t.amount;
-        currencyBreakdown[t.currency] = currentVal + change;
-
-        if (t.type === 'expense') {
-            const currentExp = expenseBreakdown[t.currency] || 0;
-            expenseBreakdown[t.currency] = currentExp + t.amount;
-        }
-    });
-
-    // Total estimated balance in Display Currency (for the big number)
-    // We sum up all different currencies converted to the main display currency
-    const balance = Object.entries(currencyBreakdown).reduce((sum, [code, amount]) => {
-        return sum + convertCurrency(amount, code, state.currency.code, state.exchangeRates);
-    }, 0);
-    
-    // Income/Expense for period (converted for summary view)
-    const income = txSource
-        .filter(t => t.type === 'income')
-        .reduce((sum, t) => sum + convertCurrency(t.amount, t.currency, state.currency.code, state.exchangeRates), 0);
-
-    const expense = txSource
-        .filter(t => t.type === 'expense')
-        .reduce((sum, t) => sum + convertCurrency(t.amount, t.currency, state.currency.code, state.exchangeRates), 0);
-
-    return { income, expense, balance, currencyBreakdown, expenseBreakdown };
-  }, [filteredTransactions, state.wallets, state.currency, state.exchangeRates, selectedWalletId]);
+    return calculateConsolidatedPosition(
+      filteredTransactions,
+      state.wallets,
+      state.currency.code,
+      state.exchangeRates,
+      selectedWalletId
+    );
+  }, [filteredTransactions, state.wallets, state.currency.code, state.exchangeRates, selectedWalletId]);
 
   // Handle Wallet Selection & Currency Sync
   const handleSelectWallet = (id: string | null) => {
@@ -372,20 +391,36 @@ const App: React.FC = () => {
       }
   };
 
-  const handlePrint = (type: 'summary' | 'detailed', walletId?: string | null, currencyFilter?: string | null) => {
+  const handlePrint = (
+    type: 'summary' | 'detailed',
+    walletId?: string | null,
+    currencyFilter?: string | null,
+    startDate?: string | null,
+    endDate?: string | null
+  ) => {
     setPrintType(type);
     setPrintWalletFilter(walletId !== undefined ? walletId : selectedWalletId);
     setPrintCurrencyFilter(currencyFilter || null);
+    setPrintStartDate(startDate || null);
+    setPrintEndDate(endDate || null);
     // Give React time to update state and re-render FinancialReport before opening print dialog
     setTimeout(() => { 
       window.print(); 
     }, 600);
   };
 
-  const handleShare = async (type: 'summary' | 'detailed', walletId?: string | null, currencyFilter?: string | null) => {
+  const handleShare = async (
+    type: 'summary' | 'detailed',
+    walletId?: string | null,
+    currencyFilter?: string | null,
+    startDate?: string | null,
+    endDate?: string | null
+  ) => {
     setPrintType(type);
     setPrintWalletFilter(walletId !== undefined ? walletId : selectedWalletId);
     setPrintCurrencyFilter(currencyFilter || null);
+    setPrintStartDate(startDate || null);
+    setPrintEndDate(endDate || null);
     
     // Fallback to native print dialog which accurately renders Arabic text into PDFs
     // For mobile platforms, we trigger print where the user can save as PDF and share.
@@ -396,7 +431,12 @@ const App: React.FC = () => {
     }, 600);
   };
 
-  const handleExportExcelReport = (type: 'summary' | 'detailed' = 'detailed', currencyFilter?: string | null) => {
+  const handleExportExcelReport = (
+    type: 'summary' | 'detailed' = 'detailed',
+    currencyFilter?: string | null,
+    startDate?: string | null,
+    endDate?: string | null
+  ) => {
     const csvContent = buildExecutiveCSVContent({
       transactions: state.transactions,
       categories: state.categories,
@@ -406,7 +446,9 @@ const App: React.FC = () => {
       exchangeRates: state.exchangeRates,
       type,
       filterWalletId: selectedWalletId,
-      filterCurrency: currencyFilter || null
+      filterCurrency: currencyFilter || null,
+      startDate: startDate || null,
+      endDate: endDate || null,
     });
 
     const fileName = `Thari_Executive_Report_${type}_${new Date().toISOString().split('T')[0]}.csv`;
@@ -418,20 +460,119 @@ const App: React.FC = () => {
     setShowAddForm(true);
   };
 
+  // Soft Delete Handler
+  const handleDeleteTransaction = (id: string) => {
+    const target = state.transactions.find(t => t.id === id);
+    if (!target) return;
+
+    const deletedItem: Transaction = {
+      ...target,
+      isDeleted: true,
+      deletedAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    setState(p => ({
+      ...p,
+      transactions: p.transactions.filter(t => t.id !== id),
+      trashTransactions: [deletedItem, ...(p.trashTransactions || [])],
+    }));
+  };
+
+  const handleRestoreTransaction = (id: string) => {
+    const target = state.trashTransactions?.find(t => t.id === id);
+    if (!target) return;
+
+    const restoredItem: Transaction = {
+      ...target,
+      isDeleted: false,
+      deletedAt: undefined,
+      updatedAt: new Date().toISOString(),
+    };
+
+    setState(p => ({
+      ...p,
+      trashTransactions: (p.trashTransactions || []).filter(t => t.id !== id),
+      transactions: [restoredItem, ...p.transactions],
+    }));
+  };
+
+  const handlePermanentDelete = (id: string) => {
+    setState(p => ({
+      ...p,
+      trashTransactions: (p.trashTransactions || []).filter(t => t.id !== id),
+    }));
+  };
+
+  const handleEmptyTrash = () => {
+    setState(p => ({
+      ...p,
+      trashTransactions: [],
+    }));
+  };
+
+  // Recurring Rules Handlers
+  const handleToggleRecurringActive = (id: string) => {
+    setState(p => ({
+      ...p,
+      recurringRules: (p.recurringRules || []).map(r => r.id === id ? { ...r, isActive: !r.isActive } : r),
+    }));
+  };
+
+  const handleDeleteRecurringRule = (id: string) => {
+    setState(p => ({
+      ...p,
+      recurringRules: (p.recurringRules || []).filter(r => r.id !== id),
+    }));
+  };
+
+  const handleAddRecurringRule = (ruleData: Omit<RecurringRule, 'id' | 'createdAt'>) => {
+    const newRule: RecurringRule = {
+      ...ruleData,
+      id: `rec-${Date.now()}`,
+      createdAt: new Date().toISOString(),
+    };
+    setState(p => ({
+      ...p,
+      recurringRules: [newRule, ...(p.recurringRules || [])],
+    }));
+  };
+
+  const handleTriggerRecurringCatchup = () => {
+    if (state.recurringRules && state.recurringRules.length > 0) {
+      const { newTransactions, updatedRules } = processDueRecurringRules(
+        state.recurringRules,
+        state.transactions
+      );
+      if (newTransactions.length > 0) {
+        setState(prev => ({
+          ...prev,
+          transactions: [...newTransactions, ...prev.transactions],
+          recurringRules: updatedRules,
+        }));
+      }
+    }
+  };
+
+  const handleApplyRepairedState = (repairedState: AppState) => {
+    setState(repairedState);
+  };
+
   const handleSubmitTransaction = (txData: any) => {
     if (editingTransaction) {
         setState(p => ({
             ...p,
-            transactions: p.transactions.map(t => t.id === editingTransaction.id ? { ...txData, id: t.id } : t)
+            transactions: p.transactions.map(t => t.id === editingTransaction.id ? { ...txData, id: t.id, updatedAt: new Date().toISOString() } : t)
         }));
     } else {
         setState(p => ({ 
             ...p, 
-            transactions: [{ ...txData, id: 'tx-' + Date.now() }, ...p.transactions] 
+            transactions: [{ ...txData, id: 'tx-' + Date.now(), createdAt: new Date().toISOString() }, ...p.transactions] 
         }));
     }
     setShowAddForm(false);
     setEditingTransaction(null);
+    setFormDefaultType(undefined);
   };
 
   // ... (Debt handlers remain the same) ...
@@ -519,8 +660,10 @@ const App: React.FC = () => {
     return (
       <LockScreen 
         savedPin={state.pin} 
+        pinSalt={state.pinSalt}
         isBiometricEnabled={state.isBiometricEnabled !== false} 
         onUnlock={() => setState(p => ({ ...p, isLocked: false }))} 
+        onRehashPin={(newPinHash, newSalt) => setState(p => ({ ...p, pin: newPinHash, pinSalt: newSalt }))}
       />
     );
   }
@@ -546,13 +689,77 @@ const App: React.FC = () => {
         exchangeRates={state.exchangeRates}
         filterWalletId={printWalletFilter} 
         filterCurrency={printCurrencyFilter}
+        startDate={printStartDate}
+        endDate={printEndDate}
       />
       
       <div className="flex flex-col flex-1 print:hidden relative z-20 overflow-hidden">
         <header className="sticky top-0 shrink-0 px-4 pb-3 md:px-6 md:py-4 glass-effect border-b border-white/5 z-30 backdrop-blur-xl bg-slate-950/80" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 0.75rem)' }}>
           <div className="flex justify-between items-center max-w-6xl mx-auto w-full">
-            <Logo size={28} showText />
-            <div className="flex gap-2">
+            <div className="flex items-center gap-3">
+              <Logo size={28} showText />
+              {/* Online/Offline status pill */}
+              <div
+                className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold border transition-colors ${
+                  isOnline
+                    ? 'bg-emerald-950/40 border-emerald-500/30 text-emerald-400'
+                    : 'bg-rose-950/40 border-rose-500/30 text-rose-400'
+                }`}
+                title={isOnline ? 'بياناتك محفوظة محلياً ومتصل' : 'التطبيق يعمل بكفاءة أوفلاين 100%'}
+              >
+                {isOnline ? <Wifi size={11} /> : <WifiOff size={11} />}
+                <span>{isOnline ? 'متصل' : 'أوفلاين'}</span>
+              </div>
+            </div>
+
+            <div className="flex gap-2 items-center">
+              {/* System Diagnostics / Accounting Audit */}
+              <button
+                type="button"
+                onClick={() => setShowDiagnosticsModal(true)}
+                className="p-2 rounded-xl border border-white/10 text-slate-400 bg-white/5 hover:bg-white/10 hover:text-emerald-400 transition-all"
+                title="فحص تكامل البيانات والتدقيق المحاسبي"
+              >
+                <Scale size={16} />
+              </button>
+
+              {/* Recurring Rules Manager */}
+              <button
+                type="button"
+                onClick={() => setShowRecurringModal(true)}
+                className="relative p-2 rounded-xl border border-white/10 text-slate-400 bg-white/5 hover:bg-white/10 hover:text-amber-400 transition-all"
+                title="إدارة العمليات الدورية والمجدولة"
+              >
+                <Repeat size={16} />
+                {(state.recurringRules?.length || 0) > 0 && (
+                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-amber-500 text-slate-950 rounded-full text-[9px] font-black flex items-center justify-center shadow-md">
+                    {state.recurringRules.length}
+                  </span>
+                )}
+              </button>
+
+              {/* Trash Bin Quick Access */}
+              <button
+                type="button"
+                onClick={() => setShowTrashModal(true)}
+                className="relative p-2 rounded-xl border border-white/10 text-slate-400 bg-white/5 hover:bg-white/10 hover:text-rose-400 transition-all"
+                title="سلة المحذوفات"
+              >
+                <Trash2 size={16} />
+                {(state.trashTransactions?.length || 0) > 0 && (
+                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-rose-500 text-white rounded-full text-[9px] font-black flex items-center justify-center shadow-md animate-pulse">
+                    {state.trashTransactions.length}
+                  </span>
+                )}
+              </button>
+
+              <button 
+                onClick={() => setShowReportModal(true)} 
+                className="p-2 rounded-xl border border-white/10 text-slate-400 bg-white/5 hover:bg-white/10 hover:text-amber-400 transition-all" 
+                title="إصدار التقارير المالية"
+              >
+                <FileText size={16} />
+              </button>
               <button onClick={() => setActiveTab('chat')} className={`p-2 rounded-xl border border-white/10 transition-all ${activeTab === 'chat' ? 'bg-amber-500 text-slate-950 shadow-[0_0_20px_rgba(245,158,11,0.4)]' : 'text-slate-400 bg-white/5 hover:bg-white/10'}`} title="المستشار المالي"><Briefcase size={16} /></button>
               <button onClick={() => setActiveTab('settings')} className="flex items-center justify-center w-9 h-9 rounded-xl bg-slate-800/50 border border-slate-700 text-slate-500 hover:text-amber-500 hover:border-amber-500/50 transition-all shrink-0 active:scale-95 backdrop-blur-md" title="الإعدادات"><SettingsIcon size={16} /></button>
             </div>
@@ -624,7 +831,7 @@ const App: React.FC = () => {
 
                     {/* Mobile-First Quick Action Bar & Time Period Filter */}
                     <div className="lg:col-span-12 space-y-2.5">
-                        <div className="grid grid-cols-3 gap-2 sm:gap-3">
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
                             <motion.button 
                                 whileTap={{ scale: 0.95 }}
                                 onClick={() => { setEditingTransaction(null); setFormDefaultType('expense'); setShowAddForm(true); }}
@@ -641,6 +848,15 @@ const App: React.FC = () => {
                             >
                                 <ArrowUpRight size={16} className="shrink-0" />
                                 <span className="text-xs font-bold truncate">تسجيل دخل</span>
+                            </motion.button>
+
+                            <motion.button 
+                                whileTap={{ scale: 0.95 }}
+                                onClick={() => { setEditingTransaction(null); setFormDefaultType('transfer'); setShowAddForm(true); }}
+                                className="bg-blue-500/10 border border-blue-500/20 hover:border-blue-500/40 text-blue-400 p-2.5 sm:p-3 rounded-2xl flex items-center justify-center gap-1.5 sm:gap-2 transition-all active:scale-95 shadow-sm"
+                            >
+                                <ArrowLeftRight size={16} className="shrink-0" />
+                                <span className="text-xs font-bold truncate">تحويل بين المحافظ</span>
                             </motion.button>
 
                             <motion.button 
@@ -684,12 +900,12 @@ const App: React.FC = () => {
                     {/* LEFT COLUMN: Balance Card & Executive Insights */}
                     <div className="lg:col-span-6 space-y-6 w-full">
                         <BalanceCard 
-                            totalBalance={totals.balance} 
-                            totalIncome={totals.income} 
-                            totalExpense={totals.expense} 
+                            totalBalance={totals.netWorthInBase} 
+                            totalIncome={totals.totalIncomeInBase} 
+                            totalExpense={totals.totalExpenseInBase} 
                             symbol={state.currency.symbol}
-                            balances={totals.currencyBreakdown}
-                            expenseBreakdown={totals.expenseBreakdown}
+                            balances={totals.currencyBalances}
+                            expenseBreakdown={totals.expenseByCurrency}
                             showSeparateCurrencies={state.showSeparateCurrencies}
                         />
 
@@ -697,7 +913,7 @@ const App: React.FC = () => {
                             transactions={filteredTransactions}
                             budgets={state.budgets}
                             debts={state.debts}
-                            totalBalance={totals.balance}
+                            totalBalance={totals.netWorthInBase}
                             currencySymbol={state.currency.symbol}
                         />
                     </div>
@@ -716,10 +932,10 @@ const App: React.FC = () => {
                             <button onClick={() => setActiveTab('transactions')} className="text-amber-500 text-[10px] font-black uppercase flex items-center gap-1 hover:text-amber-400 transition-colors">عرض الكل <ArrowRight size={11} className="rotate-180" /></button>
                           </div>
                           <TransactionList 
-                            transactions={filteredTransactions.slice(0, 3)} 
+                            transactions={filteredTransactions.slice(0, 5)} 
                             categories={state.categories} 
                             wallets={state.wallets} 
-                            onDelete={(id) => setState(p => ({ ...p, transactions: p.transactions.filter(t => t.id !== id) }))} 
+                            onDelete={handleDeleteTransaction} 
                             onEdit={handleEditTransaction} 
                             currencySymbol={state.currency.symbol}
                             currentCurrencyCode={state.currency.code}
@@ -736,7 +952,7 @@ const App: React.FC = () => {
                 {activeTab === 'chat' && <AIChat history={state.chatHistory} transactions={filteredTransactions} categories={state.categories} currency={state.currency.symbol} onSendMessage={(msg) => setState(p => ({ ...p, chatHistory: [...p.chatHistory, msg].slice(-30) }))} apiKey={state.apiKey} />}
                 {activeTab === 'debts' && <DebtManager debts={state.debts} wallets={state.wallets} onAddDebt={handleAddDebt} onUpdateDebt={handleUpdateDebt} onSettleDebt={handleSettleDebt} onPayDebt={handlePayDebt} onDeleteDebt={(id) => setState(p => ({ ...p, debts: p.debts.filter(d => d.id !== id) }))} currencySymbol={state.currency.symbol} currencyCode={state.currency.code} />}
                 {activeTab === 'subscriptions' && <SubscriptionManager subscriptions={state.subscriptions} categories={state.categories} onAdd={(sub) => setState(p => ({ ...p, subscriptions: [{...sub, id: 's-'+Date.now()}, ...p.subscriptions] }))} onRemove={(id) => setState(p => ({ ...p, subscriptions: p.subscriptions.filter(s => s.id !== id) }))} currencySymbol={state.currency.symbol} />}
-                {activeTab === 'zakat' && <ZakatCalculator totalBalance={totals.balance} currencySymbol={state.currency.symbol} debts={state.debts} />}
+                {activeTab === 'zakat' && <ZakatCalculator totalBalance={totals.netWorthInBase} currencySymbol={state.currency.symbol} debts={state.debts} />}
                 
                 {activeTab === 'transactions' && (
                     <div className="space-y-8">
@@ -758,7 +974,7 @@ const App: React.FC = () => {
                             transactions={filteredTransactions} 
                             categories={state.categories} 
                             wallets={state.wallets} 
-                            onDelete={(id) => setState(p => ({...p, transactions: p.transactions.filter(t => t.id !== id)}))} 
+                            onDelete={handleDeleteTransaction} 
                             onEdit={handleEditTransaction} 
                             currencySymbol={state.currency.symbol}
                             currentCurrencyCode={state.currency.code}
@@ -844,6 +1060,58 @@ const App: React.FC = () => {
         )}
 
         <AnimatePresence>
+          {showTrashModal && (
+            <TrashModal
+              isOpen={showTrashModal}
+              onClose={() => setShowTrashModal(false)}
+              trashTransactions={state.trashTransactions || []}
+              categories={state.categories}
+              wallets={state.wallets}
+              currencies={state.currencies}
+              onRestore={handleRestoreTransaction}
+              onPermanentDelete={handlePermanentDelete}
+              onEmptyTrash={handleEmptyTrash}
+            />
+          )}
+          {showReportModal && (
+            <ReportModal
+              isOpen={showReportModal}
+              onClose={() => setShowReportModal(false)}
+              transactions={state.transactions}
+              categories={state.categories}
+              wallets={state.wallets}
+              currencies={state.currencies}
+              currentCurrency={state.currency}
+              userName={state.userName}
+              exchangeRates={state.exchangeRates}
+              initialType={printType}
+              initialWalletId={selectedWalletId}
+              initialCurrencyCode={printCurrencyFilter}
+              onTriggerPrint={handlePrint}
+            />
+          )}
+          {showRecurringModal && (
+            <RecurringManagerModal
+              isOpen={showRecurringModal}
+              onClose={() => setShowRecurringModal(false)}
+              rules={state.recurringRules || []}
+              wallets={state.wallets}
+              categories={state.categories}
+              currencies={state.currencies}
+              onToggleActive={handleToggleRecurringActive}
+              onDeleteRule={handleDeleteRecurringRule}
+              onAddRule={handleAddRecurringRule}
+              onTriggerCatchup={handleTriggerRecurringCatchup}
+            />
+          )}
+          {showDiagnosticsModal && (
+            <SystemDiagnosticsModal
+              isOpen={showDiagnosticsModal}
+              onClose={() => setShowDiagnosticsModal(false)}
+              state={state}
+              onApplyRepairedState={handleApplyRepairedState}
+            />
+          )}
           {showAddForm && (
               <TransactionForm categories={state.categories} wallets={state.wallets} onSubmit={handleSubmitTransaction} onClose={() => { setShowAddForm(false); setEditingTransaction(null); setFormDefaultType(undefined); }} initialData={editingTransaction} defaultType={formDefaultType} exchangeRates={state.exchangeRates} />
           )}

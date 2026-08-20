@@ -6,35 +6,39 @@ interface ExecutiveInsightsProps {
   transactions: Transaction[];
   budgets: Budget[];
   debts: Debt[];
-  totalBalance: number;
+  totalBalance?: number;
   currencySymbol: string;
 }
 
-const ExecutiveInsights: React.FC<ExecutiveInsightsProps> = ({ transactions, budgets, debts, totalBalance, currencySymbol }) => {
+const ExecutiveInsights: React.FC<ExecutiveInsightsProps> = ({ transactions = [], budgets = [], debts = [], totalBalance = 0, currencySymbol = 'ر.س' }) => {
   const calculations = useMemo(() => {
+    const safeTotalBalance = typeof totalBalance === 'number' && !isNaN(totalBalance) ? totalBalance : 0;
+    const safeTransactions = transactions || [];
+    const safeDebts = debts || [];
+
     // 30 days of transactions for active burn rate calculation
     const currentDate = new Date();
-    const last30Days = transactions.filter(t => {
+    const last30Days = safeTransactions.filter(t => {
       const transDate = new Date(t.date);
       const diffTime = Math.abs(currentDate.getTime() - transDate.getTime());
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
       return diffDays <= 30;
     });
 
-    const totalIncome = transactions.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
-    const totalExpense = transactions.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
+    const totalIncome = safeTransactions.filter(t => t.type === 'income').reduce((s, t) => s + (Number(t.amount) || 0), 0);
+    const totalExpense = safeTransactions.filter(t => t.type === 'expense').reduce((s, t) => s + (Number(t.amount) || 0), 0);
     
     // Monthly burn rate (default to general average if no 30 days transactions exist)
-    let burnRate = last30Days.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
+    let burnRate = last30Days.filter(t => t.type === 'expense').reduce((s, t) => s + (Number(t.amount) || 0), 0);
     if (burnRate === 0) {
-      burnRate = totalExpense > 0 ? (totalExpense / Math.max(1, Math.ceil(transactions.length / 5))) : 0;
+      burnRate = totalExpense > 0 ? (totalExpense / Math.max(1, Math.ceil(safeTransactions.length / 5))) : 0;
     }
 
     // Runway (شهور الأمان المالي)
-    const runwayMonths = burnRate > 0 ? (totalBalance / burnRate) : Infinity;
+    const runwayMonths = burnRate > 0 ? (safeTotalBalance / burnRate) : Infinity;
 
     // Active Debts
-    const activeDebts = debts.filter(d => !d.isPaid && d.type === 'on_me').reduce((s, d) => s + d.amount, 0);
+    const activeDebts = safeDebts.filter(d => !d.isPaid && d.type === 'on_me').reduce((s, d) => s + (Number(d.amount) || 0), 0);
 
     // Savings rate
     const savingsRatio = totalIncome > 0 ? ((totalIncome - totalExpense) / totalIncome) * 100 : 0;

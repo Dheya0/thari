@@ -54,30 +54,81 @@ export const DEFAULT_EXCHANGE_RATES: Record<string, number> = {
   YER: 1 / 430.0,
 };
 
-// Helper to convert amounts accurately using provided rates
+export interface CurrencyConversionResult {
+  status: 'SUCCESS' | 'RATE_UNAVAILABLE' | 'SAME_CURRENCY';
+  convertedAmount: number | null;
+  effectiveRate: number | null;
+  fromCode: string;
+  toCode: string;
+  source: 'direct' | 'calculated' | 'identity' | 'missing';
+  timestamp: string;
+}
+
+// Strict conversion function that never silences missing rates
+export const tryConvertCurrency = (
+  amount: number,
+  fromCode: string,
+  toCode: string,
+  customRates: Record<string, number> = DEFAULT_EXCHANGE_RATES
+): CurrencyConversionResult => {
+  const timestamp = new Date().toISOString();
+  if (fromCode === toCode) {
+    return {
+      status: 'SAME_CURRENCY',
+      convertedAmount: amount,
+      effectiveRate: 1.0,
+      fromCode,
+      toCode,
+      source: 'identity',
+      timestamp,
+    };
+  }
+
+  const normalizedFrom = fromCode === 'YER' ? 'YER_ADEN' : fromCode;
+  const normalizedTo = toCode === 'YER' ? 'YER_ADEN' : toCode;
+
+  const fromRate = customRates[normalizedFrom] ?? DEFAULT_EXCHANGE_RATES[normalizedFrom];
+  const toRate = customRates[normalizedTo] ?? DEFAULT_EXCHANGE_RATES[normalizedTo];
+
+  if (!fromRate || !toRate || fromRate <= 0 || toRate <= 0) {
+    return {
+      status: 'RATE_UNAVAILABLE',
+      convertedAmount: null,
+      effectiveRate: null,
+      fromCode,
+      toCode,
+      source: 'missing',
+      timestamp,
+    };
+  }
+
+  const effectiveRate = fromRate / toRate;
+  const convertedAmount = amount * effectiveRate;
+
+  return {
+    status: 'SUCCESS',
+    convertedAmount,
+    effectiveRate,
+    fromCode,
+    toCode,
+    source: 'calculated',
+    timestamp,
+  };
+};
+
+// Helper to convert amounts accurately using provided rates (with fallback to 0 / unchanged if requested)
 export const convertCurrency = (
   amount: number, 
   fromCode: string, 
   toCode: string, 
   customRates: Record<string, number> = DEFAULT_EXCHANGE_RATES
 ): number => {
-  if (fromCode === toCode) return amount;
-  
-  // تطبيع الكود القديم إن وجد
-  const normalizedFrom = fromCode === 'YER' ? 'YER_ADEN' : fromCode;
-  const normalizedTo = toCode === 'YER' ? 'YER_ADEN' : toCode;
-
-  // Get rates relative to SAR
-  const fromRate = customRates[normalizedFrom] || DEFAULT_EXCHANGE_RATES[normalizedFrom] || 0;
-  const toRate = customRates[normalizedTo] || DEFAULT_EXCHANGE_RATES[normalizedTo] || 0;
-
-  if (fromRate === 0 || toRate === 0) return amount;
-
-  // Step 1: Convert 'from' currency to SAR
-  const amountInSAR = amount * fromRate;
-
-  // Step 2: Convert SAR to 'to' currency
-  return amountInSAR / toRate;
+  const res = tryConvertCurrency(amount, fromCode, toCode, customRates);
+  if (res.status === 'SUCCESS' || res.status === 'SAME_CURRENCY') {
+    return res.convertedAmount ?? amount;
+  }
+  // Return original amount in case of failure to maintain numerical continuity
+  return amount;
 };
 
 export const INITIAL_CATEGORIES: Category[] = [

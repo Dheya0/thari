@@ -2,12 +2,12 @@ import React, { useState, useMemo } from 'react';
 import { Coins, Scale, TrendingDown, TrendingUp, Info, CheckCircle2, XCircle, ChevronDown, ChevronUp, Landmark, FileText, Sparkles, AlertCircle } from 'lucide-react';
 
 interface ZakatCalculatorProps {
-  totalBalance: number; // الرصيد الحالي من التطبيق للمساعدة
-  currencySymbol: string;
+  totalBalance?: number; // الرصيد الحالي من التطبيق للمساعدة
+  currencySymbol?: string;
   debts?: any[];
 }
 
-const ZakatCalculator: React.FC<ZakatCalculatorProps> = ({ totalBalance, currencySymbol, debts = [] }) => {
+const ZakatCalculator: React.FC<ZakatCalculatorProps> = ({ totalBalance = 0, currencySymbol = 'ر.س', debts = [] }) => {
   // أسعار افتراضية للذهب والفضة
   const [goldPrice, setGoldPrice] = useState(285); // سعر جرام الذهب عيار 24 الأساسي
 
@@ -18,7 +18,10 @@ const ZakatCalculator: React.FC<ZakatCalculatorProps> = ({ totalBalance, currenc
   const [silverWeight, setSilverWeight] = useState('');
 
   // الأصول والمدخرات والسيولة
-  const [cash, setCash] = useState(totalBalance.toFixed(2));
+  const [cash, setCash] = useState(() => {
+    const val = typeof totalBalance === 'number' && !isNaN(totalBalance) ? totalBalance : 0;
+    return val.toFixed(2);
+  });
   
   // المحافظ والأسهم
   const [tradingStocks, setTradingStocks] = useState(''); // أسهم مضاربة ومتاجرة (تزكى كأورق تجارية بسعر السوق كاملة)

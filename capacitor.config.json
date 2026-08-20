@@ -1,9 +1,8 @@
 
 {
   "appId": "com.thari.finance.app",
-  "appName": "Thari",
+  "appName": "ثري",
   "webDir": "dist",
-  "bundledWebRuntime": false,
   "server": {
     "androidScheme": "https",
     "cleartext": true
