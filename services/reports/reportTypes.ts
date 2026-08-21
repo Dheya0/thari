@@ -112,6 +112,10 @@ export interface ReportLedgerEntry {
   categoryIcon: string;
   walletId: string;
   walletName: string;
+  walletCurrencyCode?: string;
+  walletDeductionAmount?: number;
+  isCrossCurrencyWithWallet?: boolean;
+  exchangeRateToWallet?: number;
   note: string;
   originalAmount: number;
   currencyCode: string;

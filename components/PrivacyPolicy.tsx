@@ -80,8 +80,8 @@ const PrivacyPolicy: React.FC<PrivacyPolicyProps> = ({ onBack }) => {
         </section>
 
         <div className="pt-10 border-t border-slate-100 dark:border-slate-800 text-center">
-          <p className="text-xs text-slate-400 font-bold mb-4">إذا كان لديك أي استفسار حول الخصوصية، تواصل معنا:</p>
-          <a href="mailto:support@thari.app" className="text-amber-600 font-black text-sm hover:underline">support@thari.app</a>
+          <p className="text-xs text-slate-400 font-bold mb-2">تطبيق ثري - خصوصية تامة وحماية مشفرة على جهازك</p>
+          <p className="text-xs text-amber-500 font-bold">جميع الحقوق محفوظة © {new Date().getFullYear()}</p>
         </div>
       </div>
     </div>

@@ -218,15 +218,25 @@ const Settings: React.FC<SettingsProps> = ({
     return () => { isMounted = false; };
   }, []);
   
-  const [showRatingModal, setShowRatingModal] = useState(false);
   const [showReleaseAuditModal, setShowReleaseAuditModal] = useState(false);
-  const [userRating, setUserRating] = useState(5);
-  const [ratingComment, setRatingComment] = useState('');
 
-  const [showSupportModal, setShowSupportModal] = useState(false);
-  const [supportMessage, setSupportMessage] = useState('');
-  const [supportType, setSupportType] = useState<'suggestion' | 'problem' | 'general'>('general');
-  
+  // Direct App Store / Play Store Rating Redirect
+  const handleDirectStoreRating = () => {
+    const isIOSPlatform = typeof window !== 'undefined' && (/iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
+    
+    showToast('جاري التحويل لصفحة تقييم التطبيق في المتجر...');
+    
+    if (isIOSPlatform) {
+      window.open('https://apps.apple.com/app/id64762459927?action=write-review', '_blank');
+    } else {
+      window.open('https://play.google.com/store/apps/details?id=com.thari.finance.app', '_blank');
+    }
+  };
+
+  const handleSupportClick = () => {
+    showToast('خدمة الدعم الفني المباشر ستنطلق رسمياً مع إطلاق النسخة على متاجر التطبيقات.');
+  };
+
   const [toast, setToast] = useState<{message: string, type: 'success' | 'error'} | null>(null);
   const [confirmData, setConfirmData] = useState<{message: string, action: () => void, title?: string, type?: 'danger' | 'info'} | null>(null);
 
@@ -248,28 +258,16 @@ const Settings: React.FC<SettingsProps> = ({
       showToast('تم تفعيل التنبيهات الذكية بنجاح!');
     }
   };
-
-  const handleSendSupport = () => {
-    if (!supportMessage.trim()) {
-      showToast('يرجى كتابة الرسالة قبل الإرسال', 'error');
-      return;
-    }
-    showToast('تم إرسال رسالتك لفريق تطوير ثري بنجاح!');
-    setSupportMessage('');
-    setShowSupportModal(false);
-  };
-
-  const handleRatingSubmit = () => {
-    if (userRating === 0) {
-      showToast('يرجى اختيار التقييم قبل الإرسال', 'error');
-      return;
-    }
-    showToast('شكراً لتقييمك الرائع! تم حفظ التقييم بنجاح.');
-    setShowRatingModal(false);
-  };
   
   const [showAddCurrencyForm, setShowAddCurrencyForm] = useState(false);
   const [newCurrency, setNewCurrency] = useState({ name: '', code: '', symbol: '' });
+  const [crossAlertPreference, setCrossAlertPreference] = useState(() => {
+    try {
+      return localStorage.getItem('thari_hide_cross_currency_alert') === 'true';
+    } catch {
+      return false;
+    }
+  });
 
   // Wallet Form State
   const [showWalletForm, setShowWalletForm] = useState(false);
@@ -705,6 +703,42 @@ const Settings: React.FC<SettingsProps> = ({
            <button onClick={() => setShowAddCurrencyForm(true)} className="w-full py-5 bg-amber-500/10 text-amber-500 font-black rounded-2xl border border-amber-500/20 flex items-center justify-center gap-2 active:scale-95">
               <Plus size={20} /> إضافة عملة جديدة
            </button>
+
+           {/* Cross-Currency Notification Preference */}
+           <div className="bg-slate-900 p-4 rounded-2xl border border-slate-800 flex items-center justify-between">
+              <div className="text-right space-y-0.5">
+                <span className="text-xs font-black text-white block">إشعار وفروقات العملات عند تسجيل العمليات</span>
+                <span className="text-[10px] text-slate-400 block">
+                  {crossAlertPreference
+                    ? 'التنبيه التلقائي معطل حالياً (إخفاء دائم)'
+                    : 'التنبيه التلقائي مفعل (يظهر عند اختلاف عملة المعاملة عن المحفظة)'}
+                </span>
+              </div>
+              <button
+                onClick={() => {
+                  if (crossAlertPreference) {
+                    try {
+                      localStorage.removeItem('thari_hide_cross_currency_alert');
+                    } catch {}
+                    setCrossAlertPreference(false);
+                    showToast('تم إعادة تفعيل تنبيه العملات المتعددة');
+                  } else {
+                    try {
+                      localStorage.setItem('thari_hide_cross_currency_alert', 'true');
+                    } catch {}
+                    setCrossAlertPreference(true);
+                    showToast('تم تعطيل التنبيه التلقائي (إخفاء دائم)');
+                  }
+                }}
+                className={`px-3 py-1.5 rounded-xl text-xs font-black border transition-all ${
+                  crossAlertPreference
+                    ? 'bg-slate-800 text-amber-400 border-amber-500/30'
+                    : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                }`}
+              >
+                {crossAlertPreference ? 'إعادة التفعيل' : 'مفعّل'}
+              </button>
+           </div>
         </div>
         
         {/* Modals ... */}
@@ -757,14 +791,26 @@ const Settings: React.FC<SettingsProps> = ({
         </div>
         
         {showWalletForm && (
-            <Modal title={editingWallet ? "تعديل محفظة" : "إضافة محفظة"} onClose={() => setShowWalletForm(false)}>
-                <div className="space-y-6">
-                    <InputField label="اسم المحفظة" value={walletData.name} onChange={(v: string) => setWalletData({...walletData, name: v})} placeholder="كاش، راتب..." />
+            <Modal title={editingWallet ? "تعديل محفظة مالية" : "إضافة محفظة مالية"} onClose={() => setShowWalletForm(false)}>
+                <div className="space-y-5">
+                    <InputField label="اسم المحفظة" value={walletData.name} onChange={(v: string) => setWalletData({...walletData, name: v})} placeholder="كاش، بنك، محفظة يمنية، حساب استثماري..." />
                     <div className="space-y-2">
-                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2">العملة</label>
-                        <select value={walletData.currencyCode} onChange={e => setWalletData({...walletData, currencyCode: e.target.value})} className="w-full p-4 rounded-2xl bg-slate-950 border border-slate-800 text-white font-bold outline-none">
-                            {safeCurrencies.map(c => <option key={c.code} value={c.code}>{c.name} ({c.code})</option>)}
+                        <div className="flex items-center justify-between px-1">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">العملة الأساسية للمحفظة</label>
+                          <span className="text-[9.5px] font-bold text-amber-400">تدعم العملات المتعددة</span>
+                        </div>
+                        <select value={walletData.currencyCode} onChange={e => setWalletData({...walletData, currencyCode: e.target.value})} className="w-full p-4 rounded-2xl bg-slate-950 border border-slate-800 text-white font-bold outline-none cursor-pointer hover:border-slate-700">
+                            {safeCurrencies.map(c => <option key={c.code} value={c.code}>{c.name} ({c.code} - {c.symbol})</option>)}
                         </select>
+                        <div className="p-3 bg-slate-950/70 rounded-xl border border-white/5 text-[10.5px] text-slate-400 leading-relaxed font-medium space-y-1">
+                          <div className="flex items-center gap-1.5 text-amber-300 font-black">
+                            <Sparkles size={13} />
+                            <span>مرونة العملات المزدوجة والمباشرة:</span>
+                          </div>
+                          <p>
+                            يمكنك إجراء أي معاملة (مصروف/وارد) بأي عملة تريدها دون الحاجة للتبديل بين المحافظ، وسيتم تحويل وخصم المعادل تلقائياً من رصيد المحفظة بهذه العملة الأساسية.
+                          </p>
+                        </div>
                     </div>
                     <ColorPicker selected={walletData.color} onSelect={c => setWalletData({...walletData, color: c})} />
                     <ActionButton label="حفظ المحفظة" onClick={saveWallet} />
@@ -1461,20 +1507,21 @@ const Settings: React.FC<SettingsProps> = ({
                         </div>
                     </div>
                     <button 
-                      onClick={() => setShowRatingModal(true)}
-                      className="px-3.5 py-2 bg-amber-500 text-slate-950 font-black text-xs rounded-xl active:scale-95 shadow-md shrink-0"
+                      onClick={handleDirectStoreRating}
+                      className="px-3.5 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs rounded-xl active:scale-95 shadow-md shrink-0 transition-all flex items-center gap-1.5"
                     >
-                        تقييم التطبيق
+                        <Star size={14} className="fill-slate-950" />
+                        <span>تقييم التطبيق في المتجر</span>
                     </button>
                 </div>
 
                 <div className="grid grid-cols-2 gap-2.5">
                     <button 
-                      onClick={() => setShowSupportModal(true)}
+                      onClick={handleSupportClick}
                       className="flex items-center justify-center gap-2 p-3 bg-slate-800/80 rounded-xl active:scale-95 text-slate-200 border border-slate-700/60 hover:border-amber-500/30 text-xs font-bold"
                     >
                         <MessageSquare size={16} className="text-amber-400" />
-                        <span>تواصل مع الدعم</span>
+                        <span>الدعم الفني المباشر</span>
                     </button>
                     <button 
                       onClick={onShowPrivacyPolicy}
@@ -1724,92 +1771,6 @@ const Settings: React.FC<SettingsProps> = ({
                     </div>
                 </div>
             </Modal>
-      )}
-
-      {/* Store Rating Modal */}
-      {showRatingModal && (
-        <Modal title="تقييم تطبيق ثري" onClose={() => setShowRatingModal(false)}>
-          <div className="space-y-6 text-center">
-            <div className="w-16 h-16 bg-amber-500/10 border border-amber-500/20 text-amber-500 rounded-3xl flex items-center justify-center mx-auto shadow-lg">
-              <Star size={32} className="fill-amber-500" />
-            </div>
-            <div>
-              <h4 className="text-lg font-black text-white">ما هو تقييمك لتطبيق "ثري"؟</h4>
-              <p className="text-xs text-slate-400 font-bold mt-1">رأيك يهمنا لمواصلة تطوير وتحسين الميزات المالية</p>
-            </div>
-
-            <div className="flex justify-center gap-2 py-2">
-              {[1, 2, 3, 4, 5].map((s) => (
-                <button
-                  key={s}
-                  type="button"
-                  onClick={() => setUserRating(s)}
-                  className="p-2 transition-transform active:scale-125"
-                >
-                  <Star
-                    size={32}
-                    className={s <= userRating ? "text-amber-500 fill-amber-500" : "text-slate-700"}
-                  />
-                </button>
-              ))}
-            </div>
-
-            <ActionButton label="ارسال التقييم" onClick={handleRatingSubmit} />
-          </div>
-        </Modal>
-      )}
-
-      {/* Support & Feedback Modal */}
-      {showSupportModal && (
-        <Modal title="التواصل مع الدعم الفني" onClose={() => setShowSupportModal(false)}>
-          <div className="space-y-5 text-right">
-            <div className="bg-slate-950 p-3.5 rounded-2xl border border-slate-800 space-y-1">
-              <p className="text-xs font-bold text-white flex items-center gap-2">
-                <HelpCircle size={16} className="text-amber-500" /> مركز دعم المستخدمين
-              </p>
-              <p className="text-[10px] text-slate-400 font-bold leading-relaxed">
-                يسعدنا تلقي ملاحظاتك واقتراحاتك لتطوير التطبيق أو الإبلاغ عن أي مشكلة برمجية مباشرة لفريق الدعم الفني:
-                <span className="text-amber-400 font-mono block mt-1 dir-ltr">support@thari.app</span>
-              </p>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">نوع الرسالة</label>
-              <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-800">
-                <button 
-                  onClick={() => setSupportType('general')}
-                  className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${supportType === 'general' ? 'bg-amber-500 text-slate-950' : 'text-slate-400'}`}
-                >
-                  عام
-                </button>
-                <button 
-                  onClick={() => setSupportType('suggestion')}
-                  className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${supportType === 'suggestion' ? 'bg-amber-500 text-slate-950' : 'text-slate-400'}`}
-                >
-                  اقتراح
-                </button>
-                <button 
-                  onClick={() => setSupportType('problem')}
-                  className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${supportType === 'problem' ? 'bg-amber-500 text-slate-950' : 'text-slate-400'}`}
-                >
-                  مشكلة
-                </button>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">نص الملاحظة أو الاقتراح</label>
-              <textarea
-                value={supportMessage}
-                onChange={e => setSupportMessage(e.target.value)}
-                placeholder="اكتب استفسارك أو ملاحظتك بالتفصيل..."
-                className="w-full h-32 p-4 rounded-2xl bg-slate-950 border border-slate-800 text-white font-bold text-xs outline-none focus:border-amber-500 transition-all resize-none"
-              />
-            </div>
-
-            <ActionButton label="إرسال الدعم" onClick={handleSendSupport} />
-          </div>
-        </Modal>
       )}
 
       {/* Email Backup & Export Modal */}

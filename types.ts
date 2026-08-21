@@ -25,7 +25,9 @@ export interface Wallet {
   id: string;
   accountId?: string;
   name: string;
-  currencyCode: string;
+  currencyCode: string; // العملة الأساسية للمحفظة Primary Currency
+  secondaryCurrencies?: string[]; // العملات الإضافية المدعومة
+  isMultiCurrency?: boolean;
   color: string;
   type?: 'cash' | 'bank' | 'savings' | 'ewallet';
   openingBalance?: number;
@@ -53,6 +55,9 @@ export interface Transaction {
   currency: string;
   destinationCurrency?: string; // Cross-currency transfer
   destinationAmount?: number;   // Amount in destination currency
+  walletCurrency?: string;      // العملة الأساسية للمحفظة المصدر
+  convertedAmountInWalletCurrency?: number; // المبلغ المحول والمخصوم فعلياً من المحفظة
+  exchangeRateUsed?: number;    // سعر الصرف المعتمد وقت العملية
   categoryId: string;
   type: TransactionType;
   amount: number;

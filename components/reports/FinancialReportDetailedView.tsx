@@ -163,8 +163,15 @@ export const FinancialReportDetailedView: React.FC<DetailedViewProps> = ({ model
                           isIncome ? 'text-emerald-700' : 'text-rose-700'
                         }`}
                       >
-                        {isIncome ? '+' : '-'}{t.originalAmount.toLocaleString(undefined, { maximumFractionDigits: 2 })}{' '}
-                        <span className="text-[9px] font-semibold text-slate-500">{t.currencySymbol}</span>
+                        <div>
+                          {isIncome ? '+' : '-'}{t.originalAmount.toLocaleString(undefined, { maximumFractionDigits: 2 })}{' '}
+                          <span className="text-[9px] font-semibold text-slate-500">{t.currencySymbol}</span>
+                        </div>
+                        {t.isCrossCurrencyWithWallet && t.walletDeductionAmount !== undefined && (
+                          <div className="text-[8.5px] font-normal text-amber-700 dir-rtl text-right mt-0.5">
+                            المقيد بالمحفظة: {t.walletDeductionAmount.toLocaleString(undefined, { maximumFractionDigits: 1 })} {t.walletCurrencyCode}
+                          </div>
+                        )}
                       </td>
 
                       {/* Converted Target Amount */}

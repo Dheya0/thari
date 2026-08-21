@@ -1,7 +1,7 @@
 /**
  * THARI Financial Application — Core Balance & Ledger Engine
  * Single Source of Truth for financial calculations, multi-wallet balance tracking,
- * multi-currency ledger calculation, transfer consistency, and mathematical audits.
+ * multi-currency ledger calculation, cross-currency spending, transfer consistency, and mathematical audits.
  */
 
 import { Transaction, Wallet, Currency } from '../types';
@@ -44,11 +44,14 @@ export function getActiveTransactions(transactions: Transaction[]): Transaction[
 }
 
 /**
- * Calculate precise balance for each wallet independently
+ * Calculate precise balance for each wallet independently.
+ * Accurately converts transaction amounts to the wallet's native currency
+ * when a transaction is recorded in a different currency (e.g. spending $100 from a Yemeni wallet).
  */
 export function calculateWalletBalances(
   wallets: Wallet[],
-  transactions: Transaction[]
+  transactions: Transaction[],
+  exchangeRates: Record<string, number> = DEFAULT_EXCHANGE_RATES
 ): Record<string, WalletBalanceSummary> {
   const activeTxs = getActiveTransactions(transactions);
   const result: Record<string, WalletBalanceSummary> = {};
@@ -72,32 +75,44 @@ export function calculateWalletBalances(
     const amount = Number(tx.amount) || 0;
     if (amount <= 0) return;
 
-    // 1. Source wallet affected
+    // 1. Source wallet deduction / credit
     const sourceSummary = result[tx.walletId];
     if (sourceSummary) {
+      const walletCurrency = sourceSummary.currencyCode;
+      const txCurrency = tx.currency || walletCurrency;
+
+      // Accurately convert the transaction amount to the wallet's native currency
+      const amountInWalletCurrency = (txCurrency === walletCurrency)
+        ? amount
+        : convertCurrency(amount, txCurrency, walletCurrency, exchangeRates);
+
       if (tx.type === 'income') {
-        sourceSummary.totalIncome += amount;
-        sourceSummary.currentBalance += amount;
+        sourceSummary.totalIncome += amountInWalletCurrency;
+        sourceSummary.currentBalance += amountInWalletCurrency;
       } else if (tx.type === 'expense' || tx.type === 'transfer_to_goal') {
-        sourceSummary.totalExpense += amount;
-        sourceSummary.currentBalance -= amount;
+        sourceSummary.totalExpense += amountInWalletCurrency;
+        sourceSummary.currentBalance -= amountInWalletCurrency;
       } else if (tx.type === 'transfer') {
-        sourceSummary.transfersOut += amount;
-        sourceSummary.currentBalance -= amount;
+        sourceSummary.transfersOut += amountInWalletCurrency;
+        sourceSummary.currentBalance -= amountInWalletCurrency;
       } else if (tx.type === 'adjustment') {
-        sourceSummary.adjustments += amount;
-        sourceSummary.currentBalance += amount;
+        sourceSummary.adjustments += amountInWalletCurrency;
+        sourceSummary.currentBalance += amountInWalletCurrency;
       }
     }
 
-    // 2. Destination wallet affected (for internal transfers)
+    // 2. Destination wallet credit (for internal transfers)
     if (tx.type === 'transfer' && tx.destinationWalletId) {
       const destSummary = result[tx.destinationWalletId];
       if (destSummary) {
-        // Cross-currency transfer support: use destinationAmount if provided, otherwise tx.amount
+        const destCurrency = destSummary.currencyCode;
+        const txCurrency = tx.currency || destCurrency;
+
+        // Use destinationAmount if explicitly provided; otherwise convert using exchange rates
         const receivedAmount = (tx.destinationAmount !== undefined && tx.destinationAmount !== null && tx.destinationAmount > 0)
           ? Number(tx.destinationAmount)
-          : amount;
+          : (txCurrency === destCurrency ? amount : convertCurrency(amount, txCurrency, destCurrency, exchangeRates));
+
         destSummary.transfersIn += receivedAmount;
         destSummary.currentBalance += receivedAmount;
       }
@@ -113,6 +128,7 @@ export function calculateWalletBalances(
  * - Single Currency mode (pure currency calculations without mixing exchange rates)
  * - Multi-Currency mode (normalized valuation in base currency with transparent rate breakdowns)
  * - Wallet filtering
+ * - Lifetime Cumulative Balance vs Period Flow separation for 100% accurate Net Worth
  */
 export function calculateConsolidatedPosition(
   transactions: Transaction[],
@@ -120,13 +136,15 @@ export function calculateConsolidatedPosition(
   baseCurrencyCode: string = 'SAR',
   exchangeRates: Record<string, number> = DEFAULT_EXCHANGE_RATES,
   filterWalletId?: string | null,
-  filterCurrencyCode?: string | null
+  filterCurrencyCode?: string | null,
+  allTransactionsForBalance?: Transaction[]
 ): ConsolidatedFinancialPosition {
-  let activeTxs = getActiveTransactions(transactions);
+  let periodTxs = getActiveTransactions(transactions);
+  const lifetimeTxs = getActiveTransactions(allTransactionsForBalance || transactions);
 
   // Apply wallet filtering if specified
   if (filterWalletId) {
-    activeTxs = activeTxs.filter(
+    periodTxs = periodTxs.filter(
       t => t.walletId === filterWalletId || t.destinationWalletId === filterWalletId
     );
   }
@@ -134,14 +152,15 @@ export function calculateConsolidatedPosition(
   // Apply single currency filtering if specified
   const isSingleCurrency = Boolean(filterCurrencyCode && filterCurrencyCode !== 'ALL');
   if (isSingleCurrency && filterCurrencyCode) {
-    activeTxs = activeTxs.filter(t => t.currency === filterCurrencyCode);
+    periodTxs = periodTxs.filter(t => t.currency === filterCurrencyCode);
   }
 
   const activeWallets = filterWalletId 
     ? (wallets || []).filter(w => w.id === filterWalletId)
     : (wallets || []);
 
-  const walletSummaries = calculateWalletBalances(activeWallets, activeTxs);
+  // Calculate true lifetime cumulative balances for active wallets
+  const walletSummaries = calculateWalletBalances(activeWallets, lifetimeTxs, exchangeRates);
 
   const currencyBalances: Record<string, number> = {};
   const expenseByCurrency: Record<string, number> = {};
@@ -160,41 +179,30 @@ export function calculateConsolidatedPosition(
     currencyBalances[summary.currencyCode] = (currencyBalances[summary.currencyCode] || 0) + summary.currentBalance;
   });
 
-  // Calculate Inflows, Outflows, and Internal Transfers
+  // Calculate Inflows, Outflows, and Internal Transfers for the given period
   let totalIncomeInBase = 0;
   let totalExpenseInBase = 0;
   let internalTransfersInBase = 0;
 
-  activeTxs.forEach(tx => {
+  periodTxs.forEach(tx => {
     const amount = Number(tx.amount) || 0;
     if (amount <= 0) return;
+    const txCurr = tx.currency || baseCurrencyCode;
 
     if (tx.type === 'income') {
-      incomeByCurrency[tx.currency] = (incomeByCurrency[tx.currency] || 0) + amount;
-      if (isSingleCurrency) {
-        totalIncomeInBase += amount;
-      } else {
-        totalIncomeInBase += convertCurrency(amount, tx.currency, baseCurrencyCode, exchangeRates);
-      }
+      incomeByCurrency[txCurr] = (incomeByCurrency[txCurr] || 0) + amount;
+      totalIncomeInBase += convertCurrency(amount, txCurr, baseCurrencyCode, exchangeRates);
     } else if (tx.type === 'expense' || tx.type === 'transfer_to_goal') {
-      expenseByCurrency[tx.currency] = (expenseByCurrency[tx.currency] || 0) + amount;
-      if (isSingleCurrency) {
-        totalExpenseInBase += amount;
-      } else {
-        totalExpenseInBase += convertCurrency(amount, tx.currency, baseCurrencyCode, exchangeRates);
-      }
+      expenseByCurrency[txCurr] = (expenseByCurrency[txCurr] || 0) + amount;
+      totalExpenseInBase += convertCurrency(amount, txCurr, baseCurrencyCode, exchangeRates);
     } else if (tx.type === 'transfer') {
       // Internal transfers are tracked separately and strictly NOT added to income or expense
-      transfersByCurrency[tx.currency] = (transfersByCurrency[tx.currency] || 0) + amount;
-      if (isSingleCurrency) {
-        internalTransfersInBase += amount;
-      } else {
-        internalTransfersInBase += convertCurrency(amount, tx.currency, baseCurrencyCode, exchangeRates);
-      }
+      transfersByCurrency[txCurr] = (transfersByCurrency[txCurr] || 0) + amount;
+      internalTransfersInBase += convertCurrency(amount, txCurr, baseCurrencyCode, exchangeRates);
     }
   });
 
-  // Calculate Net Worth
+  // Calculate Net Worth: valuation of all active wallets converted to base currency
   let netWorthInBase = 0;
   if (isSingleCurrency && filterCurrencyCode) {
     netWorthInBase = currencyBalances[filterCurrencyCode] || 0;
@@ -227,7 +235,7 @@ export function calculateConsolidatedPosition(
 
 /**
  * Self-Testing Mathematical Audit Suite for the Balance Engine.
- * Verifies core accounting invariants (such as the 100k YER Income, 30k Expense, 20k Transfer scenario).
+ * Verifies core accounting invariants and cross-currency spending accuracy.
  */
 export function runBalanceEngineAudit(): {
   allPassed: boolean;
@@ -247,11 +255,7 @@ export function runBalanceEngineAudit(): {
     actual: any;
   }[] = [];
 
-  // Scenario: 
-  // Wallet A (YER), Wallet B (YER)
-  // Income 100,000 YER into Wallet A
-  // Expense 30,000 YER from Wallet A
-  // Transfer 20,000 YER from Wallet A to Wallet B
+  // Scenario 1: Standard Invariant (Income 100k, Expense 30k, Transfer 20k)
   const testWallets: Wallet[] = [
     { id: 'w-a', name: 'Wallet A', currencyCode: 'YER_ADEN', color: '#10b981', openingBalance: 0 },
     { id: 'w-b', name: 'Wallet B', currencyCode: 'YER_ADEN', color: '#3b82f6', openingBalance: 0 },
@@ -372,6 +376,37 @@ export function runBalanceEngineAudit(): {
     details: `Consolidated Net Worth must equal 70,000 YER`,
     expected: 70000,
     actual: position.netWorthInBase,
+  });
+
+  // Scenario 2: Cross-Currency Expense from Yemeni Wallet ($100 USD spent from YER_ADEN wallet)
+  // Rate: 1 USD = 3.75 SAR, 1 SAR = 430 YER_ADEN => 1 USD = 1612.5 YER_ADEN
+  // 100 USD = 161,250 YER_ADEN. Opening: 500,000 YER_ADEN. Expected Remaining: 338,750 YER_ADEN.
+  const crossWallets: Wallet[] = [
+    { id: 'w-yer-main', name: 'محفظة يمنية', currencyCode: 'YER_ADEN', color: '#10b981', openingBalance: 500000 },
+  ];
+  const crossTx: Transaction[] = [
+    {
+      id: 'tx-cross-1',
+      walletId: 'w-yer-main',
+      type: 'expense',
+      amount: 100,
+      currency: 'USD',
+      categoryId: '1',
+      date: '2026-08-05',
+      note: 'Online USD Expense from Yemeni Wallet',
+      frequency: 'once',
+    }
+  ];
+
+  const crossBalances = calculateWalletBalances(crossWallets, crossTx, DEFAULT_EXCHANGE_RATES);
+  const expectedRemaining = 500000 - 161250; // 338,750
+  const crossExpensePassed = Math.abs(crossBalances['w-yer-main'].currentBalance - expectedRemaining) < 0.01;
+  testResults.push({
+    testName: 'Cross-Currency Expense ($100 USD from Yemeni Wallet)',
+    passed: crossExpensePassed,
+    details: `100 USD expense from 500k YER wallet should leave 338,750 YER (1 USD = 1612.5 YER)`,
+    expected: expectedRemaining,
+    actual: crossBalances['w-yer-main'].currentBalance,
   });
 
   const allPassed = testResults.every(r => r.passed);

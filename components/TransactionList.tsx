@@ -260,12 +260,22 @@ const TransactionList: React.FC<TransactionListProps> = ({
               const txSymbol = txCurrencyObj?.symbol || txCurrencyCode;
               const txCurrencyName = txCurrencyObj?.name || txCurrencyCode;
 
-              // Converted amount calculation
+              // Converted amount calculation for Base Currency
               const isDiffCurrency = txCurrencyCode !== currentCurrencyCode;
               const convertedAmount =
                 isDiffCurrency && !isTransfer
                   ? convertCurrency(tx.amount, txCurrencyCode, currentCurrencyCode, exchangeRates)
                   : null;
+
+              // Cross-Currency deduction relative to the specific Wallet's Primary Currency
+              const isDiffFromWallet = Boolean(wallet && txCurrencyCode !== wallet.currencyCode && !isTransfer);
+              const walletCurrencyCode = wallet?.currencyCode || currentCurrencyCode;
+              const amountInWallet = isDiffFromWallet
+                ? (tx.convertedAmountInWalletCurrency || convertCurrency(tx.amount, txCurrencyCode, walletCurrencyCode, exchangeRates))
+                : null;
+              const exchangeRateToWallet = isDiffFromWallet
+                ? (tx.exchangeRateUsed || convertCurrency(1, txCurrencyCode, walletCurrencyCode, exchangeRates))
+                : null;
 
               return (
                 <motion.div
@@ -275,7 +285,9 @@ const TransactionList: React.FC<TransactionListProps> = ({
                   exit={{ opacity: 0, x: -30, scale: 0.95 }}
                   transition={{ duration: 0.2, delay: Math.min(index * 0.02, 0.2) }}
                   key={tx.id}
-                  className="group bg-slate-900/80 p-3 sm:p-4 rounded-2xl sm:rounded-3xl shadow-sm border border-white/5 flex items-center justify-between hover:border-amber-500/30 transition-all duration-300 gap-2.5"
+                  onClick={() => onEdit(tx)}
+                  className="group bg-slate-900/80 p-3 sm:p-4 rounded-2xl sm:rounded-3xl shadow-sm border border-white/5 flex items-center justify-between hover:border-amber-500/40 hover:bg-slate-900/95 transition-all duration-300 gap-2.5 cursor-pointer"
+                  title="انقر لتعديل هذه المعاملة مباشرة"
                 >
                   {/* Left / Primary Info */}
                   <div className="flex items-center gap-3 sm:gap-3.5 min-w-0 flex-1">
@@ -320,7 +332,10 @@ const TransactionList: React.FC<TransactionListProps> = ({
                         )}
                         {tx.receipt && (
                           <button
-                            onClick={() => setViewingReceipt(tx.receipt?.dataUrl || null)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setViewingReceipt(tx.receipt?.dataUrl || null);
+                            }}
                             className="text-amber-400 hover:text-amber-300 p-0.5"
                             title="عرض الفاتورة المرفقة"
                           >
@@ -375,9 +390,20 @@ const TransactionList: React.FC<TransactionListProps> = ({
                         <span className="text-[11px] font-bold text-slate-300 ml-1">{txSymbol}</span>
                       </p>
 
+                      {isDiffFromWallet && amountInWallet !== null && (
+                        <span className="text-[9px] font-bold text-amber-400/90 dir-ltr text-right flex items-center gap-1 mt-0.5">
+                          <span>المخصوم: {amountInWallet.toLocaleString('en-US', { maximumFractionDigits: 1 })} {walletCurrencyCode}</span>
+                          {exchangeRateToWallet && (
+                            <span className="text-slate-500 font-normal">
+                              (1 {txCurrencyCode} = {exchangeRateToWallet.toLocaleString('en-US', { maximumFractionDigits: 2 })})
+                            </span>
+                          )}
+                        </span>
+                      )}
+
                       {isDiffCurrency && convertedAmount !== null && (
-                        <span className="text-[9.5px] font-bold text-slate-400 dir-ltr">
-                          ≈ {Math.round(convertedAmount).toLocaleString()} {currencySymbol}
+                        <span className="text-[9px] font-bold text-slate-400 dir-ltr">
+                          المعادل: ≈ {Math.round(convertedAmount).toLocaleString()} {currencySymbol}
                         </span>
                       )}
 
@@ -385,20 +411,26 @@ const TransactionList: React.FC<TransactionListProps> = ({
                     </div>
 
                     {/* Actions */}
-                    <div className="flex gap-1">
+                    <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
                       <motion.button
                         whileHover={{ scale: 1.1 }}
                         whileTap={{ scale: 0.9 }}
-                        onClick={() => onEdit(tx)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onEdit(tx);
+                        }}
                         className="p-1.5 text-slate-400 hover:text-amber-400 transition-colors bg-slate-800/60 rounded-xl border border-white/5"
-                        title="تعديل"
+                        title="تعديل المعاملة"
                       >
                         <Edit2 size={13} />
                       </motion.button>
                       <motion.button
                         whileHover={{ scale: 1.1 }}
                         whileTap={{ scale: 0.9 }}
-                        onClick={() => onDelete(tx.id)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onDelete(tx.id);
+                        }}
                         className="p-1.5 text-slate-400 hover:text-rose-400 transition-colors bg-slate-800/60 rounded-xl border border-white/5"
                         title="حذف"
                       >

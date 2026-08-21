@@ -353,6 +353,34 @@ export async function executeReleaseCandidateAudit(): Promise<ReleaseAuditReport
     );
   }
 
+  // --- Case K: Cross-Currency Expense Deduction ($100 USD from Yemeni YER_ADEN Wallet) ---
+  {
+    const t0 = performance.now();
+    const wallets: Wallet[] = [
+      { id: 'w-yer-k', name: 'محفظة يمنية', currencyCode: 'YER_ADEN', color: '#10b981', openingBalance: 500000 },
+    ];
+    const txs: Transaction[] = [
+      { id: 'k1', walletId: 'w-yer-k', type: 'expense', amount: 100, currency: 'USD', categoryId: '1', date: '2026-08-01', note: 'USD Subscription', frequency: 'once' },
+    ];
+    const balances = calculateWalletBalances(wallets, txs, DEFAULT_EXCHANGE_RATES);
+    const pos = calculateConsolidatedPosition(txs, wallets, 'SAR', DEFAULT_EXCHANGE_RATES, null, null, txs);
+    
+    // 100 USD = 375 SAR = 161,250 YER_ADEN. Remaining: 500,000 - 161,250 = 338,750 YER_ADEN.
+    const expectedRemainingYER = 338750;
+    const actualRemainingYER = balances['w-yer-k'].currentBalance;
+    const passK = Math.abs(actualRemainingYER - expectedRemainingYER) < 0.1 && Math.abs(pos.totalExpenseInBase - 375) < 0.1;
+
+    assertTest(
+      'ACCOUNTING', 'CASE_K', 'Cross-Currency Expense Deduction ($100 USD from YER Wallet)',
+      'accounting',
+      passK,
+      { remainingYER: expectedRemainingYER, expenseSAR: 375 },
+      { remainingYER: actualRemainingYER, expenseSAR: pos.totalExpenseInBase },
+      'Verified 100 USD expense correctly converts and deducts 161,250 YER from Yemeni wallet without delay or mismatch',
+      t0
+    );
+  }
+
   // =========================================================================
   // 2. BALANCE RECONCILIATION AUDIT (1,000 randomized transactions)
   // =========================================================================

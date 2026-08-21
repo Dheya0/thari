@@ -288,6 +288,15 @@ export function buildReportModel(context: AggregationContext): ReportModel {
     const typeLabelAr = t.type === 'income' ? 'إيراد' : (t.type === 'transfer_to_goal' ? 'تحويل لهدف' : 'مصروف');
     const typeLabelEn = t.type === 'income' ? 'Income' : (t.type === 'transfer_to_goal' ? 'Goal Transfer' : 'Expense');
 
+    const walletCurr = wallet ? normalizeCurrencyCode(wallet.currencyCode) : targetCurrencyCode;
+    const isCrossWithWallet = Boolean(wallet && tCurr !== walletCurr && t.type !== 'transfer');
+    const walletDeduction = isCrossWithWallet
+      ? (t.convertedAmountInWalletCurrency || convertCurrency(t.amount, tCurr, walletCurr, exchangeRates))
+      : t.amount;
+    const rateToWallet = isCrossWithWallet
+      ? (t.exchangeRateUsed || convertCurrency(1, tCurr, walletCurr, exchangeRates))
+      : 1;
+
     return {
       id: t.id || `tx-${idx}`,
       index: idx + 1,
@@ -303,6 +312,10 @@ export function buildReportModel(context: AggregationContext): ReportModel {
       categoryIcon: cat?.icon || 'Tag',
       walletId: t.walletId,
       walletName: wallet?.name || '-',
+      walletCurrencyCode: walletCurr,
+      walletDeductionAmount: walletDeduction,
+      isCrossCurrencyWithWallet: isCrossWithWallet,
+      exchangeRateToWallet: rateToWallet,
       note: t.note || '',
       originalAmount: t.amount,
       currencyCode: tCurr,

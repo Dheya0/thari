@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Plus, LayoutDashboard, History, Settings as SettingsIcon, Briefcase, HandCoins, Repeat, Coins, ArrowRight, Sparkles, Scale, Wallet as WalletIcon, Check, Plane, FileText, Download, ArrowUpRight, ArrowDownLeft, Calendar, ArrowLeftRight, Trash2, Wifi, WifiOff } from 'lucide-react';
+import { Plus, LayoutDashboard, History, Settings as SettingsIcon, Briefcase, HandCoins, Repeat, Coins, ArrowRight, Sparkles, Scale, Wallet as WalletIcon, Check, Plane, FileText, Download, ArrowUpRight, ArrowDownLeft, Calendar, ArrowLeftRight, Trash2, Wifi, WifiOff, Edit3 } from 'lucide-react';
 import { AppState, Transaction, Category, Debt, Account, RecurringRule, AuditLog } from './types';
 import { INITIAL_CATEGORIES, DEFAULT_CURRENCIES, DEFAULT_EXCHANGE_RATES, convertCurrency } from './constants';
 import { generateAndShareCSV, buildExecutiveCSVContent, exportAndShareExecutiveCSV } from './utils/exportHelper';
@@ -167,7 +167,7 @@ const App: React.FC = () => {
   // Wallet Filter State (null = All Wallets)
   const [selectedWalletId, setSelectedWalletId] = useState<string | null>(null);
   const [timePeriodFilter, setTimePeriodFilter] = useState<'all' | 'today' | 'week' | 'month'>('all');
-  const [formDefaultType, setFormDefaultType] = useState<'expense' | 'income' | 'transfer' | undefined>(undefined);
+  const [formDefaultType, setFormDefaultType] = useState<'expense' | 'income' | 'transfer' | 'adjustment' | undefined>(undefined);
 
   // Network Offline / Online State
   const [isOnline, setIsOnline] = useState<boolean>(typeof navigator !== 'undefined' ? navigator.onLine : true);
@@ -347,7 +347,7 @@ const App: React.FC = () => {
   const filteredTransactions = useMemo(() => {
       let list = state.transactions;
       if (selectedWalletId) {
-          list = list.filter(t => t.walletId === selectedWalletId);
+          list = list.filter(t => t.walletId === selectedWalletId || t.destinationWalletId === selectedWalletId);
       }
       if (timePeriodFilter !== 'all') {
           const todayStr = new Date().toISOString().split('T')[0];
@@ -367,15 +367,19 @@ const App: React.FC = () => {
   }, [state.transactions, selectedWalletId, timePeriodFilter]);
 
   // 2. Calculate Totals and Multi-Currency Breakdown via Balance Engine
+  // Lifetime transactions ensure accurate cumulative Wallet Balances & Net Worth,
+  // while filteredTransactions determine period Inflows (Income) and Outflows (Expenses).
   const totals = useMemo(() => {
     return calculateConsolidatedPosition(
       filteredTransactions,
       state.wallets,
       state.currency.code,
       state.exchangeRates,
-      selectedWalletId
+      selectedWalletId,
+      null,
+      state.transactions
     );
-  }, [filteredTransactions, state.wallets, state.currency.code, state.exchangeRates, selectedWalletId]);
+  }, [filteredTransactions, state.transactions, state.wallets, state.currency.code, state.exchangeRates, selectedWalletId]);
 
   // Handle Wallet Selection & Currency Sync
   const handleSelectWallet = (id: string | null) => {
@@ -559,10 +563,11 @@ const App: React.FC = () => {
   };
 
   const handleSubmitTransaction = (txData: any) => {
-    if (editingTransaction) {
+    const targetId = editingTransaction?.id || txData.id;
+    if (targetId) {
         setState(p => ({
             ...p,
-            transactions: p.transactions.map(t => t.id === editingTransaction.id ? { ...txData, id: t.id, updatedAt: new Date().toISOString() } : t)
+            transactions: p.transactions.map(t => t.id === targetId ? { ...txData, id: t.id, updatedAt: new Date().toISOString() } : t)
         }));
     } else {
         setState(p => ({ 
@@ -831,7 +836,7 @@ const App: React.FC = () => {
 
                     {/* Mobile-First Quick Action Bar & Time Period Filter */}
                     <div className="lg:col-span-12 space-y-2.5">
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+                        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 sm:gap-2.5">
                             <motion.button 
                                 whileTap={{ scale: 0.95 }}
                                 onClick={() => { setEditingTransaction(null); setFormDefaultType('expense'); setShowAddForm(true); }}
@@ -856,13 +861,28 @@ const App: React.FC = () => {
                                 className="bg-blue-500/10 border border-blue-500/20 hover:border-blue-500/40 text-blue-400 p-2.5 sm:p-3 rounded-2xl flex items-center justify-center gap-1.5 sm:gap-2 transition-all active:scale-95 shadow-sm"
                             >
                                 <ArrowLeftRight size={16} className="shrink-0" />
-                                <span className="text-xs font-bold truncate">تحويل بين المحافظ</span>
+                                <span className="text-xs font-bold truncate">تحويل محافظ</span>
+                            </motion.button>
+
+                            <motion.button 
+                                whileTap={{ scale: 0.95 }}
+                                onClick={() => {
+                                    const targetTx = state.transactions.length > 0 ? state.transactions[0] : null;
+                                    setEditingTransaction(targetTx);
+                                    setFormDefaultType('adjustment');
+                                    setShowAddForm(true);
+                                }}
+                                className="bg-amber-500/10 border border-amber-500/25 hover:border-amber-500/50 text-amber-400 p-2.5 sm:p-3 rounded-2xl flex items-center justify-center gap-1.5 sm:gap-2 transition-all active:scale-95 shadow-sm"
+                                title="تعديل أي معاملة سابقة من القائمة المنسدلة"
+                            >
+                                <Edit3 size={16} className="shrink-0 text-amber-400" />
+                                <span className="text-xs font-bold truncate">تعديل معاملة</span>
                             </motion.button>
 
                             <motion.button 
                                 whileTap={{ scale: 0.95 }}
                                 onClick={() => setActiveTab('debts')}
-                                className="bg-amber-500/10 border border-amber-500/20 hover:border-amber-500/40 text-amber-400 p-2.5 sm:p-3 rounded-2xl flex items-center justify-center gap-1.5 sm:gap-2 transition-all active:scale-95 shadow-sm"
+                                className="col-span-2 sm:col-span-1 bg-purple-500/10 border border-purple-500/20 hover:border-purple-500/40 text-purple-400 p-2.5 sm:p-3 rounded-2xl flex items-center justify-center gap-1.5 sm:gap-2 transition-all active:scale-95 shadow-sm"
                             >
                                 <HandCoins size={16} className="shrink-0" />
                                 <span className="text-xs font-bold truncate">ديون والتزامات</span>
@@ -1113,7 +1133,16 @@ const App: React.FC = () => {
             />
           )}
           {showAddForm && (
-              <TransactionForm categories={state.categories} wallets={state.wallets} onSubmit={handleSubmitTransaction} onClose={() => { setShowAddForm(false); setEditingTransaction(null); setFormDefaultType(undefined); }} initialData={editingTransaction} defaultType={formDefaultType} exchangeRates={state.exchangeRates} />
+              <TransactionForm 
+                categories={state.categories} 
+                wallets={state.wallets} 
+                transactions={state.transactions}
+                onSubmit={handleSubmitTransaction} 
+                onClose={() => { setShowAddForm(false); setEditingTransaction(null); setFormDefaultType(undefined); }} 
+                initialData={editingTransaction} 
+                defaultType={formDefaultType} 
+                exchangeRates={state.exchangeRates} 
+              />
           )}
           {showPrivacyPolicy && <PrivacyPolicy onBack={() => setShowPrivacyPolicy(false)} />}
         </AnimatePresence>

@@ -90,12 +90,16 @@ export function buildExcelReportCSV(model: ReportModel): string {
   // Section 7: Transactions Ledger
   const displayTxs = isSummary ? transactions.slice(0, 15) : transactions;
   lines.push(`جدول القيود المحاسبية والمعاملات المسجلة (${displayTxs.length} حركة معروضة):`);
-  lines.push(`رقم القيد,التاريخ,نوع الحركة,التصنيف,المحفظة,المبلغ الأصلي,العملة الأصلية,المعادل بـ (${scope.baseCurrency.code}),الرصيد التراكمي,البيان / تفاصيل القيد`);
+  lines.push(`رقم القيد,التاريخ,نوع الحركة,التصنيف,المحفظة,المبلغ بالعملة الأصلية,العملة الأصلية,المقيد/المخصوم بالمحفظة,المعادل بـ (${scope.baseCurrency.code}),الرصيد التراكمي,البيان / تفاصيل القيد`);
 
   displayTxs.forEach(t => {
     const sign = t.type === 'income' ? '+' : '-';
+    const walletDeductionStr = t.isCrossCurrencyWithWallet && t.walletDeductionAmount !== undefined
+      ? `${sign}${t.walletDeductionAmount.toLocaleString()} ${t.walletCurrencyCode}`
+      : `${sign}${t.originalAmount.toLocaleString()} ${t.currencyCode}`;
+
     lines.push(
-      `${t.index},${escapeCSV(t.date)},${escapeCSV(t.typeLabelAr)},${escapeCSV(t.categoryName)},${escapeCSV(t.walletName)},${sign}${t.originalAmount.toLocaleString()},${escapeCSV(t.currencyCode)},${Math.round(t.convertedAmount).toLocaleString()} ${baseSymbol},${t.runningBalance !== undefined ? Math.round(t.runningBalance).toLocaleString() + ' ' + baseSymbol : '-'},${escapeCSV(t.note || '-')}`
+      `${t.index},${escapeCSV(t.date)},${escapeCSV(t.typeLabelAr)},${escapeCSV(t.categoryName)},${escapeCSV(t.walletName)},${sign}${t.originalAmount.toLocaleString()},${escapeCSV(t.currencyCode)},${escapeCSV(walletDeductionStr)},${Math.round(t.convertedAmount).toLocaleString()} ${baseSymbol},${t.runningBalance !== undefined ? Math.round(t.runningBalance).toLocaleString() + ' ' + baseSymbol : '-'},${escapeCSV(t.note || '-')}`
     );
   });
 
