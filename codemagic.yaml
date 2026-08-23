@@ -213,6 +213,30 @@ workflows:
             echo "Skipping automated signing profile download (credentials not configured)."
           fi
 
+      - name: Create export_options.plist if missing
+        script: |
+          if [ ! -f "/Users/builder/export_options.plist" ]; then
+            echo "Creating default export_options.plist..."
+            cat <<EOF > /Users/builder/export_options.plist
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>method</key>
+              <string>app-store</string>
+              <key>signingStyle</key>
+              <string>automatic</string>
+              <key>stripSwiftSymbols</key>
+              <true/>
+              <key>uploadBitcode</key>
+              <false/>
+              <key>uploadSymbols</key>
+              <true/>
+          </dict>
+          </plist>
+          EOF
+          fi
+
       - name: Build IPA package for App Store distribution
         script: |
           set -e
@@ -223,7 +247,8 @@ workflows:
 
           xcode-project build-ipa \
             --workspace "$XCODE_WORKSPACE" \
-            --scheme "$XCODE_SCHEME"
+            --scheme "$XCODE_SCHEME" \
+            --export-options-plist /Users/builder/export_options.plist
     artifacts:
       - "build/ios/ipa/*.ipa"
       - "/tmp/xcodebuild_logs/*.log"
