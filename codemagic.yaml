@@ -250,10 +250,15 @@ workflows:
           agvtool new-version -all $(($BUILD_NUMBER + 10200)) || true
           cd ../..
 
-          xcode-project build-ipa \
-            --workspace "$XCODE_WORKSPACE" \
-            --scheme "$XCODE_SCHEME" \
-            --export-options-plist /Users/builder/export_options.plist
+          if [ -n "$APP_STORE_CONNECT_KEY_IDENTIFIER" ] || [ -n "$CERTIFICATE_PRIVATE_KEY" ]; then
+            xcode-project build-ipa \
+              --workspace "$XCODE_WORKSPACE" \
+              --scheme "$XCODE_SCHEME" \
+              --export-options-plist /Users/builder/export_options.plist
+          else
+            echo "⚠️ Skipping IPA signing and packaging because code signing credentials are not configured in Codemagic."
+            echo "To build signed IPAs for TestFlight / App Store, please configure your App Store Connect API key and iOS signing certificates in Codemagic environment variables."
+          fi
     artifacts:
       - "build/ios/ipa/*.ipa"
       - "/tmp/xcodebuild_logs/*.log"
