@@ -4,8 +4,9 @@
  * multi-currency ledger calculation, cross-currency spending, transfer consistency, and mathematical audits.
  */
 
-import { Transaction, Wallet, Currency } from '../types';
+import { Transaction, Wallet, Currency, Debt } from '../types';
 import { convertCurrency, DEFAULT_EXCHANGE_RATES } from '../constants';
+export * from './coreLedger';
 
 export interface WalletBalanceSummary {
   walletId: string;

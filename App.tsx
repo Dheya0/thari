@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Plus, LayoutDashboard, History, Settings as SettingsIcon, Briefcase, HandCoins, Repeat, Coins, ArrowRight, Sparkles, Scale, Wallet as WalletIcon, Check, Plane, FileText, Download, ArrowUpRight, ArrowDownLeft, Calendar, ArrowLeftRight, Trash2, Wifi, WifiOff, Edit3 } from 'lucide-react';
-import { AppState, Transaction, Category, Debt, Account, RecurringRule, AuditLog } from './types';
+import { AppState, Transaction, Category, Debt, DebtPayment, Account, RecurringRule, AuditLog } from './types';
 import { INITIAL_CATEGORIES, DEFAULT_CURRENCIES, DEFAULT_EXCHANGE_RATES, convertCurrency } from './constants';
 import { generateAndShareCSV, buildExecutiveCSVContent, exportAndShareExecutiveCSV } from './utils/exportHelper';
 import { saveSecureState, loadSecureState } from './utils/secureStorage';
@@ -13,6 +13,7 @@ import { App as CapApp } from '@capacitor/app';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
 import BalanceCard from './components/BalanceCard';
+import ElegantDashboard from './components/ElegantDashboard';
 import TransactionForm from './components/TransactionForm';
 import TransactionList from './components/TransactionList';
 import Analytics from './components/Analytics';
@@ -381,6 +382,58 @@ const App: React.FC = () => {
     );
   }, [filteredTransactions, state.transactions, state.wallets, state.currency.code, state.exchangeRates, selectedWalletId]);
 
+  // Specific calculation for current month's Cashflow (Income, Expense, Net) in current base currency
+  const monthlyMetrics = useMemo(() => {
+    const currentMonthPrefix = new Date().toISOString().substring(0, 7); // YYYY-MM
+    let incomeInBase = 0;
+    let expenseInBase = 0;
+
+    state.transactions.forEach(t => {
+      if (t.isDeleted || !t.date || !t.date.startsWith(currentMonthPrefix)) return;
+      if (selectedWalletId && t.walletId !== selectedWalletId && t.destinationWalletId !== selectedWalletId) return;
+
+      const amt = Number(t.amount) || 0;
+      const txCurr = t.currency || state.currency.code;
+      const amtInBase = convertCurrency(amt, txCurr, state.currency.code, state.exchangeRates);
+
+      if (t.type === 'income') {
+        incomeInBase += amtInBase;
+      } else if (t.type === 'expense') {
+        expenseInBase += amtInBase;
+      }
+    });
+
+    return {
+      monthlyIncome: incomeInBase,
+      monthlyExpense: expenseInBase,
+      monthlyNet: incomeInBase - expenseInBase
+    };
+  }, [state.transactions, state.currency.code, state.exchangeRates, selectedWalletId]);
+
+  // Debts owed to me (receivable) and Debts I owe (payable) converted to current base currency
+  const debtTotals = useMemo(() => {
+    let owedToMe = 0;
+    let iOwe = 0;
+
+    state.debts.forEach(d => {
+      if (d.isPaid || d.status === 'settled') return;
+      const remainingAmt = Math.max(0, (Number(d.amount) || 0) - (Number(d.paidAmount) || 0));
+      const debtCurr = d.currency || state.currency.code;
+      const inBase = convertCurrency(remainingAmt, debtCurr, state.currency.code, state.exchangeRates);
+
+      if (d.type === 'to_me') {
+        owedToMe += inBase;
+      } else {
+        iOwe += inBase;
+      }
+    });
+
+    return {
+      debtsOwedToMe: owedToMe,
+      debtsIOwe: iOwe
+    };
+  }, [state.debts, state.currency.code, state.exchangeRates]);
+
   // Handle Wallet Selection & Currency Sync
   const handleSelectWallet = (id: string | null) => {
       setSelectedWalletId(id);
@@ -580,17 +633,28 @@ const App: React.FC = () => {
     setFormDefaultType(undefined);
   };
 
-  // ... (Debt handlers remain the same) ...
+  // Debt handlers
   const handleUpdateDebt = (id: string, updates: Partial<Debt>) => {
     setState(p => ({
       ...p,
       debts: p.debts.map(d => d.id === id ? { ...d, ...updates } : d)
     }));
   };
-  const handlePayDebt = (id: string, amount: number, walletId?: string, noteSuffix?: string, customDebtUpdates?: Partial<Debt>) => {
+
+  const handlePayDebt = (
+    id: string, 
+    amount: number, 
+    walletId?: string, 
+    noteSuffix?: string, 
+    customDebtUpdates?: Partial<Debt>,
+    paymentDate?: string
+  ) => {
     const debt = state.debts.find(d => d.id === id);
-    if (!debt) return;
+    if (!debt || amount <= 0) return;
     
+    const targetWallet = walletId ? state.wallets.find(w => w.id === walletId) : undefined;
+    const dateToUse = paymentDate || new Date().toISOString().split('T')[0];
+
     let newTransaction: Transaction | null = null;
     if (walletId && amount > 0) {
         newTransaction = {
@@ -602,21 +666,39 @@ const App: React.FC = () => {
             note: debt.type === 'to_me' 
                 ? `دفعة مستردة من دين: ${debt.personName}${noteSuffix ? ` (${noteSuffix})` : ''}` 
                 : `دفعة مسددة من دين: ${debt.personName}${noteSuffix ? ` (${noteSuffix})` : ''}`,
-            date: new Date().toISOString().split('T')[0],
+            date: dateToUse,
             currency: debt.currency,
-            frequency: 'once'
+            frequency: 'once',
+            createdAt: new Date().toISOString()
         };
     }
+
+    const newPayment: DebtPayment = {
+      id: 'pay-' + Date.now(),
+      debtId: id,
+      amount: amount,
+      date: dateToUse,
+      walletId: walletId,
+      walletName: targetWallet?.name,
+      note: noteSuffix || (amount >= (debt.amount - (debt.paidAmount || 0)) ? 'سداد كامل' : 'دفعة سداد'),
+      createdAt: new Date().toISOString()
+    };
     
     setState(p => {
         const updatedDebts = p.debts.map(d => {
             if (d.id === id) {
+                const currentPayments = d.payments || [];
+                const updatedPayments = [newPayment, ...currentPayments];
                 const newPaidAmount = (d.paidAmount || 0) + amount;
-                const isPaid = newPaidAmount >= d.amount * 0.999;
+                const originalTotal = d.originalAmount || d.amount || 0;
+                const isPaid = newPaidAmount >= (originalTotal * 0.999);
+                
                 return {
                     ...d,
                     paidAmount: newPaidAmount,
                     isPaid: isPaid,
+                    status: isPaid ? ('settled' as const) : ('partial' as const),
+                    payments: updatedPayments,
                     ...customDebtUpdates
                 };
             }
@@ -629,10 +711,18 @@ const App: React.FC = () => {
         };
     });
   };
+
   const handleAddDebt = (debtData: Omit<Debt, 'id'>, walletId?: string) => {
     const newDebtId = 'd-' + Date.now();
     const newTransactionId = 'tx-' + Date.now();
-    const newDebt: Debt = { ...debtData, id: newDebtId };
+    const newDebt: Debt = { 
+      ...debtData, 
+      id: newDebtId,
+      originalAmount: debtData.originalAmount || debtData.amount,
+      paidAmount: debtData.paidAmount || 0,
+      payments: debtData.payments || []
+    };
+
     let newTransaction: Transaction | null = null;
     if (walletId) {
         newTransaction = {
@@ -644,7 +734,8 @@ const App: React.FC = () => {
             note: debtData.type === 'to_me' ? `إقراض مبلغ لـ: ${debtData.personName}` : `استلاف مبلغ من: ${debtData.personName}`,
             date: debtData.createdAt,
             currency: debtData.currency,
-            frequency: 'once'
+            frequency: 'once',
+            createdAt: new Date().toISOString()
         };
     }
     setState(p => ({
@@ -653,10 +744,12 @@ const App: React.FC = () => {
         transactions: newTransaction ? [newTransaction, ...p.transactions] : p.transactions
     }));
   };
+
   const handleSettleDebt = (id: string, walletId?: string) => {
     const debt = state.debts.find(d => d.id === id);
     if (!debt) return;
-    const remaining = debt.amount - (debt.paidAmount || 0);
+    const original = debt.originalAmount || debt.amount || 0;
+    const remaining = Math.max(0, original - (debt.paidAmount || 0));
     handlePayDebt(id, remaining, walletId, "سداد كامل");
   };
 
@@ -699,7 +792,7 @@ const App: React.FC = () => {
       />
       
       <div className="flex flex-col flex-1 print:hidden relative z-20 overflow-hidden">
-        <header className="sticky top-0 shrink-0 px-4 pb-3 md:px-6 md:py-4 glass-effect border-b border-white/5 z-30 backdrop-blur-xl bg-slate-950/80" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 0.75rem)' }}>
+        <header className="sticky top-0 shrink-0 px-4 pb-3 md:px-6 md:py-4 glass-effect border-b border-white/5 z-30 backdrop-blur-xl bg-[#0A0D10]/85" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 0.75rem)' }}>
           <div className="flex justify-between items-center max-w-6xl mx-auto w-full">
             <div className="flex items-center gap-3">
               <Logo size={28} showText />
@@ -707,8 +800,8 @@ const App: React.FC = () => {
               <div
                 className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold border transition-colors ${
                   isOnline
-                    ? 'bg-emerald-950/40 border-emerald-500/30 text-emerald-400'
-                    : 'bg-rose-950/40 border-rose-500/30 text-rose-400'
+                    ? 'bg-[#8EB9A7]/10 border-[#8EB9A7]/30 text-[#8EB9A7]'
+                    : 'bg-[#C98387]/10 border-[#C98387]/30 text-[#C98387]'
                 }`}
                 title={isOnline ? 'بياناتك محفوظة محلياً ومتصل' : 'التطبيق يعمل بكفاءة أوفلاين 100%'}
               >
@@ -722,7 +815,7 @@ const App: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setShowDiagnosticsModal(true)}
-                className="p-2 rounded-xl border border-white/10 text-slate-400 bg-white/5 hover:bg-white/10 hover:text-emerald-400 transition-all"
+                className="p-2 rounded-xl border border-white/10 text-slate-400 bg-white/5 hover:bg-white/10 hover:text-[#8EB9A7] transition-all"
                 title="فحص تكامل البيانات والتدقيق المحاسبي"
               >
                 <Scale size={16} />
@@ -732,12 +825,12 @@ const App: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setShowRecurringModal(true)}
-                className="relative p-2 rounded-xl border border-white/10 text-slate-400 bg-white/5 hover:bg-white/10 hover:text-amber-400 transition-all"
+                className="relative p-2 rounded-xl border border-white/10 text-slate-400 bg-white/5 hover:bg-white/10 hover:text-[#D9B978] transition-all"
                 title="إدارة العمليات الدورية والمجدولة"
               >
                 <Repeat size={16} />
                 {(state.recurringRules?.length || 0) > 0 && (
-                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-amber-500 text-slate-950 rounded-full text-[9px] font-black flex items-center justify-center shadow-md">
+                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-[#D9B978] text-slate-950 rounded-full text-[9px] font-black flex items-center justify-center shadow-md">
                     {state.recurringRules.length}
                   </span>
                 )}
@@ -747,12 +840,12 @@ const App: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setShowTrashModal(true)}
-                className="relative p-2 rounded-xl border border-white/10 text-slate-400 bg-white/5 hover:bg-white/10 hover:text-rose-400 transition-all"
+                className="relative p-2 rounded-xl border border-white/10 text-slate-400 bg-white/5 hover:bg-white/10 hover:text-[#C98387] transition-all"
                 title="سلة المحذوفات"
               >
                 <Trash2 size={16} />
                 {(state.trashTransactions?.length || 0) > 0 && (
-                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-rose-500 text-white rounded-full text-[9px] font-black flex items-center justify-center shadow-md animate-pulse">
+                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-[#C98387] text-white rounded-full text-[9px] font-black flex items-center justify-center shadow-md animate-pulse">
                     {state.trashTransactions.length}
                   </span>
                 )}
@@ -760,13 +853,13 @@ const App: React.FC = () => {
 
               <button 
                 onClick={() => setShowReportModal(true)} 
-                className="p-2 rounded-xl border border-white/10 text-slate-400 bg-white/5 hover:bg-white/10 hover:text-amber-400 transition-all" 
+                className="p-2 rounded-xl border border-white/10 text-slate-400 bg-white/5 hover:bg-white/10 hover:text-[#D9B978] transition-all" 
                 title="إصدار التقارير المالية"
               >
                 <FileText size={16} />
               </button>
-              <button onClick={() => setActiveTab('chat')} className={`p-2 rounded-xl border border-white/10 transition-all ${activeTab === 'chat' ? 'bg-amber-500 text-slate-950 shadow-[0_0_20px_rgba(245,158,11,0.4)]' : 'text-slate-400 bg-white/5 hover:bg-white/10'}`} title="المستشار المالي"><Briefcase size={16} /></button>
-              <button onClick={() => setActiveTab('settings')} className="flex items-center justify-center w-9 h-9 rounded-xl bg-slate-800/50 border border-slate-700 text-slate-500 hover:text-amber-500 hover:border-amber-500/50 transition-all shrink-0 active:scale-95 backdrop-blur-md" title="الإعدادات"><SettingsIcon size={16} /></button>
+              <button onClick={() => setActiveTab('chat')} className={`p-2 rounded-xl border border-white/10 transition-all ${activeTab === 'chat' ? 'bg-[#D9B978] text-slate-950 shadow-[0_0_20px_rgba(217,185,120,0.4)]' : 'text-slate-400 bg-white/5 hover:bg-white/10'}`} title="المستشار المالي"><Briefcase size={16} /></button>
+              <button onClick={() => setActiveTab('settings')} className="flex items-center justify-center w-9 h-9 rounded-xl bg-white/5 border border-white/10 text-slate-400 hover:text-[#D9B978] hover:border-[#D9B978]/50 transition-all shrink-0 active:scale-95 backdrop-blur-md" title="الإعدادات"><SettingsIcon size={16} /></button>
             </div>
           </div>
         </header>
@@ -783,188 +876,35 @@ const App: React.FC = () => {
                 className="w-full"
               >
                 {activeTab === 'dashboard' && (
-                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 lg:gap-7 items-start">
-                    
-                    {/* Horizontal Sliding Currencies Marquee */}
-                    <div className="lg:col-span-12 overflow-hidden mask-gradient-x py-1">
-                        <div className="flex items-center gap-2.5 relative z-10 w-full overflow-x-auto no-scrollbar py-1">
-                        {state.currencies.map((curr, index) => {
-                            const isActive = state.currency.code === curr.code;
-                            return (
-                            <motion.button 
-                              whileHover={{ scale: 1.04 }}
-                              whileTap={{ scale: 0.96 }}
-                              key={`${curr.code}-${index}`} 
-                              onClick={() => setState(p => ({...p, currency: curr}))} 
-                              className={`shrink-0 relative flex items-center gap-2 pl-3.5 pr-2.5 py-1.5 rounded-full border backdrop-blur-md transition-all duration-300 ${isActive ? 'bg-amber-500 border-amber-400 text-slate-950 shadow-[0_0_15px_rgba(245,158,11,0.35)] font-black z-20' : 'bg-slate-800/40 border-white/5 text-slate-400 hover:bg-slate-800 hover:border-white/20'}`}
-                            >
-                                {isActive && <div className="absolute inset-0 rounded-full bg-gradient-to-br from-white/30 to-transparent opacity-50 pointer-events-none" />}
-                                <span className={`text-[9px] font-black uppercase tracking-widest ${isActive ? 'text-slate-900/70' : 'text-slate-500'}`}>{curr.code}</span>
-                                <span className="font-bold text-xs whitespace-nowrap">{curr.name}</span>
-                                <div className={`w-1.5 h-1.5 rounded-full transition-colors ${isActive ? 'bg-slate-950' : 'bg-slate-600'}`} />
-                            </motion.button>
-                            );
-                        })}
-                        </div>
-                    </div>
-
-                    {/* Wallets selector */}
-                    <div className="lg:col-span-12 flex gap-2.5 overflow-x-auto no-scrollbar py-1">
-                         <motion.button 
-                             whileHover={{ scale: 1.02 }}
-                             whileTap={{ scale: 0.97 }}
-                             onClick={() => handleSelectWallet(null)}
-                             className={`shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-2xl border transition-all ${!selectedWalletId ? 'bg-white text-slate-900 border-white shadow-md' : 'bg-slate-800/50 border-slate-700 text-slate-400'}`}
-                         >
-                             <LayoutDashboard size={15} />
-                             <span className="text-xs font-black">كل المحافظ</span>
-                         </motion.button>
-                         {state.wallets.map(w => (
-                             <motion.button 
-                                 whileHover={{ scale: 1.02 }}
-                                 whileTap={{ scale: 0.97 }}
-                                 key={w.id}
-                                 onClick={() => handleSelectWallet(w.id)}
-                                 className={`shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-2xl border transition-all ${selectedWalletId === w.id ? 'bg-amber-500 text-slate-900 border-amber-500 shadow-lg shadow-amber-500/20 font-black' : 'bg-slate-800/50 border-slate-700 text-slate-400'}`}
-                             >
-                                 <div className="w-2 h-2 rounded-full" style={{backgroundColor: w.color}} />
-                                 <span className="text-xs font-black">{w.name}</span>
-                                 {selectedWalletId === w.id && <Check size={14} />}
-                             </motion.button>
-                         ))}
-                    </div>
-
-                    {/* Mobile-First Quick Action Bar & Time Period Filter */}
-                    <div className="lg:col-span-12 space-y-2.5">
-                        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 sm:gap-2.5">
-                            <motion.button 
-                                whileTap={{ scale: 0.95 }}
-                                onClick={() => { setEditingTransaction(null); setFormDefaultType('expense'); setShowAddForm(true); }}
-                                className="bg-rose-500/10 border border-rose-500/20 hover:border-rose-500/40 text-rose-400 p-2.5 sm:p-3 rounded-2xl flex items-center justify-center gap-1.5 sm:gap-2 transition-all active:scale-95 shadow-sm"
-                            >
-                                <ArrowDownLeft size={16} className="shrink-0" />
-                                <span className="text-xs font-bold truncate">تسجيل مصروف</span>
-                            </motion.button>
-
-                            <motion.button 
-                                whileTap={{ scale: 0.95 }}
-                                onClick={() => { setEditingTransaction(null); setFormDefaultType('income'); setShowAddForm(true); }}
-                                className="bg-emerald-500/10 border border-emerald-500/20 hover:border-emerald-500/40 text-emerald-400 p-2.5 sm:p-3 rounded-2xl flex items-center justify-center gap-1.5 sm:gap-2 transition-all active:scale-95 shadow-sm"
-                            >
-                                <ArrowUpRight size={16} className="shrink-0" />
-                                <span className="text-xs font-bold truncate">تسجيل دخل</span>
-                            </motion.button>
-
-                            <motion.button 
-                                whileTap={{ scale: 0.95 }}
-                                onClick={() => { setEditingTransaction(null); setFormDefaultType('transfer'); setShowAddForm(true); }}
-                                className="bg-blue-500/10 border border-blue-500/20 hover:border-blue-500/40 text-blue-400 p-2.5 sm:p-3 rounded-2xl flex items-center justify-center gap-1.5 sm:gap-2 transition-all active:scale-95 shadow-sm"
-                            >
-                                <ArrowLeftRight size={16} className="shrink-0" />
-                                <span className="text-xs font-bold truncate">تحويل محافظ</span>
-                            </motion.button>
-
-                            <motion.button 
-                                whileTap={{ scale: 0.95 }}
-                                onClick={() => {
-                                    const targetTx = state.transactions.length > 0 ? state.transactions[0] : null;
-                                    setEditingTransaction(targetTx);
-                                    setFormDefaultType('adjustment');
-                                    setShowAddForm(true);
-                                }}
-                                className="bg-amber-500/10 border border-amber-500/25 hover:border-amber-500/50 text-amber-400 p-2.5 sm:p-3 rounded-2xl flex items-center justify-center gap-1.5 sm:gap-2 transition-all active:scale-95 shadow-sm"
-                                title="تعديل أي معاملة سابقة من القائمة المنسدلة"
-                            >
-                                <Edit3 size={16} className="shrink-0 text-amber-400" />
-                                <span className="text-xs font-bold truncate">تعديل معاملة</span>
-                            </motion.button>
-
-                            <motion.button 
-                                whileTap={{ scale: 0.95 }}
-                                onClick={() => setActiveTab('debts')}
-                                className="col-span-2 sm:col-span-1 bg-purple-500/10 border border-purple-500/20 hover:border-purple-500/40 text-purple-400 p-2.5 sm:p-3 rounded-2xl flex items-center justify-center gap-1.5 sm:gap-2 transition-all active:scale-95 shadow-sm"
-                            >
-                                <HandCoins size={16} className="shrink-0" />
-                                <span className="text-xs font-bold truncate">ديون والتزامات</span>
-                            </motion.button>
-                        </div>
-
-                        {/* Period Filter Chips */}
-                        <div className="flex items-center justify-between gap-2 bg-slate-900/60 p-1.5 rounded-2xl border border-white/5 overflow-x-auto no-scrollbar">
-                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-2 shrink-0 flex items-center gap-1">
-                                <Calendar size={12} /> الفترة:
-                            </span>
-                            <div className="flex gap-1 shrink-0">
-                                {[
-                                    { id: 'all', label: 'الكل' },
-                                    { id: 'today', label: 'اليوم' },
-                                    { id: 'week', label: 'هذا الأسبوع' },
-                                    { id: 'month', label: 'هذا الشهر' },
-                                ].map((p) => (
-                                    <button
-                                        key={p.id}
-                                        onClick={() => setTimePeriodFilter(p.id as any)}
-                                        className={`px-3 py-1 rounded-xl text-xs font-bold transition-all shrink-0 ${timePeriodFilter === p.id ? 'bg-amber-500 text-slate-950 shadow-md' : 'text-slate-400 hover:text-white'}`}
-                                    >
-                                        {p.label}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="lg:col-span-12">
-                       <SmartAlerts budgets={state.budgets} transactions={filteredTransactions} debts={state.debts} subscriptions={state.subscriptions} categories={state.categories} />
-                    </div>
-
-                    {/* LEFT COLUMN: Balance Card & Executive Insights */}
-                    <div className="lg:col-span-6 space-y-6 w-full">
-                        <BalanceCard 
-                            totalBalance={totals.netWorthInBase} 
-                            totalIncome={totals.totalIncomeInBase} 
-                            totalExpense={totals.totalExpenseInBase} 
-                            symbol={state.currency.symbol}
-                            balances={totals.currencyBalances}
-                            expenseBreakdown={totals.expenseByCurrency}
-                            showSeparateCurrencies={state.showSeparateCurrencies}
-                        />
-
-                        <ExecutiveInsights 
-                            transactions={filteredTransactions}
-                            budgets={state.budgets}
-                            debts={state.debts}
-                            totalBalance={totals.netWorthInBase}
-                            currencySymbol={state.currency.symbol}
-                        />
-                    </div>
-
-                    {/* RIGHT COLUMN: Sankey Flow & Recent Operations */}
-                    <div className="lg:col-span-6 space-y-6 w-full">
-                        <CashflowSankey 
-                            transactions={filteredTransactions}
-                            categories={state.categories}
-                            currencySymbol={state.currency.symbol}
-                        />
-
-                        <section className="space-y-4">
-                          <div className="flex justify-between items-center px-1">
-                            <h3 className="text-[10px] font-black text-slate-400 uppercase flex items-center gap-2 tracking-[0.15em]"><History size={13} /> {selectedWalletId ? 'سجل المحفظة المختارة' : 'أحدث العمليات'}</h3>
-                            <button onClick={() => setActiveTab('transactions')} className="text-amber-500 text-[10px] font-black uppercase flex items-center gap-1 hover:text-amber-400 transition-colors">عرض الكل <ArrowRight size={11} className="rotate-180" /></button>
-                          </div>
-                          <TransactionList 
-                            transactions={filteredTransactions.slice(0, 5)} 
-                            categories={state.categories} 
-                            wallets={state.wallets} 
-                            onDelete={handleDeleteTransaction} 
-                            onEdit={handleEditTransaction} 
-                            currencySymbol={state.currency.symbol}
-                            currentCurrencyCode={state.currency.code}
-                            currencies={state.currencies}
-                            exchangeRates={state.exchangeRates}
-                          />
-                        </section>
-                    </div>
-                  </div>
+                  <ElegantDashboard
+                    userName={state.userName}
+                    netWorth={totals.netWorthInBase}
+                    availableBalance={totals.netWorthInBase}
+                    debtsOwedToMe={debtTotals.debtsOwedToMe}
+                    debtsIOwe={debtTotals.debtsIOwe}
+                    monthlyIncome={monthlyMetrics.monthlyIncome}
+                    monthlyExpense={monthlyMetrics.monthlyExpense}
+                    monthlyNet={monthlyMetrics.monthlyNet}
+                    currency={state.currency}
+                    currencies={state.currencies}
+                    wallets={state.wallets}
+                    transactions={state.transactions}
+                    categories={state.categories}
+                    debts={state.debts}
+                    exchangeRates={state.exchangeRates}
+                    selectedWalletId={selectedWalletId}
+                    onSelectWallet={handleSelectWallet}
+                    onChangeCurrency={(curr) => setState(p => ({ ...p, currency: curr }))}
+                    onOpenNewTransaction={(type) => {
+                      setEditingTransaction(null);
+                      setFormDefaultType(type);
+                      setShowAddForm(true);
+                    }}
+                    onOpenDebts={() => setActiveTab('debts')}
+                    onOpenAllTransactions={() => setActiveTab('transactions')}
+                    onEditTransaction={handleEditTransaction}
+                    onDeleteTransaction={handleDeleteTransaction}
+                  />
                 )}
                 
                 {activeTab === 'goals' && <GoalTracker goals={state.goals} wallets={state.wallets} transactions={state.transactions} onAddGoal={(g) => setState(p => ({ ...p, goals: [...p.goals, { ...g, id: 'g-'+Date.now() }] }))} onUpdateGoalAmount={(id, amt) => setState(p => ({ ...p, goals: p.goals.map(g => g.id === id ? { ...g, currentAmount: g.currentAmount + amt } : g) }))} currencySymbol={state.currency.symbol} apiKey={state.apiKey} />}
@@ -972,7 +912,22 @@ const App: React.FC = () => {
                 {activeTab === 'chat' && <AIChat history={state.chatHistory} transactions={filteredTransactions} categories={state.categories} currency={state.currency.symbol} onSendMessage={(msg) => setState(p => ({ ...p, chatHistory: [...p.chatHistory, msg].slice(-30) }))} apiKey={state.apiKey} />}
                 {activeTab === 'debts' && <DebtManager debts={state.debts} wallets={state.wallets} onAddDebt={handleAddDebt} onUpdateDebt={handleUpdateDebt} onSettleDebt={handleSettleDebt} onPayDebt={handlePayDebt} onDeleteDebt={(id) => setState(p => ({ ...p, debts: p.debts.filter(d => d.id !== id) }))} currencySymbol={state.currency.symbol} currencyCode={state.currency.code} />}
                 {activeTab === 'subscriptions' && <SubscriptionManager subscriptions={state.subscriptions} categories={state.categories} onAdd={(sub) => setState(p => ({ ...p, subscriptions: [{...sub, id: 's-'+Date.now()}, ...p.subscriptions] }))} onRemove={(id) => setState(p => ({ ...p, subscriptions: p.subscriptions.filter(s => s.id !== id) }))} currencySymbol={state.currency.symbol} />}
-                {activeTab === 'zakat' && <ZakatCalculator totalBalance={totals.netWorthInBase} currencySymbol={state.currency.symbol} debts={state.debts} />}
+                {activeTab === 'zakat' && (
+                  <ZakatCalculator 
+                    totalBalance={totals.netWorthInBase} 
+                    currencySymbol={state.currency.symbol} 
+                    debts={state.debts}
+                    wallets={state.wallets}
+                    transactions={state.transactions}
+                    currencies={state.currencies}
+                    currentCurrency={state.currency}
+                    exchangeRates={state.exchangeRates}
+                    zakatProfiles={state.zakatProfiles}
+                    zakatPayments={state.zakatPayments}
+                    onSaveProfiles={(profiles) => setState(p => ({ ...p, zakatProfiles: profiles }))}
+                    onSavePayments={(payments) => setState(p => ({ ...p, zakatPayments: payments }))}
+                  />
+                )}
                 
                 {activeTab === 'transactions' && (
                     <div className="space-y-8">
@@ -1034,18 +989,18 @@ const App: React.FC = () => {
           </div>
         </main>
 
-        <div className="fixed bottom-0 left-0 right-0 pt-16 pb-[calc(1rem+env(safe-area-inset-bottom,0px))] px-4 md:px-0 flex justify-center pointer-events-none z-50 bg-gradient-to-t from-slate-950 via-slate-950/80 to-transparent">
-            <nav className="pointer-events-auto w-full md:max-w-xl bg-slate-900/95 backdrop-blur-2xl border border-white/10 flex items-center justify-between px-2 py-2 rounded-[2rem] shadow-[0_20px_40px_rgba(0,0,0,0.5)]">
+        <div className="fixed bottom-0 left-0 right-0 pt-16 pb-[calc(1rem+env(safe-area-inset-bottom,0px))] px-4 md:px-0 flex justify-center pointer-events-none z-50 bg-gradient-to-t from-[#0A0D10] via-[#0A0D10]/80 to-transparent">
+            <nav className="pointer-events-auto w-full md:max-w-xl bg-[#11161C]/95 backdrop-blur-2xl border border-white/10 flex items-center justify-between px-2 py-2 rounded-[2rem] shadow-[0_20px_50px_rgba(0,0,0,0.4)]">
                 <NavButton icon={<LayoutDashboard />} label="الرئيسية" active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} />
                 <NavButton icon={<Scale />} label="زكاتي" active={activeTab === 'zakat'} onClick={() => setActiveTab('zakat')} />
                 
                 <motion.button 
-                  whileHover={{ scale: 1.08 }}
-                  whileTap={{ scale: 0.92 }}
+                  whileHover={{ scale: 1.06 }}
+                  whileTap={{ scale: 0.94 }}
                   onClick={() => { setEditingTransaction(null); setShowAddForm(true); }}
-                  className="w-14 h-14 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-[1.5rem] shadow-[0_10px_20px_rgba(245,158,11,0.4)] flex items-center justify-center z-50 border-[4px] border-slate-900 mx-1 shrink-0"
+                  className="w-14 h-14 bg-[#D9B978] hover:bg-[#D9B978]/90 text-slate-950 rounded-[1.5rem] shadow-[0_10px_25px_rgba(217,185,120,0.35)] flex items-center justify-center z-50 border-[4px] border-[#11161C] mx-1 shrink-0"
                 >
-                  <Plus size={28} strokeWidth={4} />
+                  <Plus size={28} strokeWidth={3.5} />
                 </motion.button>
 
                 <NavButton icon={<HandCoins />} label="ديون" active={activeTab === 'debts'} onClick={() => setActiveTab('debts')} />
@@ -1060,21 +1015,21 @@ const App: React.FC = () => {
               whileHover={{ scale: 1.08 }}
               whileTap={{ scale: 0.9 }}
               onClick={() => setActiveTab('goals')} 
-              className="pointer-events-auto w-10 h-10 sm:w-12 sm:h-12 bg-slate-900/95 backdrop-blur-3xl border border-white/10 hover:border-amber-500/50 rounded-full flex flex-col items-center justify-center text-amber-500 shadow-[0_10px_25px_rgba(0,0,0,0.6)] group relative"
+              className="pointer-events-auto w-10 h-10 sm:w-12 sm:h-12 bg-[#11161C]/95 backdrop-blur-3xl border border-white/10 hover:border-[#D9B978]/50 rounded-full flex flex-col items-center justify-center text-[#D9B978] shadow-[0_10px_25px_rgba(0,0,0,0.5)] group relative"
               title="الأهداف المالية"
             >
               <Coins size={18} className="group-hover:scale-110 transition-transform" />
-              <span className="absolute right-12 sm:right-14 bg-slate-900/95 backdrop-blur-xl border border-white/10 text-white font-bold text-[10px] px-2.5 py-1 rounded-xl whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-md hidden group-hover:block">الأهداف</span>
+              <span className="absolute right-12 sm:right-14 bg-[#11161C]/95 backdrop-blur-xl border border-white/10 text-white font-bold text-[10px] px-2.5 py-1 rounded-xl whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-md hidden group-hover:block">الأهداف</span>
             </motion.button>
             <motion.button 
               whileHover={{ scale: 1.08 }}
               whileTap={{ scale: 0.9 }}
               onClick={() => setActiveTab('budgets')} 
-              className="pointer-events-auto w-10 h-10 sm:w-12 sm:h-12 bg-slate-900/95 backdrop-blur-3xl border border-white/10 hover:border-blue-500/50 rounded-full flex flex-col items-center justify-center text-blue-400 shadow-[0_10px_25px_rgba(0,0,0,0.6)] group relative"
+              className="pointer-events-auto w-10 h-10 sm:w-12 sm:h-12 bg-[#11161C]/95 backdrop-blur-3xl border border-white/10 hover:border-[#759BC8]/50 rounded-full flex flex-col items-center justify-center text-[#759BC8] shadow-[0_10px_25px_rgba(0,0,0,0.5)] group relative"
               title="إدارة الميزانية"
             >
               <LayoutDashboard size={18} className="group-hover:scale-110 transition-transform" />
-              <span className="absolute right-12 sm:right-14 bg-slate-900/95 backdrop-blur-xl border border-white/10 text-white font-bold text-[10px] px-2.5 py-1 rounded-xl whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-md hidden group-hover:block">الميزانية</span>
+              <span className="absolute right-12 sm:right-14 bg-[#11161C]/95 backdrop-blur-xl border border-white/10 text-white font-bold text-[10px] px-2.5 py-1 rounded-xl whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-md hidden group-hover:block">الميزانية</span>
             </motion.button>
           </div>
         )}
@@ -1137,7 +1092,10 @@ const App: React.FC = () => {
                 categories={state.categories} 
                 wallets={state.wallets} 
                 transactions={state.transactions}
+                debts={state.debts}
                 onSubmit={handleSubmitTransaction} 
+                onAddDebt={handleAddDebt}
+                onPayDebt={handlePayDebt}
                 onClose={() => { setShowAddForm(false); setEditingTransaction(null); setFormDefaultType(undefined); }} 
                 initialData={editingTransaction} 
                 defaultType={formDefaultType} 
@@ -1155,14 +1113,14 @@ const NavButton = ({ icon, label, active, onClick }: { icon: any, label: string,
   <motion.button 
     whileTap={{ scale: 0.92 }}
     onClick={onClick} 
-    className={`flex flex-col items-center justify-center gap-1 transition-all flex-1 min-w-[60px] group ${active ? 'text-amber-500' : 'text-slate-500'}`}
+    className={`flex flex-col items-center justify-center gap-1 transition-all flex-1 min-w-[60px] group ${active ? 'text-[#D9B978]' : 'text-slate-500'}`}
   >
-    <div className={`p-2 rounded-xl transition-all duration-300 relative ${active ? 'bg-amber-500/10 text-amber-500' : 'group-hover:bg-white/5'}`}>
-        {React.cloneElement(icon, { size: 24, strokeWidth: active ? 2.5 : 2 })}
+    <div className={`p-2 rounded-xl transition-all duration-300 relative ${active ? 'bg-[#D9B978]/10 text-[#D9B978]' : 'group-hover:bg-white/5'}`}>
+        {React.cloneElement(icon, { size: 24, strokeWidth: active ? 2.2 : 1.8 })}
         {active && (
           <motion.div 
             layoutId="activeTabGlow" 
-            className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-4 h-1 bg-amber-500 rounded-full shadow-[0_0_8px_rgba(245,158,11,0.8)]" 
+            className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-4 h-1 bg-[#D9B978] rounded-full shadow-[0_0_8px_rgba(217,185,120,0.8)]" 
           />
         )}
     </div>

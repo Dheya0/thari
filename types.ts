@@ -1,6 +1,53 @@
 
 export type TransactionType = 'income' | 'expense' | 'transfer' | 'adjustment' | 'transfer_to_goal';
 
+export type FinancialEventType = 
+  | 'expense'           // مصروف
+  | 'income'            // دخل
+  | 'transfer'          // تحويل
+  | 'debt_to_me'        // دين لي (إقراض)
+  | 'debt_on_me'        // دين عليّ (استلاف)
+  | 'debt_repayment'    // سداد دين
+  | 'balance_adjustment'; // تصحيح الرصيد
+
+export type LedgerAccountType = 
+  | 'asset'             // أصول: محافظ وحسابات نقدية
+  | 'liability'         // التزامات: ديون ومطلوبات
+  | 'receivable'        // مستحقات: ديون لي بذمة الغير
+  | 'payable'           // مطلوبات: ديون عليّ للغير
+  | 'equity'            // رأس المال / أرصدة افتتاحية
+  | 'income'            // إيرادات
+  | 'expense'           // مصروفات
+  | 'reconciliation';   // تسويات وفروقات أرصدة
+
+export interface JournalLine {
+  id: string;
+  accountId: string;
+  accountName: string;
+  accountType: LedgerAccountType;
+  debit: number;
+  credit: number;
+  currency: string;
+  rateSnapshot: number;
+  amountInBaseCurrency: number;
+  note?: string;
+}
+
+export interface JournalEntry {
+  id: string;
+  eventId: string;
+  eventType: FinancialEventType;
+  date: string;
+  timestamp: string;
+  description: string;
+  sourceWalletId?: string;
+  destinationWalletId?: string;
+  debtId?: string;
+  personName?: string;
+  lines: JournalLine[];
+  metadata?: Record<string, any>;
+}
+
 export type SyncState = 'LOCAL_ONLY' | 'PENDING' | 'SYNCING' | 'SYNCED' | 'FAILED' | 'CONFLICT';
 
 export interface Account {
@@ -127,18 +174,37 @@ export interface DebtInstallment {
   paidDate?: string;
 }
 
+export interface DebtPayment {
+  id: string;
+  debtId: string;
+  amount: number;
+  date: string;
+  walletId?: string;
+  walletName?: string;
+  note?: string;
+  receipt?: ReceiptAttachment;
+  createdAt: string;
+}
+
+export type DebtStatus = 'active' | 'partial' | 'settled' | 'overdue';
+
 export interface Debt {
   id: string;
   personName: string;
-  amount: number; // Total amount
-  paidAmount: number; // Amount paid so far
-  type: 'to_me' | 'on_me';
-  createdAt: string; // Date the debt was created
-  dueDate?: string;  // Expected repayment date (final)
+  personPhone?: string;
+  personTag?: 'individual' | 'friend' | 'family' | 'customer' | 'supplier';
+  amount: number; // المبلغ الأصلي Total/Original amount
+  originalAmount?: number;
+  paidAmount: number; // إجمالي المبلغ المدفوع Amount paid so far
+  type: 'to_me' | 'on_me'; // 'to_me' = دين لي (مستحق لي) | 'on_me' = دين علي (مستحق علي)
+  createdAt: string; // تاريخ الإنشاء
+  dueDate?: string;  // تاريخ الاستحقاق
   isPaid: boolean; // True only if fully paid
+  status?: DebtStatus; // حالة الدين
   note: string;
   currency: string;
-  installments?: DebtInstallment[]; // Optional list of installments
+  payments?: DebtPayment[]; // سجل الدفعات التفصيلي
+  installments?: DebtInstallment[]; // أقساط اختيارية
 }
 
 export interface Budget {
@@ -175,6 +241,47 @@ export interface AuditLog {
   timestamp: string;
 }
 
+export type ZakatScopeType = 'all' | 'selected_wallets' | 'custom';
+
+export interface ZakatProfile {
+  id: string;
+  name: string;
+  description?: string;
+  scopeType: ZakatScopeType;
+  selectedWalletIds: string[];
+  includeDebtsToMe: boolean;
+  includeDebtsOnMe: boolean;
+  gold24Grams: number;
+  gold21Grams: number;
+  gold18Grams: number;
+  silverGrams: number;
+  tradeInventoryValue: number;
+  tradingStocksValue: number;
+  investmentStocksMethod: 'liquid_ratio' | 'dividends_only';
+  longTermStocksValue: number;
+  longTermDividendsValue: number;
+  realEstateTradeValue: number;
+  hawlStartDate: string;
+  hawlDurationDays: number;
+  customDeductions?: number;
+  lastCalculatedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ZakatPaymentRecord {
+  id: string;
+  profileId: string;
+  profileName: string;
+  amount: number;
+  currency: string;
+  date: string;
+  recipient?: string;
+  walletId?: string;
+  note?: string;
+  cycleYear: string;
+}
+
 export interface AppState {
   accounts: Account[];
   activeAccountId: string;
@@ -190,6 +297,8 @@ export interface AppState {
   goals: Goal[];
   debts: Debt[];
   budgets: Budget[];
+  zakatProfiles?: ZakatProfile[];
+  zakatPayments?: ZakatPaymentRecord[];
   currency: Currency;
   currencies: Currency[];
   exchangeRates: Record<string, number>; // Custom Exchange Rates (Base: SAR)

@@ -1,6 +1,5 @@
-
 import React, { useMemo } from 'react';
-import { AlertTriangle, Clock, Calendar, ChevronLeft, Bell, TrendingUp, ZapOff } from 'lucide-react';
+import { AlertTriangle, Clock, ChevronLeft, Bell, TrendingUp, ZapOff } from 'lucide-react';
 import { Budget, Transaction, Debt, Subscription } from '../types';
 
 interface SmartAlertsProps {
@@ -11,11 +10,11 @@ interface SmartAlertsProps {
   categories: any[];
 }
 
-const SmartAlerts: React.FC<SmartAlertsProps> = ({ budgets, transactions, debts, subscriptions, categories }) => {
+export const FinancialAlerts: React.FC<SmartAlertsProps> = ({ budgets, transactions, debts, subscriptions, categories }) => {
   const alerts = useMemo(() => {
     const list: { id: string, type: 'warning' | 'critical' | 'info', message: string, icon: any }[] = [];
 
-    // 1. Spending Spike Detection (Anomaly)
+    // 1. Spending Spike Detection
     const thisWeekExpenses = transactions.filter(t => {
       const d = new Date(t.date);
       const now = new Date();
@@ -34,7 +33,7 @@ const SmartAlerts: React.FC<SmartAlertsProps> = ({ budgets, transactions, debts,
       list.push({
         id: 'anomaly-spike',
         type: 'warning',
-        message: `تنبيه: صرفك هذا الأسبوع أعلى من المعتاد بنسبة ${increase}%`,
+        message: `معدل الصرف هذا الأسبوع أعلى من المعتاد بنسبة ${increase}%`,
         icon: TrendingUp
       });
     }
@@ -47,7 +46,7 @@ const SmartAlerts: React.FC<SmartAlertsProps> = ({ budgets, transactions, debts,
         .reduce((sum, t) => sum + t.amount, 0);
       const percent = (spent / b.amount) * 100;
       if (percent >= 100) {
-        list.push({ id: `b-${b.categoryId}`, type: 'critical', message: `تجاوزت ميزانية ${categoryName}!`, icon: AlertTriangle });
+        list.push({ id: `b-${b.categoryId}`, type: 'critical', message: `تجاوزت ميزانية ${categoryName}`, icon: AlertTriangle });
       }
     });
 
@@ -61,12 +60,12 @@ const SmartAlerts: React.FC<SmartAlertsProps> = ({ budgets, transactions, debts,
       }
     });
 
-    // 4. Subscription Potential Waste (If high expense but no activity in category)
+    // 4. Subscription Verification
     subscriptions.forEach(s => {
-        const d = new Date(s.nextBillingDate);
-        if (d < today) {
-            list.push({ id: `s-expired-${s.id}`, type: 'warning', message: `اشتراك "${s.name}" قد يكون غير مفعل أو متأخر`, icon: ZapOff });
-        }
+      const d = new Date(s.nextBillingDate);
+      if (d < today) {
+        list.push({ id: `s-expired-${s.id}`, type: 'warning', message: `اشتراك "${s.name}" قد يحتاج للتجديد أو المراجعة`, icon: ZapOff });
+      }
     });
 
     return list;
@@ -75,36 +74,36 @@ const SmartAlerts: React.FC<SmartAlertsProps> = ({ budgets, transactions, debts,
   if (alerts.length === 0) return null;
 
   return (
-    <div className="mb-6 space-y-3 animate-fade">
-      <div className="flex items-center gap-2 px-2">
-        <Bell size={14} className="text-amber-500 animate-pulse" />
-        <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest">تنبيهات ثري الذكية</h3>
+    <div className="space-y-2.5">
+      <div className="flex items-center gap-2 px-1">
+        <Bell size={13} className="text-[#D9B978]" />
+        <h3 className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">التنبيهات المالية</h3>
       </div>
-      <div className="flex gap-2.5 overflow-x-auto no-scrollbar pb-1 snap-x">
+      <div className="flex gap-2.5 overflow-x-auto no-scrollbar pb-1">
         {alerts.map(alert => (
           <div 
             key={alert.id} 
-            className={`snap-start min-w-[85%] sm:min-w-[280px] p-3.5 sm:p-4 rounded-2xl border flex items-center gap-3 shadow-md backdrop-blur-md ${
-              alert.type === 'critical' ? 'bg-rose-500/10 border-rose-500/20' : 
-              alert.type === 'warning' ? 'bg-amber-500/10 border-amber-500/20' : 
-              'bg-blue-500/10 border-blue-500/20'
+            className={`min-w-[85%] sm:min-w-[280px] p-3.5 rounded-2xl border flex items-center gap-3 backdrop-blur-md ${
+              alert.type === 'critical' ? 'bg-[#C98387]/10 border-[#C98387]/25' : 
+              alert.type === 'warning' ? 'bg-[#D9B978]/10 border-[#D9B978]/25' : 
+              'bg-[#759BC8]/10 border-[#759BC8]/25'
             }`}
           >
             <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
-               alert.type === 'critical' ? 'bg-rose-500 text-white shadow-md shadow-rose-500/20' : 
-               alert.type === 'warning' ? 'bg-amber-500 text-slate-950' : 
-               'bg-blue-500 text-white'
+               alert.type === 'critical' ? 'bg-[#C98387] text-slate-950 font-bold' : 
+               alert.type === 'warning' ? 'bg-[#D9B978] text-slate-950 font-bold' : 
+               'bg-[#759BC8] text-slate-950 font-bold'
             }`}>
-              <alert.icon size={16} />
+              <alert.icon size={15} />
             </div>
-            <p className={`text-[11px] font-bold flex-1 leading-snug ${
-               alert.type === 'critical' ? 'text-rose-400' : 
-               alert.type === 'warning' ? 'text-amber-400' : 
-               'text-blue-400'
+            <p className={`text-xs font-medium flex-1 leading-snug ${
+               alert.type === 'critical' ? 'text-[#C98387]' : 
+               alert.type === 'warning' ? 'text-[#D9B978]' : 
+               'text-[#759BC8]'
             }`}>
               {alert.message}
             </p>
-            <ChevronLeft size={14} className="opacity-30 shrink-0" />
+            <ChevronLeft size={14} className="opacity-30 shrink-0 text-slate-400" />
           </div>
         ))}
       </div>
@@ -112,4 +111,4 @@ const SmartAlerts: React.FC<SmartAlertsProps> = ({ budgets, transactions, debts,
   );
 };
 
-export default SmartAlerts;
+export default FinancialAlerts;

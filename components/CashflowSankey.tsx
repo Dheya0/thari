@@ -85,8 +85,8 @@ const CashflowSankey: React.FC<CashflowSankeyProps> = ({ transactions, categorie
           </h4>
           <p className="text-[10px] sm:text-xs text-slate-400 font-bold">بوابة رصد التدفقات الواردة، وقنوات الحفظ، ونقاط التصريف</p>
         </div>
-        <div className="bg-slate-950 px-2.5 py-1 rounded-xl border border-white/5 text-[10px] font-black text-amber-500 shrink-0">
-          تفاعل ذكي
+        <div className="bg-[#171D24] px-2.5 py-1 rounded-xl border border-white/5 text-[10px] font-medium text-[#D9B978] shrink-0">
+          تحليل مباشر
         </div>
       </div>
 

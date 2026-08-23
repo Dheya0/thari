@@ -1,52 +1,82 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   X, Calendar, StickyNote, Wallet as WalletIcon, ArrowLeftRight, 
-  Camera, Image as ImageIcon, Trash2, Eye, CheckCircle2, Clock, 
-  AlertCircle, Sparkles, Search, History, Edit3, ArrowUpRight, 
-  ArrowDownLeft, ChevronDown, ChevronUp, Check, Filter
+  Camera, Image as ImageIcon, Trash2, CheckCircle2, Clock, 
+  AlertCircle, Search, ArrowUpRight, ArrowDownLeft, ChevronRight, 
+  UserPlus, UserMinus, Scale, Sliders, Check, Phone, DollarSign,
+  Tag, Info, Edit3
 } from 'lucide-react';
-import { Transaction, Category, TransactionType, Wallet, ReceiptAttachment } from '../types';
+import { 
+  Transaction, 
+  Category, 
+  TransactionType, 
+  Wallet, 
+  ReceiptAttachment, 
+  Debt, 
+  FinancialEventType 
+} from '../types';
 import { getIcon, DEFAULT_CURRENCIES, convertCurrency } from '../constants';
-import { validateTransactionData } from '../services/balanceEngine';
 
 interface TransactionFormProps {
   categories: Category[];
   wallets: Wallet[];
+  transactions?: Transaction[];
+  debts?: Debt[];
   onSubmit: (transaction: Omit<Transaction, 'id'> & { id?: string }) => void;
+  onAddDebt?: (debt: Omit<Debt, 'id'>, walletId?: string) => void;
+  onPayDebt?: (
+    id: string, 
+    amount: number, 
+    walletId?: string, 
+    noteSuffix?: string, 
+    customDebtUpdates?: Partial<Debt>,
+    paymentDate?: string
+  ) => void;
   onClose: () => void;
   initialData?: Transaction | null;
   exchangeRates: Record<string, number>;
-  defaultType?: TransactionType;
-  transactions?: Transaction[];
+  defaultType?: FinancialEventType | TransactionType;
 }
 
 const TransactionForm: React.FC<TransactionFormProps> = ({
   categories,
   wallets,
+  transactions = [],
+  debts = [],
   onSubmit,
+  onAddDebt,
+  onPayDebt,
   onClose,
   initialData,
   exchangeRates,
   defaultType,
-  transactions = []
 }) => {
-  // Mode: 'new' or 'edit'
-  const [mode, setMode] = useState<'new' | 'edit'>(
-    initialData || defaultType === 'adjustment' ? 'edit' : 'new'
-  );
-  
-  // Selected transaction when editing
-  const [selectedTxId, setSelectedTxId] = useState<string>(
-    initialData?.id || (transactions.length > 0 ? transactions[0].id : '')
-  );
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const [dropdownSearch, setDropdownSearch] = useState('');
-  const [dropdownFilter, setDropdownFilter] = useState<'all' | 'expense' | 'income' | 'transfer'>('all');
+  // Map initial type to financial event type
+  const mapInitialEventType = (): FinancialEventType | null => {
+    if (initialData) {
+      if (initialData.type === 'income') return 'income';
+      if (initialData.type === 'transfer') return 'transfer';
+      if (initialData.type === 'adjustment') return 'balance_adjustment';
+      return 'expense';
+    }
+    if (defaultType) {
+      if (defaultType === 'income') return 'income';
+      if (defaultType === 'transfer') return 'transfer';
+      if (defaultType === 'adjustment' || defaultType === 'balance_adjustment') return 'balance_adjustment';
+      if (defaultType === 'debt_to_me') return 'debt_to_me';
+      if (defaultType === 'debt_on_me') return 'debt_on_me';
+      if (defaultType === 'debt_repayment') return 'debt_repayment';
+      return 'expense';
+    }
+    return null;
+  };
 
-  const [type, setType] = useState<TransactionType>(
-    initialData?.type || (defaultType === 'adjustment' ? 'expense' : defaultType) || 'expense'
-  );
+  const [selectedEvent, setSelectedEvent] = useState<FinancialEventType | null>(mapInitialEventType);
+  const [isEditingExisting, setIsEditingExisting] = useState<boolean>(Boolean(initialData));
+  const [selectedTxForEdit, setSelectedTxForEdit] = useState<string>(initialData?.id || '');
+
+  // Form Fields State
   const [amount, setAmount] = useState(initialData ? initialData.amount.toString() : '');
   const [categoryId, setCategoryId] = useState(initialData?.categoryId || '');
   const [walletId, setWalletId] = useState(initialData?.walletId || wallets[0]?.id || '');
@@ -63,910 +93,1469 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
   const [showReceiptPreview, setShowReceiptPreview] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [dismissCrossCurrencyAlert, setDismissCrossCurrencyAlert] = useState(false);
-  const [permanentDismissCrossAlert, setPermanentDismissCrossAlert] = useState(() => {
-    try {
-      return localStorage.getItem('thari_hide_cross_currency_alert') === 'true';
-    } catch {
-      return false;
-    }
-  });
+
+  // Debt Specific States
+  const [personName, setPersonName] = useState('');
+  const [personPhone, setPersonPhone] = useState('');
+  const [debtDueDate, setDebtDueDate] = useState('');
+  const [linkDebtToWallet, setLinkDebtToWallet] = useState(true);
+  const [selectedDebtIdForRepayment, setSelectedDebtIdForRepayment] = useState<string>(
+    debts.find(d => !d.isPaid)?.id || ''
+  );
+
+  // Balance Adjustment Specific States
+  const [actualRealBalance, setActualRealBalance] = useState('');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const dropdownRef = useRef<HTMLDivElement>(null);
   
-  const initialWallet = wallets.find(w => w.id === (initialData?.walletId || wallets[0]?.id));
-  const [inputCurrency, setInputCurrency] = useState(initialData?.currency || initialWallet?.currencyCode || 'SAR');
+  const selectedSourceWallet = wallets.find(w => w.id === walletId) || wallets[0];
+  const selectedDestWallet = wallets.find(w => w.id === destinationWalletId) || (wallets.length > 1 ? wallets[1] : undefined);
+  
+  const [inputCurrency, setInputCurrency] = useState(
+    initialData?.currency || selectedSourceWallet?.currencyCode || 'SAR'
+  );
 
-  const selectedSourceWallet = wallets.find(w => w.id === walletId);
-  const selectedDestWallet = wallets.find(w => w.id === destinationWalletId);
-
-  // Close dropdown when clicking outside
+  // Sync default category when changing event type
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsDropdownOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  // Alternative wallet matching selected currency if available
-  const matchingCurrencyWallet = wallets.find(w => w.id !== walletId && w.currencyCode === inputCurrency);
-
-  const handleTogglePermanentDismiss = (checked: boolean) => {
-    setPermanentDismissCrossAlert(checked);
-    try {
-      if (checked) {
-        localStorage.setItem('thari_hide_cross_currency_alert', 'true');
-      } else {
-        localStorage.removeItem('thari_hide_cross_currency_alert');
-      }
-    } catch {
-      // storage unavailable
+    if (selectedEvent === 'expense' && !categoryId) {
+      const firstExp = categories.find(c => c.type === 'expense');
+      if (firstExp) setCategoryId(firstExp.id);
+    } else if (selectedEvent === 'income' && !categoryId) {
+      const firstInc = categories.find(c => c.type === 'income');
+      if (firstInc) setCategoryId(firstInc.id);
     }
-  };
+  }, [selectedEvent, categories]);
 
-  const populateFormWithTransaction = (tx: Transaction) => {
-    setSelectedTxId(tx.id);
-    setType(tx.type);
+  // Keep currency in sync with selected source wallet unless manually modified
+  useEffect(() => {
+    if (selectedSourceWallet && !initialData && selectedEvent !== 'transfer') {
+      setInputCurrency(selectedSourceWallet.currencyCode);
+    }
+  }, [walletId, selectedEvent]);
+
+  // List of active (unsettled) debts for repayment
+  const activeDebts = useMemo(() => {
+    return debts.filter(d => !d.isPaid);
+  }, [debts]);
+
+  // Selected debt details for repayment
+  const currentSelectedDebt = useMemo(() => {
+    return debts.find(d => d.id === selectedDebtIdForRepayment);
+  }, [debts, selectedDebtIdForRepayment]);
+
+  // Unique past contact names for autocomplete
+  const knownContacts = useMemo(() => {
+    const names = new Set<string>();
+    debts.forEach(d => {
+      if (d.personName) names.add(d.personName.trim());
+    });
+    return Array.from(names);
+  }, [debts]);
+
+  // Handle transaction selection in edit mode
+  const handleSelectTxForEdit = (txId: string) => {
+    const tx = transactions.find(t => t.id === txId);
+    if (!tx) return;
+    setSelectedTxForEdit(txId);
     setAmount(tx.amount.toString());
     setCategoryId(tx.categoryId || '');
     setWalletId(tx.walletId);
-    setDestinationWalletId(tx.destinationWalletId || (wallets.find(w => w.id !== tx.walletId)?.id || ''));
+    setDestinationWalletId(tx.destinationWalletId || '');
     setDestinationAmount(tx.destinationAmount ? tx.destinationAmount.toString() : '');
+    setInputCurrency(tx.currency || 'SAR');
     setNote(tx.note || '');
-    setDate(tx.date || new Date().toISOString().split('T')[0]);
-    setTime(tx.time || new Date().toTimeString().slice(0, 5));
-    setInputCurrency(tx.currency);
+    setDate(tx.date);
+    setTime(tx.time || '12:00');
     setReceipt(tx.receipt);
-    setErrorMessage('');
+
+    if (tx.type === 'income') setSelectedEvent('income');
+    else if (tx.type === 'transfer') setSelectedEvent('transfer');
+    else if (tx.type === 'adjustment') {
+      setSelectedEvent('balance_adjustment');
+      setActualRealBalance(tx.amount.toString());
+    } else setSelectedEvent('expense');
   };
 
-  // Initial load
-  useEffect(() => {
-    if (initialData) {
-      populateFormWithTransaction(initialData);
-      setMode('edit');
-    }
-  }, [initialData]);
-
-  // When switching to Edit tab, if no transaction is selected or to set the first one
-  const handleSwitchToEditMode = () => {
-    setMode('edit');
-    setErrorMessage('');
-    if (transactions.length > 0) {
-      const currentTx = transactions.find(t => t.id === selectedTxId) || transactions[0];
-      populateFormWithTransaction(currentTx);
-    }
-  };
-
-  // When switching to New mode
-  const handleSwitchToNewMode = (newType: TransactionType) => {
-    setMode('new');
-    setType(newType);
-    setAmount('');
-    setNote('');
-    setReceipt(undefined);
-    setErrorMessage('');
-    const defaultW = wallets[0];
-    if (defaultW) {
-      setWalletId(defaultW.id);
-      setInputCurrency(defaultW.currencyCode);
-    }
-    if (categories.length > 0) {
-      const availableCat = categories.find(c => c.type === (newType === 'transfer_to_goal' ? 'expense' : newType));
-      setCategoryId(availableCat?.id || '');
-    }
-  };
-
-  // Sync default currency on wallet change when in 'new' mode
-  useEffect(() => {
-    if (mode === 'new') {
-      const selectedW = wallets.find(w => w.id === walletId);
-      if (selectedW) {
-        setInputCurrency(selectedW.currencyCode);
-        setDismissCrossCurrencyAlert(false);
-      }
-    }
-  }, [walletId, wallets, mode]);
-
-  // Auto-calculate estimated destination amount if cross-currency transfer
-  useEffect(() => {
-    if (type === 'transfer' && amount && selectedSourceWallet && selectedDestWallet) {
-      const srcCurr = inputCurrency;
-      const destCurr = selectedDestWallet.currencyCode;
-      if (srcCurr === destCurr) {
-        setDestinationAmount(amount);
-      } else {
-        const numAmt = parseFloat(amount);
-        if (!isNaN(numAmt) && numAmt > 0) {
-          const estimated = convertCurrency(numAmt, srcCurr, destCurr, exchangeRates);
-          setDestinationAmount(estimated.toFixed(2));
-        }
-      }
-    }
-  }, [type, amount, inputCurrency, selectedSourceWallet, selectedDestWallet, exchangeRates]);
-
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Image Upload Handler
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (file.size > 4 * 1024 * 1024) {
-      setErrorMessage('حجم الصورة كبير جداً، يرجى اختيار صورة أقل من 4 ميجابايت');
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = () => {
-      const resultStr = reader.result as string;
-      setReceipt({
-        id: `rcp-${Date.now()}`,
-        fileName: file.name,
-        mimeType: file.type,
-        size: file.size,
-        dataUrl: resultStr,
-        createdAt: new Date().toISOString(),
-      });
-      setErrorMessage('');
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (isSubmitting) return;
-
-    const parsedAmount = parseFloat(amount);
-    if (!parsedAmount || isNaN(parsedAmount) || parsedAmount <= 0) {
-      setErrorMessage('يرجى إدخال مبلغ صحيح أكبر من صفر');
-      return;
-    }
-
-    if (type !== 'transfer' && type !== 'adjustment' && !categoryId) {
-      setErrorMessage('يرجى اختيار تصنيف للعملية');
-      return;
-    }
-
-    if (type === 'transfer') {
-      if (!destinationWalletId || destinationWalletId === walletId) {
-        setErrorMessage('يرجى اختيار محفظة مستلمة مختلفة عن المحفظة المصدر');
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        setErrorMessage('حجم الصورة كبير جداً، يرجى اختيار صورة أقل من 5 ميجابايت');
         return;
       }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setReceipt({
+          id: 'rcpt-' + Date.now(),
+          dataUrl: reader.result as string,
+          fileName: file.name,
+          mimeType: file.type,
+          size: file.size,
+          createdAt: new Date().toISOString()
+        });
+      };
+      reader.readAsDataURL(file);
     }
-
-    if (mode === 'edit' && transactions.length > 0 && !selectedTxId) {
-      setErrorMessage('يرجى اختيار المعاملة السابقة المراد تعديلها من القائمة المنسدلة');
-      return;
-    }
-
-    setIsSubmitting(true);
-
-    const walletNativeCurrency = selectedSourceWallet?.currencyCode || inputCurrency;
-    const isCrossCurrency = inputCurrency !== walletNativeCurrency;
-    const convertedInWallet = isCrossCurrency
-      ? convertCurrency(parsedAmount, inputCurrency, walletNativeCurrency, exchangeRates)
-      : parsedAmount;
-    const rateUsed = isCrossCurrency && parsedAmount > 0 ? (convertedInWallet / parsedAmount) : 1;
-
-    const editingOriginalTx = mode === 'edit' ? transactions.find(t => t.id === selectedTxId) : null;
-
-    const txPayload: Omit<Transaction, 'id'> & { id?: string } = {
-      ...(mode === 'edit' && selectedTxId ? { id: selectedTxId } : {}),
-      amount: parsedAmount,
-      type,
-      categoryId: type === 'transfer' ? 'transfer' : type === 'adjustment' ? 'adjustment' : categoryId,
-      walletId,
-      destinationWalletId: type === 'transfer' ? destinationWalletId : undefined,
-      destinationCurrency: type === 'transfer' && selectedDestWallet ? selectedDestWallet.currencyCode : undefined,
-      destinationAmount: type === 'transfer' && destinationAmount ? parseFloat(destinationAmount) : undefined,
-      walletCurrency: walletNativeCurrency,
-      convertedAmountInWalletCurrency: convertedInWallet,
-      exchangeRateUsed: rateUsed,
-      note: note.trim() || (type === 'transfer' ? `تحويل إلى ${selectedDestWallet?.name || 'محفظة أخرى'}` : ''),
-      date,
-      time,
-      currency: inputCurrency,
-      frequency: 'once',
-      receipt,
-      createdAt: editingOriginalTx?.createdAt || new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      syncStatus: 'PENDING',
-    };
-
-    const validation = validateTransactionData(txPayload as any);
-    if (!validation.isValid) {
-      setErrorMessage(validation.error || 'بيانات المعاملة غير مكتملة');
-      setIsSubmitting(false);
-      return;
-    }
-
-    onSubmit(txPayload);
   };
 
-  const isCrossCurrency = selectedSourceWallet && inputCurrency !== selectedSourceWallet.currencyCode;
-  const numAmount = parseFloat(amount) || 0;
-  const effectiveTotalInWallet = isCrossCurrency && selectedSourceWallet && numAmount > 0
-    ? convertCurrency(numAmount, inputCurrency, selectedSourceWallet.currencyCode, exchangeRates)
-    : 0;
-  const singleUnitRate = isCrossCurrency && selectedSourceWallet
-    ? convertCurrency(1, inputCurrency, selectedSourceWallet.currencyCode, exchangeRates)
-    : 1;
+  // Form Submissions
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMessage('');
 
-  // Filter transactions for dropdown selector
-  const filteredTransactions = transactions.filter(t => {
-    if (dropdownFilter !== 'all' && t.type !== dropdownFilter) return false;
-    if (!dropdownSearch.trim()) return true;
-    const query = dropdownSearch.toLowerCase();
-    const cat = categories.find(c => c.id === t.categoryId);
-    const wal = wallets.find(w => w.id === t.walletId);
-    const noteMatch = (t.note || '').toLowerCase().includes(query);
-    const catMatch = (cat?.name || '').toLowerCase().includes(query);
-    const walMatch = (wal?.name || '').toLowerCase().includes(query);
-    const amountMatch = t.amount.toString().includes(query);
-    const currMatch = (t.currency || '').toLowerCase().includes(query);
-    return noteMatch || catMatch || walMatch || amountMatch || currMatch;
-  });
+    if (!selectedEvent) {
+      setErrorMessage('يرجى اختيار نوع الحدث المالي أولاً');
+      return;
+    }
 
-  const currentEditingTx = transactions.find(t => t.id === selectedTxId);
-  const currentTxCat = categories.find(c => c.id === currentEditingTx?.categoryId);
-  const currentTxWal = wallets.find(w => w.id === currentEditingTx?.walletId);
+    const numericAmount = parseFloat(amount);
+
+    // 1. EXPENSE EVENT
+    if (selectedEvent === 'expense') {
+      if (isNaN(numericAmount) || numericAmount <= 0) {
+        setErrorMessage('يرجى إدخال مبلغ صحيح أكبر من الصفر');
+        return;
+      }
+      if (!walletId) {
+        setErrorMessage('يرجى اختيار محفظة الدفع');
+        return;
+      }
+
+      setIsSubmitting(true);
+      const rate = exchangeRates[inputCurrency] || 1;
+      const walletCurrency = selectedSourceWallet?.currencyCode || inputCurrency;
+      const convertedToWallet = inputCurrency === walletCurrency 
+        ? numericAmount 
+        : convertCurrency(numericAmount, inputCurrency, walletCurrency, exchangeRates);
+
+      const targetId = initialData?.id || (isEditingExisting ? selectedTxForEdit : undefined);
+
+      onSubmit({
+        ...(targetId ? { id: targetId } : {}),
+        amount: numericAmount,
+        type: 'expense',
+        categoryId: categoryId || 'general-expense',
+        walletId,
+        currency: inputCurrency,
+        exchangeRateUsed: rate,
+        convertedAmountInWalletCurrency: convertedToWallet,
+        date,
+        time,
+        frequency: 'once',
+        note: note.trim(),
+        receipt,
+      });
+      return;
+    }
+
+    // 2. INCOME EVENT
+    if (selectedEvent === 'income') {
+      if (isNaN(numericAmount) || numericAmount <= 0) {
+        setErrorMessage('يرجى إدخال مبلغ صحيح أكبر من الصفر');
+        return;
+      }
+      if (!walletId) {
+        setErrorMessage('يرجى اختيار محفظة الإيداع');
+        return;
+      }
+
+      setIsSubmitting(true);
+      const rate = exchangeRates[inputCurrency] || 1;
+      const walletCurrency = selectedSourceWallet?.currencyCode || inputCurrency;
+      const convertedToWallet = inputCurrency === walletCurrency 
+        ? numericAmount 
+        : convertCurrency(numericAmount, inputCurrency, walletCurrency, exchangeRates);
+
+      const targetId = initialData?.id || (isEditingExisting ? selectedTxForEdit : undefined);
+
+      onSubmit({
+        ...(targetId ? { id: targetId } : {}),
+        amount: numericAmount,
+        type: 'income',
+        categoryId: categoryId || 'general-income',
+        walletId,
+        currency: inputCurrency,
+        exchangeRateUsed: rate,
+        convertedAmountInWalletCurrency: convertedToWallet,
+        date,
+        time,
+        frequency: 'once',
+        note: note.trim(),
+        receipt,
+      });
+      return;
+    }
+
+    // 3. TRANSFER EVENT
+    if (selectedEvent === 'transfer') {
+      if (isNaN(numericAmount) || numericAmount <= 0) {
+        setErrorMessage('يرجى إدخال مبلغ التحويل بشكل صحيح');
+        return;
+      }
+      if (!walletId || !destinationWalletId) {
+        setErrorMessage('يرجى اختيار المحفظة المرسلة والمستلمة');
+        return;
+      }
+      if (walletId === destinationWalletId) {
+        setErrorMessage('لا يمكن التحويل لنفس المحفظة');
+        return;
+      }
+
+      setIsSubmitting(true);
+      const sourceCurrency = selectedSourceWallet?.currencyCode || 'SAR';
+      const destCurrency = selectedDestWallet?.currencyCode || sourceCurrency;
+      
+      let parsedDestAmount = parseFloat(destinationAmount);
+      if (isNaN(parsedDestAmount) || parsedDestAmount <= 0) {
+        parsedDestAmount = sourceCurrency === destCurrency 
+          ? numericAmount 
+          : convertCurrency(numericAmount, sourceCurrency, destCurrency, exchangeRates);
+      }
+
+      const targetId = initialData?.id || (isEditingExisting ? selectedTxForEdit : undefined);
+
+      onSubmit({
+        ...(targetId ? { id: targetId } : {}),
+        amount: numericAmount,
+        type: 'transfer',
+        categoryId: 'transfer-internal',
+        walletId,
+        destinationWalletId,
+        destinationAmount: parsedDestAmount,
+        destinationCurrency: destCurrency,
+        currency: sourceCurrency,
+        exchangeRateUsed: exchangeRates[sourceCurrency] || 1,
+        convertedAmountInWalletCurrency: numericAmount,
+        date,
+        time,
+        frequency: 'once',
+        note: note.trim() || `تحويل من ${selectedSourceWallet?.name} إلى ${selectedDestWallet?.name}`,
+      });
+      return;
+    }
+
+    // 4. DEBT TO ME (دين لي)
+    if (selectedEvent === 'debt_to_me') {
+      if (!personName.trim()) {
+        setErrorMessage('يرجى إدخال اسم الشخص أو الجهة المدين');
+        return;
+      }
+      if (isNaN(numericAmount) || numericAmount <= 0) {
+        setErrorMessage('يرجى إدخال مبلغ الدين بشكل صحيح');
+        return;
+      }
+
+      setIsSubmitting(true);
+      if (onAddDebt) {
+        onAddDebt({
+          personName: personName.trim(),
+          personPhone: personPhone.trim() || undefined,
+          amount: numericAmount,
+          originalAmount: numericAmount,
+          paidAmount: 0,
+          type: 'to_me',
+          currency: inputCurrency,
+          createdAt: date ? `${date}T${time}:00.000Z` : new Date().toISOString(),
+          dueDate: debtDueDate || undefined,
+          isPaid: false,
+          status: 'active',
+          note: note.trim(),
+          payments: []
+        }, linkDebtToWallet ? walletId : undefined);
+      }
+      onClose();
+      return;
+    }
+
+    // 5. DEBT ON ME (دين عليّ)
+    if (selectedEvent === 'debt_on_me') {
+      if (!personName.trim()) {
+        setErrorMessage('يرجى إدخال اسم صاحب الدين (الدائن)');
+        return;
+      }
+      if (isNaN(numericAmount) || numericAmount <= 0) {
+        setErrorMessage('يرجى إدخال مبلغ الدين بشكل صحيح');
+        return;
+      }
+
+      setIsSubmitting(true);
+      if (onAddDebt) {
+        onAddDebt({
+          personName: personName.trim(),
+          personPhone: personPhone.trim() || undefined,
+          amount: numericAmount,
+          originalAmount: numericAmount,
+          paidAmount: 0,
+          type: 'on_me',
+          currency: inputCurrency,
+          createdAt: date ? `${date}T${time}:00.000Z` : new Date().toISOString(),
+          dueDate: debtDueDate || undefined,
+          isPaid: false,
+          status: 'active',
+          note: note.trim(),
+          payments: []
+        }, linkDebtToWallet ? walletId : undefined);
+      }
+      onClose();
+      return;
+    }
+
+    // 6. DEBT REPAYMENT (تسديد دين)
+    if (selectedEvent === 'debt_repayment') {
+      if (!selectedDebtIdForRepayment) {
+        setErrorMessage('يرجى تحديد الدين المراد سداده');
+        return;
+      }
+      if (isNaN(numericAmount) || numericAmount <= 0) {
+        setErrorMessage('يرجى إدخال مبلغ السداد');
+        return;
+      }
+
+      setIsSubmitting(true);
+      if (onPayDebt) {
+        onPayDebt(
+          selectedDebtIdForRepayment,
+          numericAmount,
+          linkDebtToWallet ? walletId : undefined,
+          note.trim(),
+          undefined,
+          date
+        );
+      }
+      onClose();
+      return;
+    }
+
+    // 7. BALANCE ADJUSTMENT (تصحيح الرصيد)
+    if (selectedEvent === 'balance_adjustment') {
+      if (!walletId) {
+        setErrorMessage('يرجى اختيار المحفظة المراد تسوية رصيدها');
+        return;
+      }
+
+      const realBal = parseFloat(actualRealBalance);
+      if (isNaN(realBal)) {
+        setErrorMessage('يرجى إدخال الرصيد الفعلي الحقيقي الموجود في المحفظة');
+        return;
+      }
+
+      const currentLedgerBal = selectedSourceWallet ? (selectedSourceWallet.currentBalance || selectedSourceWallet.openingBalance || 0) : 0;
+      const difference = realBal - currentLedgerBal;
+
+      if (Math.abs(difference) < 0.001) {
+        setErrorMessage('الرصيد الفعلي مطابق للرصيد المسجل، لا توجد فروقات للتصحيح');
+        return;
+      }
+
+      setIsSubmitting(true);
+      const walletCurrency = selectedSourceWallet?.currencyCode || 'SAR';
+
+      const targetId = initialData?.id || (isEditingExisting ? selectedTxForEdit : undefined);
+
+      onSubmit({
+        ...(targetId ? { id: targetId } : {}),
+        amount: Math.abs(difference),
+        type: 'adjustment',
+        categoryId: 'balance-reconciliation',
+        walletId,
+        currency: walletCurrency,
+        exchangeRateUsed: exchangeRates[walletCurrency] || 1,
+        convertedAmountInWalletCurrency: Math.abs(difference),
+        date,
+        time,
+        frequency: 'once',
+        note: note.trim() || `تسوية رصيد: تعديل من ${currentLedgerBal.toLocaleString()} إلى ${realBal.toLocaleString()} ${walletCurrency}`,
+      });
+      return;
+    }
+  };
+
+  // Helper calculation for Adjustment
+  const adjustmentCalc = useMemo(() => {
+    if (selectedEvent !== 'balance_adjustment' || !selectedSourceWallet) return null;
+    const current = selectedSourceWallet.currentBalance ?? selectedSourceWallet.openingBalance ?? 0;
+    const actual = parseFloat(actualRealBalance);
+    if (isNaN(actual)) return { current, actual: null, diff: 0, isIncrease: true };
+    const diff = actual - current;
+    return {
+      current,
+      actual,
+      diff,
+      isIncrease: diff > 0,
+      absDiff: Math.abs(diff)
+    };
+  }, [selectedEvent, selectedSourceWallet, actualRealBalance]);
 
   return (
-    <motion.div
+    <motion.div 
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 z-[100] no-print overflow-hidden"
+      className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/80 backdrop-blur-md overflow-y-auto"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
     >
-      <motion.div
-        initial={{ scale: 0.95, y: 10, opacity: 0 }}
-        animate={{ scale: 1, y: 0, opacity: 1 }}
-        exit={{ scale: 0.95, y: 10, opacity: 0 }}
-        transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-        className="bg-slate-900 w-full max-w-md mx-auto rounded-3xl p-5 shadow-2xl relative max-h-[92vh] flex flex-col min-h-0 border border-white/10 overflow-hidden"
+      <motion.div 
+        initial={{ scale: 0.95, opacity: 0, y: 15 }}
+        animate={{ scale: 1, opacity: 1, y: 0 }}
+        exit={{ scale: 0.95, opacity: 0, y: 15 }}
+        className="w-full max-w-lg bg-slate-900 border border-white/10 rounded-3xl shadow-2xl overflow-hidden my-auto"
       >
-        {/* Header */}
-        <div className="flex justify-between items-center mb-3 shrink-0 pb-2.5 border-b border-white/5">
-          <div className="flex items-center gap-2">
-            <div className={`w-2.5 h-2.5 rounded-full ${mode === 'edit' ? 'bg-amber-400 animate-pulse' : 'bg-amber-500'}`} />
-            <h3 className="text-sm sm:text-base font-black text-white">
-              {mode === 'edit' ? 'تعديل معاملة سابقة من السجل' : 'تسجيل معاملة مالية جديدة'}
-            </h3>
+        {/* TOP BAR / NAVIGATION */}
+        <div className="p-4 sm:p-5 border-b border-white/5 flex items-center justify-between bg-slate-950/50">
+          <div className="flex items-center gap-2.5">
+            {selectedEvent && !initialData && (
+              <button 
+                type="button"
+                onClick={() => {
+                  setSelectedEvent(null);
+                  setErrorMessage('');
+                }}
+                className="w-9 h-9 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 flex items-center justify-center transition-colors"
+                title="الرجوع لقائمة الأحداث"
+              >
+                <ChevronRight size={20} />
+              </button>
+            )}
+
+            <div>
+              <h3 className="font-black text-white text-base sm:text-lg">
+                {!selectedEvent 
+                  ? 'ماذا حدث؟' 
+                  : selectedEvent === 'expense' ? 'تسجيل مصروف'
+                  : selectedEvent === 'income' ? 'إيداع دخل'
+                  : selectedEvent === 'transfer' ? 'تحويل مالي بين المحافظ'
+                  : selectedEvent === 'debt_to_me' ? 'قيد دين لي (مستحق لي)'
+                  : selectedEvent === 'debt_on_me' ? 'قيد دين عليّ (التزام)'
+                  : selectedEvent === 'debt_repayment' ? 'تسديد دفعة دين'
+                  : 'تصحيح وتسوية الرصيد'
+                }
+              </h3>
+              <p className="text-[11px] font-medium text-slate-400">
+                {!selectedEvent 
+                  ? 'اختر نوع الحدث المالي للتسجيل الدفتري'
+                  : 'تسجيل في دفتر القيود المحاسبية'
+                }
+              </p>
+            </div>
           </div>
-          <button
-            onClick={onClose}
-            className="p-1.5 bg-slate-800 hover:bg-slate-700 rounded-xl text-slate-400 hover:text-white transition-colors border border-white/5 active:scale-90"
-          >
-            <X size={16} />
-          </button>
+
+          <div className="flex items-center gap-1.5">
+            {!selectedEvent && transactions.length > 0 && !initialData && (
+              <button
+                type="button"
+                onClick={() => {
+                  setIsEditingExisting(!isEditingExisting);
+                  if (!isEditingExisting && transactions[0]) {
+                    handleSelectTxForEdit(transactions[0].id);
+                  }
+                }}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1 border ${
+                  isEditingExisting 
+                    ? 'bg-amber-500/20 text-amber-300 border-amber-500/30' 
+                    : 'bg-slate-800 text-slate-300 border-white/5 hover:bg-slate-700'
+                }`}
+              >
+                <Edit3 size={13} />
+                <span>تعديل سابق</span>
+              </button>
+            )}
+
+            <button 
+              type="button"
+              onClick={onClose}
+              className="w-9 h-9 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition-colors"
+            >
+              <X size={18} />
+            </button>
+          </div>
         </div>
 
-        {/* Top 4-Button Tabs: [مصروف | وارد | تحويل | تعديل ✏️] */}
-        <div className="grid grid-cols-4 bg-slate-950 p-1 rounded-2xl border border-white/5 shrink-0 gap-1 mb-3.5">
-          <button
-            type="button"
-            onClick={() => handleSwitchToNewMode('expense')}
-            className={`py-2 rounded-xl text-xs font-black transition-all ${
-              mode === 'new' && type === 'expense'
-                ? 'bg-rose-500 text-white shadow-md'
-                : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            مصروف
-          </button>
-          <button
-            type="button"
-            onClick={() => handleSwitchToNewMode('income')}
-            className={`py-2 rounded-xl text-xs font-black transition-all ${
-              mode === 'new' && type === 'income'
-                ? 'bg-emerald-500 text-slate-950 shadow-md font-black'
-                : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            وارد
-          </button>
-          <button
-            type="button"
-            onClick={() => handleSwitchToNewMode('transfer')}
-            className={`py-2 rounded-xl text-xs font-black transition-all ${
-              mode === 'new' && type === 'transfer'
-                ? 'bg-blue-500 text-white shadow-md'
-                : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            تحويل
-          </button>
-          <button
-            type="button"
-            onClick={handleSwitchToEditMode}
-            className={`py-2 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1 ${
-              mode === 'edit'
-                ? 'bg-amber-500 text-slate-950 shadow-md font-black'
-                : 'text-amber-400 hover:text-amber-300 bg-amber-500/10'
-            }`}
-          >
-            <Edit3 size={12} />
-            <span>تعديل</span>
-          </button>
-        </div>
-
-        {/* Error message banner */}
+        {/* ERROR BANNER */}
         {errorMessage && (
-          <div className="bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs font-bold p-2.5 rounded-xl mb-2.5 text-right shrink-0 flex items-center gap-1.5">
-            <AlertCircle size={14} className="shrink-0" />
+          <div className="mx-4 mt-3 p-3 bg-rose-500/10 border border-rose-500/20 rounded-2xl flex items-center gap-2.5 text-rose-400 text-xs font-bold">
+            <AlertCircle size={16} className="shrink-0" />
             <span>{errorMessage}</span>
           </div>
         )}
 
-        {/* Form Container */}
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto no-scrollbar space-y-3.5 min-h-0 pr-0.5 pl-0.5 pb-2">
-          
-          {/* ========================================================= */}
-          {/* 🌟 EDIT MODE: PROFESSIONAL DROPDOWN OF PREVIOUS RECORDS   */}
-          {/* ========================================================= */}
-          {mode === 'edit' && (
-            <div className="space-y-2 shrink-0" ref={dropdownRef}>
-              <div className="flex items-center justify-between px-1">
-                <label className="text-[11px] font-bold text-amber-400 flex items-center gap-1.5">
-                  <History size={13} />
-                  <span>اختر المعاملة السابقة من القائمة المنسدلة:</span>
-                </label>
-                <span className="text-[10px] text-slate-400">
-                  {transactions.length} معاملة مسجلة
-                </span>
-              </div>
-
-              {transactions.length === 0 ? (
-                <div className="bg-slate-950/80 border border-dashed border-white/10 rounded-2xl p-4 text-center space-y-2">
-                  <p className="text-xs font-bold text-slate-300">لا توجد لديك معاملات سابقة في السجل حتى الآن</p>
+        {/* SCREEN 1: EVENT SELECTION GRID ("ماذا حدث؟") */}
+        {!selectedEvent && (
+          <div className="p-4 sm:p-6 space-y-4">
+            {/* If Edit mode selected from selector */}
+            {isEditingExisting && (
+              <div className="p-3.5 bg-amber-500/5 rounded-2xl border border-amber-500/20 space-y-3 animate-fade">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Edit3 size={15} className="text-amber-400" />
+                    <span className="text-xs font-bold text-amber-300">تعديل عملية مسجلة سابقة</span>
+                  </div>
                   <button
                     type="button"
-                    onClick={() => handleSwitchToNewMode('expense')}
-                    className="px-3 py-1.5 bg-amber-500 text-slate-950 text-xs font-black rounded-xl"
+                    onClick={() => setIsEditingExisting(false)}
+                    className="text-[11px] text-slate-400 hover:text-white px-2 py-0.5 rounded-lg bg-slate-800/80"
                   >
-                    تسجيل معاملة جديدة
+                    إلغاء التعديل
                   </button>
                 </div>
-              ) : (
-                <div className="relative">
-                  {/* Dropdown Toggle Trigger Button */}
-                  <button
-                    type="button"
-                    onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                    className="w-full bg-slate-950 hover:bg-slate-900 border border-amber-500/40 focus:border-amber-400 p-3 rounded-2xl text-right transition-all flex items-center justify-between gap-2 shadow-lg group active:scale-[0.99]"
-                  >
-                    {currentEditingTx ? (
-                      <div className="flex items-center gap-2.5 overflow-hidden">
-                        <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 border ${
-                          currentEditingTx.type === 'expense' ? 'bg-rose-500/15 text-rose-400 border-rose-500/30' :
-                          currentEditingTx.type === 'income' ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' :
-                          'bg-blue-500/15 text-blue-400 border-blue-500/30'
-                        }`}>
-                          {currentEditingTx.type === 'expense' ? <ArrowUpRight size={15} /> :
-                           currentEditingTx.type === 'income' ? <ArrowDownLeft size={15} /> :
-                           <ArrowLeftRight size={14} />}
-                        </div>
-                        <div className="truncate text-right">
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-xs font-bold text-white truncate">
-                              {currentEditingTx.note || (currentEditingTx.type === 'transfer' ? 'تحويل' : currentTxCat?.name || 'معاملة')}
-                            </span>
-                            <span className="text-[10px] text-amber-400/90 font-medium px-1.5 py-0.2 bg-amber-500/10 rounded-md">
-                              {currentTxWal?.name}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-2 text-[10px] text-slate-400 mt-0.5">
-                            <span>{currentEditingTx.date}</span>
-                            <span>•</span>
-                            <span className="font-bold dir-ltr text-amber-300">
-                              {currentEditingTx.amount.toLocaleString()} {currentEditingTx.currency}
-                            </span>
-                          </div>
-                        </div>
+
+                {transactions.length === 0 ? (
+                  <p className="text-xs text-slate-400 py-2 text-center">لا توجد عمليات مسجلة حتى الآن للتعديل.</p>
+                ) : (
+                  <div className="space-y-2">
+                    <label className="text-[11px] font-bold text-slate-400 block">اختر العملية من السجل:</label>
+                    <select
+                      value={selectedTxForEdit}
+                      onChange={(e) => handleSelectTxForEdit(e.target.value)}
+                      className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-amber-500 font-bold"
+                    >
+                      {transactions.slice(0, 40).map(t => {
+                        const cat = categories.find(c => c.id === t.categoryId);
+                        const typeLabel = t.type === 'expense' ? 'مصروف' : t.type === 'income' ? 'دخل' : t.type === 'transfer' ? 'تحويل' : 'تسوية';
+                        return (
+                          <option key={t.id} value={t.id}>
+                            {t.date} | {typeLabel} ({cat?.name || 'عام'}): {t.amount.toLocaleString()} {t.currency || 'SAR'} {t.note ? `- ${t.note}` : ''}
+                          </option>
+                        );
+                      })}
+                    </select>
+
+                    {selectedTxForEdit && (
+                      <div className="pt-1 flex justify-end">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const tx = transactions.find(t => t.id === selectedTxForEdit);
+                            if (tx) handleSelectTxForEdit(tx.id);
+                          }}
+                          className="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded-xl text-xs flex items-center gap-1.5 transition-all shadow-md"
+                        >
+                          <span>فتح نموذج التعديل</span>
+                          <ChevronRight size={14} className="rotate-180" />
+                        </button>
                       </div>
-                    ) : (
-                      <span className="text-xs font-bold text-slate-400">
-                        اضغط لفتح القائمة واختيار معاملة...
-                      </span>
                     )}
-
-                    <div className="flex items-center gap-1 text-amber-400 shrink-0">
-                      <span className="text-[10.5px] font-bold hidden sm:inline">تغيير</span>
-                      {isDropdownOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                    </div>
-                  </button>
-
-                  {/* Dropdown Floating Menu */}
-                  <AnimatePresence>
-                    {isDropdownOpen && (
-                      <motion.div
-                        initial={{ opacity: 0, y: -6, scale: 0.98 }}
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{ opacity: 0, y: -6, scale: 0.98 }}
-                        transition={{ duration: 0.15 }}
-                        className="absolute top-full left-0 right-0 mt-1.5 bg-slate-950/95 backdrop-blur-xl border border-amber-500/40 rounded-2xl p-2.5 shadow-2xl z-50 max-h-64 flex flex-col min-h-0 space-y-2 overflow-hidden"
-                      >
-                        {/* Search and Filters inside dropdown */}
-                        <div className="space-y-1.5 shrink-0">
-                          <div className="relative">
-                            <Search size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                            <input
-                              type="text"
-                              value={dropdownSearch}
-                              onChange={(e) => setDropdownSearch(e.target.value)}
-                              placeholder="بحث سريع بالملاحظة، المحفظة، أو المبلغ..."
-                              className="w-full pl-3 pr-8 py-1.5 rounded-xl bg-slate-900 border border-white/10 text-xs text-white placeholder:text-slate-500 outline-none focus:border-amber-500/50 text-right"
-                              autoFocus
-                            />
-                            {dropdownSearch && (
-                              <button
-                                type="button"
-                                onClick={() => setDropdownSearch('')}
-                                className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
-                              >
-                                <X size={12} />
-                              </button>
-                            )}
-                          </div>
-
-                          {/* Filter pills */}
-                          <div className="flex gap-1 overflow-x-auto no-scrollbar flex-row-reverse pb-0.5">
-                            {[
-                              { id: 'all', label: 'الكل' },
-                              { id: 'expense', label: 'مصروف' },
-                              { id: 'income', label: 'وارد' },
-                              { id: 'transfer', label: 'تحويل' },
-                            ].map(f => (
-                              <button
-                                key={f.id}
-                                type="button"
-                                onClick={() => setDropdownFilter(f.id as any)}
-                                className={`px-2.5 py-0.5 rounded-lg text-[10.5px] font-bold border transition-all shrink-0 ${
-                                  dropdownFilter === f.id
-                                    ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 font-black'
-                                    : 'bg-slate-900 text-slate-400 border-white/5 hover:border-white/15'
-                                }`}
-                              >
-                                {f.label}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-
-                        {/* List Items in Dropdown */}
-                        <div className="flex-1 overflow-y-auto no-scrollbar space-y-1.5 min-h-0 pr-0.5">
-                          {filteredTransactions.length === 0 ? (
-                            <div className="text-center py-4 text-slate-400 text-xs">
-                              لا توجد معاملات مطابقة للبحث
-                            </div>
-                          ) : (
-                            filteredTransactions.map(tx => {
-                              const cat = categories.find(c => c.id === tx.categoryId);
-                              const wal = wallets.find(w => w.id === tx.walletId);
-                              const isSelected = tx.id === selectedTxId;
-                              const isExp = tx.type === 'expense';
-                              const isInc = tx.type === 'income';
-
-                              return (
-                                <div
-                                  key={tx.id}
-                                  onClick={() => {
-                                    populateFormWithTransaction(tx);
-                                    setIsDropdownOpen(false);
-                                  }}
-                                  className={`p-2 rounded-xl cursor-pointer transition-all flex items-center justify-between gap-2 border ${
-                                    isSelected
-                                      ? 'bg-amber-500/15 border-amber-500/50 text-white'
-                                      : 'bg-slate-900/80 hover:bg-slate-800/90 border-white/5 text-slate-300'
-                                  }`}
-                                >
-                                  <div className="flex items-center gap-2 overflow-hidden">
-                                    <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 text-xs border ${
-                                      isExp ? 'bg-rose-500/10 text-rose-400 border-rose-500/20' :
-                                      isInc ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
-                                      'bg-blue-500/10 text-blue-400 border-blue-500/20'
-                                    }`}>
-                                      {isExp ? <ArrowUpRight size={13} /> : isInc ? <ArrowDownLeft size={13} /> : <ArrowLeftRight size={12} />}
-                                    </div>
-                                    <div className="text-right truncate">
-                                      <p className="text-xs font-bold truncate">
-                                        {tx.note || (tx.type === 'transfer' ? 'تحويل' : cat?.name || 'معاملة')}
-                                      </p>
-                                      <p className="text-[10px] text-slate-400">
-                                        {wal?.name} • {tx.date}
-                                      </p>
-                                    </div>
-                                  </div>
-
-                                  <div className="text-left shrink-0 flex items-center gap-1.5">
-                                    <span className={`text-xs font-black dir-ltr ${
-                                      isExp ? 'text-rose-400' : isInc ? 'text-emerald-400' : 'text-blue-400'
-                                    }`}>
-                                      {tx.amount.toLocaleString()} {tx.currency}
-                                    </span>
-                                    {isSelected && <Check size={14} className="text-amber-400" />}
-                                  </div>
-                                </div>
-                              );
-                            })
-                          )}
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Transfer Info Note */}
-          {type === 'transfer' && (
-            <p className="text-[10px] text-blue-300/80 px-1 text-right font-medium">
-              💡 <strong>التحويل:</strong> نقل أموال بين محافظك الخاصة (مثلاً: صرف يمني إلى دولار أو سحب بنكي إلى كاش)، ولا يُحسب كمصروف أو إيراد جديد.
-            </p>
-          )}
-
-          {/* Amount & Currency Fields */}
-          <div className="space-y-1 shrink-0">
-            <div className="bg-slate-950/80 border border-white/10 p-3.5 rounded-2xl flex flex-col gap-1.5 focus-within:border-amber-500/50 transition-colors">
-              <div className="flex items-center justify-between text-right">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">المبلغ والعملة</span>
-                <span className="text-[10px] text-amber-400/80 font-semibold">
-                  {type === 'transfer' ? 'المبلغ المحوّل من المصدر' : mode === 'edit' ? 'تعديل المبلغ' : 'قيمة المعاملة'}
-                </span>
+                  </div>
+                )}
               </div>
-              <div className="flex items-center justify-between gap-3 w-full">
-                <div className="relative shrink-0">
+            )}
+
+            <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
+              {/* 1. EXPENSE */}
+              <button
+                type="button"
+                onClick={() => setSelectedEvent('expense')}
+                className="p-4 rounded-2xl bg-slate-950/60 border border-white/5 hover:border-rose-500/40 hover:bg-rose-500/5 transition-all text-right group flex flex-col justify-between min-h-[95px] relative overflow-hidden"
+              >
+                <div className="flex items-center justify-between w-full">
+                  <span className="font-black text-white text-sm sm:text-base group-hover:text-rose-400 transition-colors">مصروف</span>
+                  <div className="w-8 h-8 rounded-xl bg-rose-500/10 text-rose-400 flex items-center justify-center group-hover:scale-110 transition-transform border border-rose-500/20">
+                    <ArrowDownLeft size={18} />
+                  </div>
+                </div>
+                <p className="text-[10px] text-slate-400 mt-2 font-medium">تسجيل نفقة، شراء، فواتير</p>
+              </button>
+
+              {/* 2. INCOME */}
+              <button
+                type="button"
+                onClick={() => setSelectedEvent('income')}
+                className="p-4 rounded-2xl bg-slate-950/60 border border-white/5 hover:border-emerald-500/40 hover:bg-emerald-500/5 transition-all text-right group flex flex-col justify-between min-h-[95px]"
+              >
+                <div className="flex items-center justify-between w-full">
+                  <span className="font-black text-white text-sm sm:text-base group-hover:text-emerald-400 transition-colors">دخل</span>
+                  <div className="w-8 h-8 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center group-hover:scale-110 transition-transform border border-emerald-500/20">
+                    <ArrowUpRight size={18} />
+                  </div>
+                </div>
+                <p className="text-[10px] text-slate-400 mt-2 font-medium">إيداع راتب، أرباح، إيرادات</p>
+              </button>
+
+              {/* 3. TRANSFER */}
+              <button
+                type="button"
+                onClick={() => setSelectedEvent('transfer')}
+                className="p-4 rounded-2xl bg-slate-950/60 border border-white/5 hover:border-blue-500/40 hover:bg-blue-500/5 transition-all text-right group flex flex-col justify-between min-h-[95px]"
+              >
+                <div className="flex items-center justify-between w-full">
+                  <span className="font-black text-white text-sm sm:text-base group-hover:text-blue-400 transition-colors">تحويل</span>
+                  <div className="w-8 h-8 rounded-xl bg-blue-500/10 text-blue-400 flex items-center justify-center group-hover:scale-110 transition-transform border border-blue-500/20">
+                    <ArrowLeftRight size={18} />
+                  </div>
+                </div>
+                <p className="text-[10px] text-slate-400 mt-2 font-medium">نقل أموال بين المحافظ والحسابات</p>
+              </button>
+
+              {/* 4. DEBT TO ME */}
+              <button
+                type="button"
+                onClick={() => setSelectedEvent('debt_to_me')}
+                className="p-4 rounded-2xl bg-slate-950/60 border border-white/5 hover:border-teal-500/40 hover:bg-teal-500/5 transition-all text-right group flex flex-col justify-between min-h-[95px]"
+              >
+                <div className="flex items-center justify-between w-full">
+                  <span className="font-black text-white text-sm sm:text-base group-hover:text-teal-400 transition-colors">دين لي</span>
+                  <div className="w-8 h-8 rounded-xl bg-teal-500/10 text-teal-400 flex items-center justify-center group-hover:scale-110 transition-transform border border-teal-500/20">
+                    <UserPlus size={18} />
+                  </div>
+                </div>
+                <p className="text-[10px] text-slate-400 mt-2 font-medium">إقراض مبلغ لشخص (مستحق لي)</p>
+              </button>
+
+              {/* 5. DEBT ON ME */}
+              <button
+                type="button"
+                onClick={() => setSelectedEvent('debt_on_me')}
+                className="p-4 rounded-2xl bg-slate-950/60 border border-white/5 hover:border-amber-500/40 hover:bg-amber-500/5 transition-all text-right group flex flex-col justify-between min-h-[95px]"
+              >
+                <div className="flex items-center justify-between w-full">
+                  <span className="font-black text-white text-sm sm:text-base group-hover:text-amber-400 transition-colors">دين عليّ</span>
+                  <div className="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center group-hover:scale-110 transition-transform border border-amber-500/20">
+                    <UserMinus size={18} />
+                  </div>
+                </div>
+                <p className="text-[10px] text-slate-400 mt-2 font-medium">استلاف مبلغ أو التزام للغير</p>
+              </button>
+
+              {/* 6. DEBT REPAYMENT */}
+              <button
+                type="button"
+                onClick={() => setSelectedEvent('debt_repayment')}
+                className="p-4 rounded-2xl bg-slate-950/60 border border-white/5 hover:border-indigo-500/40 hover:bg-indigo-500/5 transition-all text-right group flex flex-col justify-between min-h-[95px]"
+              >
+                <div className="flex items-center justify-between w-full">
+                  <span className="font-black text-white text-sm sm:text-base group-hover:text-indigo-400 transition-colors">تسديد دين</span>
+                  <div className="w-8 h-8 rounded-xl bg-indigo-500/10 text-indigo-400 flex items-center justify-center group-hover:scale-110 transition-transform border border-indigo-500/20">
+                    <CheckCircle2 size={18} />
+                  </div>
+                </div>
+                <p className="text-[10px] text-slate-400 mt-2 font-medium">دفع أو استرداد دفعة من ذمة</p>
+              </button>
+
+              {/* 7. BALANCE ADJUSTMENT */}
+              <button
+                type="button"
+                onClick={() => setSelectedEvent('balance_adjustment')}
+                className="p-4 rounded-2xl bg-slate-950/60 border border-white/5 hover:border-purple-500/40 hover:bg-purple-500/5 transition-all text-right group flex flex-col justify-between min-h-[95px]"
+              >
+                <div className="flex items-center justify-between w-full">
+                  <span className="font-black text-white text-sm sm:text-base group-hover:text-purple-400 transition-colors">تصحيح الرصيد</span>
+                  <div className="w-8 h-8 rounded-xl bg-purple-500/10 text-purple-400 flex items-center justify-center group-hover:scale-110 transition-transform border border-purple-500/20">
+                    <Scale size={18} />
+                  </div>
+                </div>
+                <p className="text-[10px] text-slate-400 mt-2 font-medium">تسوية ومطابقة الرصيد الفعلي</p>
+              </button>
+
+              {/* 8. EDIT PREVIOUS TRANSACTION */}
+              <button
+                type="button"
+                onClick={() => {
+                  setIsEditingExisting(true);
+                  if (transactions.length > 0) {
+                    handleSelectTxForEdit(selectedTxForEdit || transactions[0].id);
+                  }
+                }}
+                className={`p-4 rounded-2xl border transition-all text-right group flex flex-col justify-between min-h-[95px] relative overflow-hidden ${
+                  isEditingExisting
+                    ? 'bg-amber-500/15 border-amber-500/40 text-amber-300'
+                    : 'bg-slate-950/60 border-white/5 hover:border-amber-500/40 hover:bg-amber-500/5'
+                }`}
+              >
+                <div className="flex items-center justify-between w-full">
+                  <span className="font-black text-white text-sm sm:text-base group-hover:text-amber-400 transition-colors">تعديل عملية سابقة</span>
+                  <div className="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center group-hover:scale-110 transition-transform border border-amber-500/20">
+                    <Edit3 size={18} />
+                  </div>
+                </div>
+                <p className="text-[10px] text-slate-400 mt-2 font-medium">تعديل قيود المصاريف والدخل السابقة</p>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* SCREEN 2: DEDICATED EVENT FORM */}
+        {selectedEvent && (
+          <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4 max-h-[80vh] overflow-y-auto custom-scrollbar">
+            
+            {/* === 1. EXPENSE VIEW === */}
+            {selectedEvent === 'expense' && (
+              <>
+                {/* Amount & Currency */}
+                <div className="p-4 bg-slate-950/80 rounded-2xl border border-white/5 space-y-2">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">مبلغ المصروف والعملة</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      step="any"
+                      required
+                      autoFocus
+                      placeholder="0.00"
+                      value={amount}
+                      onChange={(e) => setAmount(e.target.value)}
+                      className="w-full bg-transparent text-2xl sm:text-3xl font-black text-white focus:outline-none placeholder-slate-600"
+                    />
+                    <select
+                      value={inputCurrency}
+                      onChange={(e) => setInputCurrency(e.target.value)}
+                      className="bg-slate-900 border border-white/10 rounded-xl px-2.5 py-1.5 text-xs text-amber-400 font-bold focus:outline-none shrink-0"
+                    >
+                      {DEFAULT_CURRENCIES.map(c => (
+                        <option key={c.code} value={c.code}>{c.symbol} - {c.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Wallet to pay from */}
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold text-slate-400 flex items-center gap-1.5">
+                    <WalletIcon size={14} className="text-amber-400" />
+                    <span>الدفع من محفظة:</span>
+                  </label>
                   <select
-                    value={inputCurrency}
-                    onChange={(e) => setInputCurrency(e.target.value)}
-                    className="appearance-none bg-slate-900 border border-white/15 text-amber-400 text-xs font-black rounded-xl py-2 pl-6 pr-3 outline-none uppercase tracking-wider shadow-md cursor-pointer hover:border-amber-400"
+                    value={walletId}
+                    onChange={(e) => setWalletId(e.target.value)}
+                    className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white font-bold focus:outline-none focus:border-amber-500"
                   >
-                    {DEFAULT_CURRENCIES.map(c => (
-                      <option key={c.code} value={c.code}>
-                        {c.code} ({c.symbol})
+                    {wallets.map(w => (
+                      <option key={w.id} value={w.id}>
+                        {w.name} ({w.currencyCode}) — الرصيد: {(w.currentBalance ?? w.openingBalance ?? 0).toLocaleString()} {w.currencyCode}
                       </option>
                     ))}
                   </select>
                 </div>
 
-                <input
-                  type="number"
-                  step="any"
-                  inputMode="decimal"
-                  value={amount}
-                  onChange={(e) => { setAmount(e.target.value); setErrorMessage(''); }}
-                  placeholder="0.00"
-                  className="w-full text-2xl sm:text-3xl font-black text-right bg-transparent border-none outline-none text-white placeholder:text-white/20"
-                  autoFocus={mode === 'new'}
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Source Wallet Selector */}
-          <div className="space-y-1.5 shrink-0">
-            <label className="text-[11px] font-bold text-slate-400 px-1 block text-right">
-              {type === 'transfer' ? 'المحفظة المصدر (يخصم منها)' : 'المحفظة المتأثرة'}
-            </label>
-            <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1 px-1 flex-row-reverse">
-              {wallets.map(w => (
-                <button
-                  key={w.id}
-                  type="button"
-                  onClick={() => setWalletId(w.id)}
-                  className={`shrink-0 px-3.5 py-2 rounded-xl border transition-all text-xs font-bold flex items-center gap-1.5 ${
-                    walletId === w.id
-                      ? 'bg-amber-500 text-slate-950 border-amber-500 font-black shadow-md'
-                      : 'bg-slate-950 text-slate-400 border-white/10 hover:border-white/20'
-                  }`}
-                >
-                  <div className="w-2 h-2 rounded-full" style={{ backgroundColor: w.color }} />
-                  <span>{w.name}</span>
-                  <span className="text-[10px] opacity-75">({w.currencyCode})</span>
-                </button>
-              ))}
-            </div>
-
-            {/* Multi-Currency & Cross-Wallet Notice Banner */}
-            {type !== 'transfer' && isCrossCurrency && selectedSourceWallet && !dismissCrossCurrencyAlert && !permanentDismissCrossAlert && (
-              <motion.div
-                initial={{ opacity: 0, y: -5 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -5 }}
-                className="bg-gradient-to-r from-amber-500/15 via-amber-500/10 to-amber-950/20 border border-amber-500/35 rounded-2xl p-3 space-y-2 mt-2 text-right"
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex items-center gap-1.5 text-amber-400 font-black text-xs">
-                    <Sparkles size={14} className="text-amber-400 shrink-0 animate-pulse" />
-                    <span>تنبيه العملات المتعددة والصرف الآلي</span>
+                {/* Expense Categories */}
+                <div className="space-y-2">
+                  <label className="text-[11px] font-bold text-slate-400 flex items-center gap-1.5">
+                    <Tag size={14} className="text-rose-400" />
+                    <span>تصنيف المصروف:</span>
+                  </label>
+                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-1.5 max-h-36 overflow-y-auto custom-scrollbar p-1">
+                    {categories.filter(c => c.type === 'expense').map(cat => {
+                      const isSelected = categoryId === cat.id;
+                      return (
+                        <button
+                          key={cat.id}
+                          type="button"
+                          onClick={() => setCategoryId(cat.id)}
+                          className={`p-2 rounded-xl border text-xs font-bold flex flex-col items-center gap-1 transition-all ${
+                            isSelected 
+                              ? 'bg-rose-500/20 text-rose-300 border-rose-500/50 shadow-sm' 
+                              : 'bg-slate-950/60 border-white/5 text-slate-400 hover:text-white hover:bg-slate-900'
+                          }`}
+                        >
+                          <span className="text-[10px] truncate max-w-full">{cat.name}</span>
+                        </button>
+                      );
+                    })}
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setDismissCrossCurrencyAlert(true)}
-                    className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-white/10 transition-colors"
-                    title="إخفاء التنبيه"
-                  >
-                    <X size={13} />
-                  </button>
+                </div>
+              </>
+            )}
+
+            {/* === 2. INCOME VIEW === */}
+            {selectedEvent === 'income' && (
+              <>
+                {/* Amount & Currency */}
+                <div className="p-4 bg-slate-950/80 rounded-2xl border border-white/5 space-y-2">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">مبلغ الدخل والعملة</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      step="any"
+                      required
+                      autoFocus
+                      placeholder="0.00"
+                      value={amount}
+                      onChange={(e) => setAmount(e.target.value)}
+                      className="w-full bg-transparent text-2xl sm:text-3xl font-black text-emerald-400 focus:outline-none placeholder-slate-600"
+                    />
+                    <select
+                      value={inputCurrency}
+                      onChange={(e) => setInputCurrency(e.target.value)}
+                      className="bg-slate-900 border border-white/10 rounded-xl px-2.5 py-1.5 text-xs text-emerald-400 font-bold focus:outline-none shrink-0"
+                    >
+                      {DEFAULT_CURRENCIES.map(c => (
+                        <option key={c.code} value={c.code}>{c.symbol} - {c.name}</option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
 
-                <p className="text-[11px] leading-relaxed text-amber-200/90 font-medium">
-                  أنت تسجل هذه المعاملة بـ <strong className="text-amber-300 font-black">({inputCurrency})</strong> بينما العملة الأساسية للمحفظة المختارة (<span className="text-white font-bold">{selectedSourceWallet.name}</span>) هي <strong className="text-amber-300 font-black">({selectedSourceWallet.currencyCode})</strong>.
-                </p>
+                {/* Destination Wallet */}
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold text-slate-400 flex items-center gap-1.5">
+                    <WalletIcon size={14} className="text-emerald-400" />
+                    <span>الإيداع في محفظة:</span>
+                  </label>
+                  <select
+                    value={walletId}
+                    onChange={(e) => setWalletId(e.target.value)}
+                    className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white font-bold focus:outline-none focus:border-emerald-500"
+                  >
+                    {wallets.map(w => (
+                      <option key={w.id} value={w.id}>
+                        {w.name} ({w.currencyCode}) — الرصيد: {(w.currentBalance ?? w.openingBalance ?? 0).toLocaleString()} {w.currencyCode}
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
-                <div className="bg-slate-950/80 p-2.5 rounded-xl border border-white/5 space-y-1 text-xs">
-                  <div className="flex items-center justify-between text-[11px]">
-                    <span className="text-slate-400">سعر الصرف المعتمد:</span>
-                    <span className="font-mono font-bold text-slate-200 dir-ltr">
-                      1 {inputCurrency} = {singleUnitRate.toLocaleString('en-US', { maximumFractionDigits: 4 })} {selectedSourceWallet.currencyCode}
-                    </span>
+                {/* Income Categories */}
+                <div className="space-y-2">
+                  <label className="text-[11px] font-bold text-slate-400 flex items-center gap-1.5">
+                    <Tag size={14} className="text-emerald-400" />
+                    <span>مصدر / تصنيف الدخل:</span>
+                  </label>
+                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-1.5 max-h-36 overflow-y-auto custom-scrollbar p-1">
+                    {categories.filter(c => c.type === 'income').map(cat => {
+                      const isSelected = categoryId === cat.id;
+                      return (
+                        <button
+                          key={cat.id}
+                          type="button"
+                          onClick={() => setCategoryId(cat.id)}
+                          className={`p-2 rounded-xl border text-xs font-bold flex flex-col items-center gap-1 transition-all ${
+                            isSelected 
+                              ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/50 shadow-sm' 
+                              : 'bg-slate-950/60 border-white/5 text-slate-400 hover:text-white hover:bg-slate-900'
+                          }`}
+                        >
+                          <span className="text-[10px] truncate max-w-full">{cat.name}</span>
+                        </button>
+                      );
+                    })}
                   </div>
-                  {numAmount > 0 && (
-                    <div className="flex items-center justify-between pt-1 border-t border-white/5 font-black text-[11px]">
-                      <span className="text-amber-300">
-                        {type === 'expense' ? 'المخصوم الفعلي من المحفظة:' : 'المضاف الفعلي للمحفظة:'}
-                      </span>
-                      <span className="font-mono text-amber-200 dir-ltr text-xs">
-                        {effectiveTotalInWallet.toLocaleString('en-US', { maximumFractionDigits: 2 })} {selectedSourceWallet.currencyCode}
-                      </span>
+                </div>
+              </>
+            )}
+
+            {/* === 3. TRANSFER VIEW === */}
+            {selectedEvent === 'transfer' && (
+              <>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* From Wallet */}
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-bold text-slate-400 flex items-center gap-1">
+                      <ArrowDownLeft size={13} className="text-rose-400" />
+                      <span>من محفظة (خصم):</span>
+                    </label>
+                    <select
+                      value={walletId}
+                      onChange={(e) => setWalletId(e.target.value)}
+                      className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white font-bold focus:outline-none focus:border-blue-500"
+                    >
+                      {wallets.map(w => (
+                        <option key={w.id} value={w.id} disabled={w.id === destinationWalletId}>
+                          {w.name} ({w.currencyCode})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* To Wallet */}
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-bold text-slate-400 flex items-center gap-1">
+                      <ArrowUpRight size={13} className="text-emerald-400" />
+                      <span>إلى محفظة (استلام):</span>
+                    </label>
+                    <select
+                      value={destinationWalletId}
+                      onChange={(e) => setDestinationWalletId(e.target.value)}
+                      className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white font-bold focus:outline-none focus:border-blue-500"
+                    >
+                      {wallets.map(w => (
+                        <option key={w.id} value={w.id} disabled={w.id === walletId}>
+                          {w.name} ({w.currencyCode})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Amount to transfer */}
+                <div className="p-4 bg-slate-950/80 rounded-2xl border border-white/5 space-y-2">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">المبلغ المراد تحويله ({selectedSourceWallet?.currencyCode})</label>
+                  <input
+                    type="number"
+                    step="any"
+                    required
+                    autoFocus
+                    placeholder="0.00"
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    className="w-full bg-transparent text-2xl sm:text-3xl font-black text-blue-400 focus:outline-none placeholder-slate-600"
+                  />
+                </div>
+
+                {/* Multi-currency destination preview if currencies differ */}
+                {selectedSourceWallet?.currencyCode !== selectedDestWallet?.currencyCode && selectedDestWallet && (
+                  <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-2xl space-y-2">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-bold text-blue-300">المبلغ المستلم بالعملة المستهدفة:</span>
+                      <span className="text-[10px] text-slate-400">عملة {selectedDestWallet.currencyCode}</span>
+                    </div>
+                    <input
+                      type="number"
+                      step="any"
+                      placeholder={`المبلغ بـ ${selectedDestWallet.currencyCode}`}
+                      value={destinationAmount}
+                      onChange={(e) => setDestinationAmount(e.target.value)}
+                      className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-sm text-white font-bold focus:outline-none focus:border-blue-400"
+                    />
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* === 4. DEBT TO ME (دين لي) === */}
+            {selectedEvent === 'debt_to_me' && (
+              <>
+                {/* Person Name */}
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold text-slate-400 flex items-center gap-1.5">
+                    <UserPlus size={14} className="text-teal-400" />
+                    <span>اسم الشخص أو الجهة المستدينة (المدين):</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    autoFocus
+                    placeholder="مثال: أحمد محمد، مكتب المقاولات..."
+                    value={personName}
+                    onChange={(e) => setPersonName(e.target.value)}
+                    className="w-full bg-slate-950 border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white font-bold focus:outline-none focus:border-teal-500"
+                  />
+                  {/* Known Contacts Chips */}
+                  {knownContacts.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {knownContacts.slice(0, 5).map(name => (
+                        <button
+                          key={name}
+                          type="button"
+                          onClick={() => setPersonName(name)}
+                          className="px-2 py-0.5 rounded-lg bg-slate-800 text-[10px] text-slate-300 hover:text-white hover:bg-slate-700 font-medium"
+                        >
+                          {name}
+                        </button>
+                      ))}
                     </div>
                   )}
                 </div>
 
-                <label className="flex items-center gap-2 cursor-pointer pt-1 px-1 text-[10.5px] text-slate-300 hover:text-white transition-colors select-none">
-                  <input
-                    type="checkbox"
-                    checked={permanentDismissCrossAlert}
-                    onChange={(e) => handleTogglePermanentDismiss(e.target.checked)}
-                    className="w-3.5 h-3.5 accent-amber-500 rounded cursor-pointer"
-                  />
-                  <span>عدم إظهار هذا التنبيه مستقبلاً (إخفاء دائم)</span>
-                </label>
-
-                <div className="flex items-center justify-between gap-2 pt-1 border-t border-white/5">
-                  {matchingCurrencyWallet ? (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setWalletId(matchingCurrencyWallet.id);
-                        setDismissCrossCurrencyAlert(false);
-                      }}
-                      className="px-2.5 py-1.5 bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 border border-blue-500/30 rounded-xl text-[10px] font-black flex items-center gap-1 transition-colors"
+                {/* Amount & Currency */}
+                <div className="p-4 bg-slate-950/80 rounded-2xl border border-white/5 space-y-2">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">مبلغ الدين المستحق لك</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      step="any"
+                      required
+                      placeholder="0.00"
+                      value={amount}
+                      onChange={(e) => setAmount(e.target.value)}
+                      className="w-full bg-transparent text-2xl sm:text-3xl font-black text-teal-400 focus:outline-none placeholder-slate-600"
+                    />
+                    <select
+                      value={inputCurrency}
+                      onChange={(e) => setInputCurrency(e.target.value)}
+                      className="bg-slate-900 border border-white/10 rounded-xl px-2.5 py-1.5 text-xs text-teal-400 font-bold focus:outline-none shrink-0"
                     >
-                      <WalletIcon size={11} />
-                      <span>التبديل إلى محفظة {matchingCurrencyWallet.name} ({inputCurrency})</span>
-                    </button>
-                  ) : (
-                    <span className="text-[9.5px] text-slate-400">
-                      سيتم احتساب الخصم بالسعر المعادل وحفظ بيانات العملتين بالتقرير
-                    </span>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => setDismissCrossCurrencyAlert(true)}
-                    className="text-[10.5px] text-amber-400 hover:text-amber-300 font-bold underline px-1 py-0.5"
-                  >
-                    إخفاء ومتابعة
-                  </button>
-                </div>
-              </motion.div>
-            )}
-          </div>
-
-          {/* Transfer Destination Wallet & Conversion */}
-          {type === 'transfer' && (
-            <div className="bg-blue-950/30 border border-blue-500/30 p-3.5 rounded-2xl space-y-3 text-right">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-blue-300 flex items-center gap-1.5">
-                  <ArrowLeftRight size={14} className="text-blue-400" />
-                  المحفظة المستلمة (يضاف إليها)
-                </span>
-              </div>
-
-              <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1 flex-row-reverse">
-                {wallets
-                  .filter(w => w.id !== walletId)
-                  .map(w => (
-                    <button
-                      key={w.id}
-                      type="button"
-                      onClick={() => setDestinationWalletId(w.id)}
-                      className={`shrink-0 px-3 py-1.5 rounded-xl border transition-all text-xs font-bold flex items-center gap-1.5 ${
-                        destinationWalletId === w.id
-                          ? 'bg-blue-500 text-white border-blue-400 font-black shadow-md'
-                          : 'bg-slate-900 text-slate-400 border-white/10 hover:border-white/20'
-                      }`}
-                    >
-                      <div className="w-2 h-2 rounded-full" style={{ backgroundColor: w.color }} />
-                      <span>{w.name}</span>
-                      <span className="text-[10px] opacity-75">({w.currencyCode})</span>
-                    </button>
-                  ))}
-              </div>
-
-              {/* Destination Amount Field (Cross Currency Support) */}
-              <div className="bg-slate-950 p-2.5 rounded-xl border border-white/10 flex items-center justify-between">
-                <span className="text-[11px] font-bold text-slate-400">المبلغ المستلم الفعلي:</span>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold text-blue-400">{selectedDestWallet?.currencyCode || ''}</span>
-                  <input
-                    type="number"
-                    step="any"
-                    value={destinationAmount}
-                    onChange={(e) => setDestinationAmount(e.target.value)}
-                    placeholder="0.00"
-                    className="w-24 text-right bg-transparent border-none outline-none font-black text-white text-sm"
-                  />
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Categories Horizontal Slider (Only for Income / Expense) */}
-          {type !== 'transfer' && type !== 'adjustment' && (
-            <div className="space-y-1.5 shrink-0">
-              <label className="text-[11px] font-bold text-slate-400 px-1 block text-right">تصنيف المعاملة</label>
-              <div className="flex gap-1.5 overflow-x-auto no-scrollbar pb-1 px-1 flex-row-reverse">
-                {categories
-                  .filter(c => c.type === (type === 'transfer_to_goal' ? 'expense' : type))
-                  .map(cat => {
-                    const isSelected = categoryId === cat.id;
-                    return (
-                      <button
-                        key={cat.id}
-                        type="button"
-                        onClick={() => { setCategoryId(cat.id); setErrorMessage(''); }}
-                        className={`shrink-0 flex items-center gap-1.5 px-3.5 py-2 rounded-xl border transition-all text-xs font-bold active:scale-95 ${
-                          isSelected
-                            ? 'border-amber-500/80 bg-amber-500/15 text-amber-400 font-black shadow-sm'
-                            : 'border-white/5 bg-slate-950 text-slate-400 hover:text-slate-300'
-                        }`}
-                      >
-                        <span className="shrink-0" style={{ color: cat.color }}>
-                          {getIcon(cat.icon, 14)}
-                        </span>
-                        <span className="truncate max-w-[90px]">{cat.name}</span>
-                      </button>
-                    );
-                  })}
-              </div>
-            </div>
-          )}
-
-          {/* Date, Time & Note */}
-          <div className="grid grid-cols-2 gap-2 shrink-0">
-            <div className="bg-slate-950 p-2.5 rounded-xl flex items-center gap-2 border border-white/5 focus-within:border-white/20 transition-all">
-              <Calendar size={14} className="text-slate-500 shrink-0" />
-              <input
-                type="date"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-                className="bg-transparent border-none outline-none font-bold text-xs text-slate-200 w-full cursor-pointer"
-              />
-            </div>
-            <div className="bg-slate-950 p-2.5 rounded-xl flex items-center gap-2 border border-white/5 focus-within:border-white/20 transition-all">
-              <Clock size={14} className="text-slate-500 shrink-0" />
-              <input
-                type="time"
-                value={time}
-                onChange={(e) => setTime(e.target.value)}
-                className="bg-transparent border-none outline-none font-bold text-xs text-slate-200 w-full cursor-pointer"
-              />
-            </div>
-          </div>
-
-          <div className="bg-slate-950 p-2.5 rounded-xl flex items-center gap-2 border border-white/5 focus-within:border-white/20 transition-all shrink-0">
-            <StickyNote size={14} className="text-slate-500 shrink-0" />
-            <input
-              type="text"
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              placeholder="وصف أو ملاحظة للمعاملة (اختياري)..."
-              className="bg-transparent border-none outline-none font-medium text-xs text-slate-200 w-full placeholder:text-slate-600 text-right"
-            />
-          </div>
-
-          {/* Receipt Attachment Section */}
-          <div className="bg-slate-950/60 p-3 rounded-2xl border border-white/5 space-y-2 shrink-0">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold text-slate-400 flex items-center gap-1.5">
-                <Camera size={13} className="text-amber-500" />
-                إرفاق سند أو فاتورة (اختياري)
-              </span>
-              {receipt && (
-                <button
-                  type="button"
-                  onClick={() => setReceipt(undefined)}
-                  className="text-rose-400 hover:text-rose-300 text-[10px] font-bold flex items-center gap-1"
-                >
-                  <Trash2 size={11} /> حذف المرفق
-                </button>
-              )}
-            </div>
-
-            {receipt ? (
-              <div className="flex items-center justify-between bg-slate-900/90 p-2 rounded-xl border border-white/10">
-                <div className="flex items-center gap-2.5 overflow-hidden">
-                  <img
-                    src={receipt.dataUrl}
-                    alt="Receipt preview"
-                    className="w-10 h-10 object-cover rounded-lg border border-white/10 shrink-0 cursor-pointer"
-                    onClick={() => setShowReceiptPreview(true)}
-                  />
-                  <div className="truncate text-right">
-                    <p className="text-xs font-bold text-slate-200 truncate">{receipt.fileName}</p>
-                    <p className="text-[10px] text-slate-400">{(receipt.size / 1024).toFixed(1)} KB</p>
+                      {DEFAULT_CURRENCIES.map(c => (
+                        <option key={c.code} value={c.code}>{c.symbol} - {c.name}</option>
+                      ))}
+                    </select>
                   </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setShowReceiptPreview(true)}
-                  className="p-1.5 rounded-lg bg-slate-800 text-slate-300 hover:text-white"
-                  title="معاينة الفاتورة"
-                >
-                  <Eye size={15} />
-                </button>
-              </div>
-            ) : (
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="w-full py-2.5 border border-dashed border-white/15 hover:border-amber-500/50 rounded-xl text-slate-400 hover:text-amber-400 text-xs font-bold flex items-center justify-center gap-2 transition-colors active:scale-98"
-              >
-                <ImageIcon size={15} />
-                <span>رفع صورة الفاتورة أو السند</span>
-              </button>
+
+                {/* Wallet Funding Option */}
+                <div className="p-3 bg-slate-950/60 rounded-2xl border border-white/5 space-y-2">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={linkDebtToWallet}
+                      onChange={(e) => setLinkDebtToWallet(e.target.checked)}
+                      className="w-4 h-4 rounded text-teal-500 focus:ring-0 bg-slate-900 border-white/20"
+                    />
+                    <span className="text-xs font-bold text-white">خصم المبلغ من محفظة نقدية الآن</span>
+                  </label>
+                  {linkDebtToWallet && (
+                    <select
+                      value={walletId}
+                      onChange={(e) => setWalletId(e.target.value)}
+                      className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-xs text-white font-bold focus:outline-none focus:border-teal-500 mt-2"
+                    >
+                      {wallets.map(w => (
+                        <option key={w.id} value={w.id}>{w.name} ({w.currencyCode})</option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+
+                {/* Optional Due Date & Phone */}
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-400">تاريخ الاستحقاق (اختياري)</label>
+                    <input
+                      type="date"
+                      value={debtDueDate}
+                      onChange={(e) => setDebtDueDate(e.target.value)}
+                      className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2 text-xs text-white font-bold focus:outline-none"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-400">رقم الهاتف (اختياري)</label>
+                    <input
+                      type="tel"
+                      placeholder="05XXXXXXXX"
+                      value={personPhone}
+                      onChange={(e) => setPersonPhone(e.target.value)}
+                      className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2 text-xs text-white font-bold focus:outline-none"
+                    />
+                  </div>
+                </div>
+              </>
             )}
 
-            <input
-              type="file"
-              ref={fileInputRef}
-              accept="image/*,application/pdf"
-              onChange={handleFileUpload}
-              className="hidden"
-            />
-          </div>
+            {/* === 5. DEBT ON ME (دين عليّ) === */}
+            {selectedEvent === 'debt_on_me' && (
+              <>
+                {/* Person Name */}
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold text-slate-400 flex items-center gap-1.5">
+                    <UserMinus size={14} className="text-amber-400" />
+                    <span>اسم صاحب الدين (الدائن المستحق له):</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    autoFocus
+                    placeholder="مثال: خالد، البنك، مورد البضاعة..."
+                    value={personName}
+                    onChange={(e) => setPersonName(e.target.value)}
+                    className="w-full bg-slate-950 border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white font-bold focus:outline-none focus:border-amber-500"
+                  />
+                  {/* Known Contacts Chips */}
+                  {knownContacts.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {knownContacts.slice(0, 5).map(name => (
+                        <button
+                          key={name}
+                          type="button"
+                          onClick={() => setPersonName(name)}
+                          className="px-2 py-0.5 rounded-lg bg-slate-800 text-[10px] text-slate-300 hover:text-white hover:bg-slate-700 font-medium"
+                        >
+                          {name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
 
-          {/* Submit Button */}
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="w-full py-3 mt-2 bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-slate-950 font-black rounded-2xl shadow-lg shadow-amber-500/20 active:scale-95 transition-all text-sm flex items-center justify-center gap-2 shrink-0"
-          >
-            <CheckCircle2 size={18} />
-            <span>{mode === 'edit' ? 'حفظ تعديل المعاملة في السجل ✏️' : 'تأكيد وحفظ المعاملة'}</span>
-          </button>
-        </form>
+                {/* Amount & Currency */}
+                <div className="p-4 bg-slate-950/80 rounded-2xl border border-white/5 space-y-2">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">مبلغ الالتزام المالي المستحق عليك</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      step="any"
+                      required
+                      placeholder="0.00"
+                      value={amount}
+                      onChange={(e) => setAmount(e.target.value)}
+                      className="w-full bg-transparent text-2xl sm:text-3xl font-black text-amber-400 focus:outline-none placeholder-slate-600"
+                    />
+                    <select
+                      value={inputCurrency}
+                      onChange={(e) => setInputCurrency(e.target.value)}
+                      className="bg-slate-900 border border-white/10 rounded-xl px-2.5 py-1.5 text-xs text-amber-400 font-bold focus:outline-none shrink-0"
+                    >
+                      {DEFAULT_CURRENCIES.map(c => (
+                        <option key={c.code} value={c.code}>{c.symbol} - {c.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
 
-        {/* Receipt Full Preview Modal */}
-        <AnimatePresence>
-          {showReceiptPreview && receipt && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black/95 z-[200] flex flex-col items-center justify-center p-4"
-            >
-              <div className="flex justify-between items-center w-full max-w-lg mb-3">
-                <h4 className="text-sm font-bold text-white truncate">{receipt.fileName}</h4>
-                <button
-                  onClick={() => setShowReceiptPreview(false)}
-                  className="p-2 bg-white/10 hover:bg-white/20 rounded-full text-white"
-                >
-                  <X size={20} />
-                </button>
+                {/* Wallet Receiving Option */}
+                <div className="p-3 bg-slate-950/60 rounded-2xl border border-white/5 space-y-2">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={linkDebtToWallet}
+                      onChange={(e) => setLinkDebtToWallet(e.target.checked)}
+                      className="w-4 h-4 rounded text-amber-500 focus:ring-0 bg-slate-900 border-white/20"
+                    />
+                    <span className="text-xs font-bold text-white">إيداع المبلغ المستلف في محفظة الآن</span>
+                  </label>
+                  {linkDebtToWallet && (
+                    <select
+                      value={walletId}
+                      onChange={(e) => setWalletId(e.target.value)}
+                      className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-xs text-white font-bold focus:outline-none focus:border-amber-500 mt-2"
+                    >
+                      {wallets.map(w => (
+                        <option key={w.id} value={w.id}>{w.name} ({w.currencyCode})</option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+
+                {/* Optional Due Date & Phone */}
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-400">تاريخ السداد المحدد</label>
+                    <input
+                      type="date"
+                      value={debtDueDate}
+                      onChange={(e) => setDebtDueDate(e.target.value)}
+                      className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2 text-xs text-white font-bold focus:outline-none"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-400">رقم الهاتف (اختياري)</label>
+                    <input
+                      type="tel"
+                      placeholder="05XXXXXXXX"
+                      value={personPhone}
+                      onChange={(e) => setPersonPhone(e.target.value)}
+                      className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2 text-xs text-white font-bold focus:outline-none"
+                    />
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* === 6. DEBT REPAYMENT (تسديد دين) === */}
+            {selectedEvent === 'debt_repayment' && (
+              <>
+                {activeDebts.length === 0 ? (
+                  <div className="p-6 bg-slate-950/60 rounded-2xl border border-white/5 text-center space-y-2">
+                    <CheckCircle2 size={32} className="text-emerald-400 mx-auto" />
+                    <h4 className="font-bold text-white text-sm">لا توجد ديون نشطة مستحقة للسداد حالياً</h4>
+                    <p className="text-xs text-slate-400">جميع الديون مسددة بالكامل أو لم يتم تسجيل أي ديون بعد.</p>
+                  </div>
+                ) : (
+                  <>
+                    {/* Debt Picker */}
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] font-bold text-slate-400">اختر الذمة المالية المراد سدادها:</label>
+                      <select
+                        value={selectedDebtIdForRepayment}
+                        onChange={(e) => {
+                          setSelectedDebtIdForRepayment(e.target.value);
+                          const target = debts.find(d => d.id === e.target.value);
+                          if (target) {
+                            const rem = Math.max(0, (target.originalAmount || target.amount) - (target.paidAmount || 0));
+                            setAmount(rem.toString());
+                          }
+                        }}
+                        className="w-full bg-slate-950 border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white font-bold focus:outline-none focus:border-indigo-500"
+                      >
+                        {activeDebts.map(d => {
+                          const rem = Math.max(0, (d.originalAmount || d.amount) - (d.paidAmount || 0));
+                          return (
+                            <option key={d.id} value={d.id}>
+                              {d.type === 'to_me' ? '[دين لي]' : '[دين عليّ]'} {d.personName} — المتبقي: {rem.toLocaleString()} {d.currency || 'SAR'}
+                            </option>
+                          );
+                        })}
+                      </select>
+                    </div>
+
+                    {/* Selected Debt Overview */}
+                    {currentSelectedDebt && (
+                      <div className="p-3 bg-indigo-500/10 border border-indigo-500/20 rounded-2xl flex items-center justify-between text-xs">
+                        <div>
+                          <span className="text-[10px] font-bold text-slate-400 block">
+                            {currentSelectedDebt.type === 'to_me' ? 'استرداد دفعة من مستحقاتك' : 'سداد دفعة من التزاماتك'}
+                          </span>
+                          <span className="font-black text-white">{currentSelectedDebt.personName}</span>
+                        </div>
+                        <div className="text-left">
+                          <span className="text-[10px] text-slate-400 block">إجمالي المتبقي:</span>
+                          <span className="font-black text-indigo-400 text-sm">
+                            {Math.max(0, (currentSelectedDebt.originalAmount || currentSelectedDebt.amount) - (currentSelectedDebt.paidAmount || 0)).toLocaleString()} {currentSelectedDebt.currency || 'SAR'}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Payment Amount */}
+                    <div className="p-4 bg-slate-950/80 rounded-2xl border border-white/5 space-y-2">
+                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">مبلغ الدفعة المسددة</label>
+                      <input
+                        type="number"
+                        step="any"
+                        required
+                        placeholder="0.00"
+                        value={amount}
+                        onChange={(e) => setAmount(e.target.value)}
+                        className="w-full bg-transparent text-2xl sm:text-3xl font-black text-indigo-400 focus:outline-none placeholder-slate-600"
+                      />
+                      {/* Quick Shortcuts */}
+                      {currentSelectedDebt && (
+                        <div className="flex gap-2 pt-1">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const rem = Math.max(0, (currentSelectedDebt.originalAmount || currentSelectedDebt.amount) - (currentSelectedDebt.paidAmount || 0));
+                              setAmount(rem.toString());
+                            }}
+                            className="px-2.5 py-1 bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 rounded-lg text-[10px] font-bold"
+                          >
+                            سداد كامل المبلغ
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const rem = Math.max(0, (currentSelectedDebt.originalAmount || currentSelectedDebt.amount) - (currentSelectedDebt.paidAmount || 0));
+                              setAmount((rem / 2).toString());
+                            }}
+                            className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-[10px] font-bold"
+                          >
+                            نصف المبلغ (50%)
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Target Wallet for Payment */}
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] font-bold text-slate-400">
+                        {currentSelectedDebt?.type === 'to_me' ? 'إيداع الدفعة المستردة في محفظة:' : 'الخصم من محفظة للسداد:'}
+                      </label>
+                      <select
+                        value={walletId}
+                        onChange={(e) => setWalletId(e.target.value)}
+                        className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white font-bold focus:outline-none focus:border-indigo-500"
+                      >
+                        {wallets.map(w => (
+                          <option key={w.id} value={w.id}>{w.name} ({w.currencyCode})</option>
+                        ))}
+                      </select>
+                    </div>
+                  </>
+                )}
+              </>
+            )}
+
+            {/* === 7. BALANCE ADJUSTMENT (تصحيح الرصيد) === */}
+            {selectedEvent === 'balance_adjustment' && (
+              <>
+                {/* Wallet Selector */}
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold text-slate-400 flex items-center gap-1.5">
+                    <WalletIcon size={14} className="text-purple-400" />
+                    <span>اختر المحفظة المراد تصحيح رصيدها:</span>
+                  </label>
+                  <select
+                    value={walletId}
+                    onChange={(e) => {
+                      setWalletId(e.target.value);
+                      const target = wallets.find(w => w.id === e.target.value);
+                      if (target) {
+                        const cur = target.currentBalance ?? target.openingBalance ?? 0;
+                        setActualRealBalance(cur.toString());
+                      }
+                    }}
+                    className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white font-bold focus:outline-none focus:border-purple-500"
+                  >
+                    {wallets.map(w => (
+                      <option key={w.id} value={w.id}>
+                        {w.name} ({w.currencyCode}) — الدفتري: {(w.currentBalance ?? w.openingBalance ?? 0).toLocaleString()} {w.currencyCode}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Ledger vs Real Comparison */}
+                {adjustmentCalc && (
+                  <div className="p-4 bg-slate-950/80 rounded-2xl border border-white/5 space-y-3">
+                    <div className="flex justify-between items-center text-xs pb-2 border-b border-white/5">
+                      <span className="text-slate-400 font-bold">الرصيد الدفتري المسجل في التطبيق:</span>
+                      <span className="text-white font-black text-sm">{adjustmentCalc.current.toLocaleString()} {selectedSourceWallet?.currencyCode}</span>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] font-bold text-purple-400 block">أدخل الرصيد الفعلي الموجود لديك الآن:</label>
+                      <input
+                        type="number"
+                        step="any"
+                        required
+                        autoFocus
+                        placeholder="الرصيد الفعلي الحقيقي..."
+                        value={actualRealBalance}
+                        onChange={(e) => setActualRealBalance(e.target.value)}
+                        className="w-full bg-slate-900 border border-purple-500/40 rounded-xl px-3.5 py-2.5 text-xl font-black text-white focus:outline-none focus:border-purple-400"
+                      />
+                    </div>
+
+                    {/* Discrepancy indicator */}
+                    {adjustmentCalc.actual !== null && Math.abs(adjustmentCalc.diff) > 0.001 && (
+                      <div className={`p-2.5 rounded-xl border text-xs font-bold flex items-center justify-between ${
+                        adjustmentCalc.isIncrease 
+                          ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' 
+                          : 'bg-rose-500/10 border-rose-500/20 text-rose-400'
+                      }`}>
+                        <span>فارق التسوية والتصحيح:</span>
+                        <span className="font-black text-sm">
+                          {adjustmentCalc.isIncrease ? '+' : '-'}{adjustmentCalc.absDiff?.toLocaleString()} {selectedSourceWallet?.currencyCode} ({adjustmentCalc.isIncrease ? 'زيادة' : 'عجز/نقص'})
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* COMMON FIELDS: DATE & TIME & NOTES */}
+            <div className="grid grid-cols-2 gap-2.5 pt-1">
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-slate-400 flex items-center gap-1">
+                  <Calendar size={12} />
+                  <span>التاريخ</span>
+                </label>
+                <input
+                  type="date"
+                  required
+                  value={date}
+                  onChange={(e) => setDate(e.target.value)}
+                  className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2 text-xs text-white font-bold focus:outline-none"
+                />
               </div>
-              <img
-                src={receipt.dataUrl}
-                alt="Receipt Full View"
-                className="max-h-[75vh] max-w-full rounded-2xl object-contain shadow-2xl border border-white/10"
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-slate-400 flex items-center gap-1">
+                  <Clock size={12} />
+                  <span>الوقت</span>
+                </label>
+                <input
+                  type="time"
+                  required
+                  value={time}
+                  onChange={(e) => setTime(e.target.value)}
+                  className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2 text-xs text-white font-bold focus:outline-none"
+                />
+              </div>
+            </div>
+
+            {/* Note Field */}
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold text-slate-400 flex items-center gap-1">
+                <StickyNote size={12} />
+                <span>ملاحظات أو بيان الحدث (اختياري)</span>
+              </label>
+              <input
+                type="text"
+                placeholder="بيان تفصيلي للعملية..."
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                className="w-full bg-slate-950 border border-white/10 rounded-xl px-3.5 py-2 text-xs text-white font-medium focus:outline-none focus:border-amber-500"
               />
-            </motion.div>
-          )}
-        </AnimatePresence>
+            </div>
+
+            {/* Receipt attachment for expenses */}
+            {selectedEvent === 'expense' && (
+              <div className="space-y-1.5 pt-1">
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleImageUpload}
+                  accept="image/*"
+                  className="hidden"
+                />
+                {!receipt ? (
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="w-full py-2.5 px-3 rounded-xl border border-dashed border-white/10 hover:border-amber-500/40 text-slate-400 hover:text-white text-xs font-bold flex items-center justify-center gap-2 transition-colors bg-slate-950/40"
+                  >
+                    <Camera size={15} />
+                    <span>إرفاق صورة الفاتورة أو الإيصال (اختياري)</span>
+                  </button>
+                ) : (
+                  <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-950 border border-white/10">
+                    <div className="flex items-center gap-2">
+                      <ImageIcon size={16} className="text-amber-400" />
+                      <span className="text-xs text-white font-bold truncate max-w-[180px]">{receipt.fileName || 'صورة الفاتورة'}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setShowReceiptPreview(true)}
+                        className="px-2 py-1 bg-slate-800 text-[10px] font-bold text-slate-300 rounded-lg"
+                      >
+                        معاينة
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setReceipt(undefined)}
+                        className="p-1 text-rose-400 hover:text-rose-300"
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* SUBMIT BUTTON */}
+            <div className="pt-2">
+              <button
+                type="submit"
+                disabled={isSubmitting || (selectedEvent === 'debt_repayment' && activeDebts.length === 0)}
+                className={`w-full py-3.5 px-4 rounded-2xl font-black text-xs sm:text-sm transition-all shadow-lg active:scale-98 flex items-center justify-center gap-2 ${
+                  selectedEvent === 'expense' ? 'bg-rose-500 hover:bg-rose-400 text-white shadow-rose-500/20'
+                  : selectedEvent === 'income' ? 'bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-emerald-500/20'
+                  : selectedEvent === 'transfer' ? 'bg-blue-500 hover:bg-blue-400 text-white shadow-blue-500/20'
+                  : selectedEvent === 'debt_to_me' ? 'bg-teal-500 hover:bg-teal-400 text-slate-950 shadow-teal-500/20'
+                  : selectedEvent === 'debt_on_me' ? 'bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-amber-500/20'
+                  : selectedEvent === 'debt_repayment' ? 'bg-indigo-500 hover:bg-indigo-400 text-white shadow-indigo-500/20'
+                  : 'bg-purple-500 hover:bg-purple-400 text-white shadow-purple-500/20'
+                }`}
+              >
+                <Check size={18} strokeWidth={3} />
+                <span>
+                  {initialData ? 'حفظ التعديلات في القيود' 
+                    : selectedEvent === 'expense' ? 'تسجيل المصروف في القيود'
+                    : selectedEvent === 'income' ? 'إيداع الدخل في القيود'
+                    : selectedEvent === 'transfer' ? 'تنفيذ التحويل المالي'
+                    : selectedEvent === 'debt_to_me' ? 'قيد الدين والمستحق الدفتري'
+                    : selectedEvent === 'debt_on_me' ? 'قيد الالتزام المالي'
+                    : selectedEvent === 'debt_repayment' ? 'تسجيل دفعة السداد'
+                    : 'تأكيد تصحيح وتسوية الرصيد'
+                  }
+                </span>
+              </button>
+            </div>
+          </form>
+        )}
+
+        {/* RECEIPT PREVIEW MODAL */}
+        {showReceiptPreview && receipt && (
+          <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/90">
+            <div className="relative max-w-lg w-full bg-slate-900 rounded-2xl p-4 border border-white/10">
+              <button
+                type="button"
+                onClick={() => setShowReceiptPreview(false)}
+                className="absolute top-3 left-3 p-2 rounded-xl bg-slate-800 text-white hover:bg-slate-700"
+              >
+                <X size={18} />
+              </button>
+              <img 
+                src={receipt.dataUrl} 
+                alt="Receipt" 
+                className="w-full max-h-[70vh] object-contain rounded-xl mt-6"
+                referrerPolicy="no-referrer"
+              />
+            </div>
+          </div>
+        )}
       </motion.div>
     </motion.div>
   );

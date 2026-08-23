@@ -30,7 +30,7 @@ const WealthScore: React.FC<WealthScoreProps> = ({ transactions, budgets, debts,
     budgetScore = Math.max(0, budgetScore);
 
     // 3. Debt Ratio (30 points)
-    const totalDebt = debts.filter(d => !d.isPaid && d.type === 'on_me').reduce((s, d) => s + d.amount, 0);
+    const totalDebt = debts.filter(d => !d.isPaid && d.type === 'on_me').reduce((s, d) => s + Math.max(0, d.amount - (d.paidAmount || 0)), 0);
     const debtScore = totalIncome > 0 ? Math.max(0, 30 - (totalDebt / totalIncome) * 30) : 15;
 
     const finalScore = Math.round(savingsScore + budgetScore + debtScore);
