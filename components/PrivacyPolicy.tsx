@@ -70,6 +70,16 @@ const PrivacyPolicy: React.FC<PrivacyPolicyProps> = ({ onBack }) => {
         </section>
 
         <section className="space-y-4">
+          <div className="flex items-center gap-3 text-amber-500">
+            <Globe size={20} />
+            <h4 className="font-black text-sm uppercase tracking-widest">تواصل معنا والدعم الفني</h4>
+          </div>
+          <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed font-medium">
+            لأي استفسارات أو مقترحات أو طلبات دعم فني، يرجى مراسلتنا عبر البريد الرسمي للتطبيق: <a href="mailto:thari-app@inbox.ru" className="text-amber-500 font-bold underline dir-ltr inline-block">thari-app@inbox.ru</a>
+          </p>
+        </section>
+
+        <section className="space-y-4">
           <div className="flex items-center gap-3 text-slate-400">
             <Globe size={20} />
             <h4 className="font-black text-sm uppercase tracking-widest">تعديلات السياسة</h4>

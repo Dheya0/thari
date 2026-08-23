@@ -5,15 +5,14 @@ import {
   ArrowDownLeft, 
   ArrowLeftRight, 
   ChevronLeft, 
+  ChevronRight,
   ArrowUp, 
-  ArrowDown, 
-  Wallet as WalletIcon,
-  ShieldCheck,
-  Calendar
+  ArrowDown
 } from 'lucide-react';
 import { Wallet, Transaction, Category, Currency, Debt } from '../types';
-import { convertCurrency, DEFAULT_EXCHANGE_RATES } from '../constants';
+import { convertCurrency } from '../constants';
 import { calculateDateBasedGrowth } from '../services/balanceEngine';
+import { getTranslation } from '../utils/translations';
 import CurrencyLandscape from './CurrencyLandscape';
 
 interface ElegantDashboardProps {
@@ -40,9 +39,9 @@ interface ElegantDashboardProps {
   onOpenAllTransactions: () => void;
   onEditTransaction: (tx: Transaction) => void;
   onDeleteTransaction: (id: string) => void;
+  language?: 'ar' | 'en';
 }
 
-// Format numbers in elegant institutional Arabic style (e.g. 1.2M, 500K or 2,486,500)
 export const formatFinancialNumber = (num: number, useCompact: boolean = false): string => {
   const safeNum = Math.abs(num || 0);
   if (useCompact) {
@@ -58,15 +57,17 @@ export const formatFinancialNumber = (num: number, useCompact: boolean = false):
   return Math.round(safeNum).toLocaleString('en-US');
 };
 
-export const getGreeting = (): { text: string; sub: string } => {
+export const getGreeting = (lang: 'ar' | 'en' = 'ar'): { text: string; sub: string } => {
   const hour = new Date().getHours();
-  if (hour >= 5 && hour < 12) {
-    return { text: 'صباح الخير', sub: 'نظرة عامة على مركزك المالي وسلامة تدفقاتك' };
-  } else if (hour >= 12 && hour < 17) {
-    return { text: 'طاب يومك', sub: 'نظرة عامة على أداء المحافظ ومستجدات اليوم' };
-  } else if (hour >= 17 && hour < 22) {
-    return { text: 'مساء الخير', sub: 'ملخص الحركة المالية وحصاد اليوم' };
+  if (lang === 'en') {
+    if (hour >= 5 && hour < 12) return { text: 'Good Morning', sub: 'Overview of your financial center & cashflow' };
+    if (hour >= 12 && hour < 17) return { text: 'Good Day', sub: 'Wallets performance & daily updates' };
+    if (hour >= 17 && hour < 22) return { text: 'Good Evening', sub: 'Financial activity summary & daily harvest' };
+    return { text: 'Good Night', sub: 'Assets and liabilities stability summary' };
   } else {
+    if (hour >= 5 && hour < 12) return { text: 'صباح الخير', sub: 'نظرة عامة على مركزك المالي وسلامة تدفقاتك' };
+    if (hour >= 12 && hour < 17) return { text: 'طاب يومك', sub: 'نظرة عامة على أداء المحافظ ومستجدات اليوم' };
+    if (hour >= 17 && hour < 22) return { text: 'مساء الخير', sub: 'ملخص الحركة المالية وحصاد اليوم' };
     return { text: 'مساء النور', sub: 'ملخص استقرار الأصول والالتزامات المالية' };
   }
 };
@@ -94,32 +95,34 @@ export const ElegantDashboard: React.FC<ElegantDashboardProps> = ({
   onOpenDebts,
   onOpenAllTransactions,
   onEditTransaction,
-  onDeleteTransaction
+  onDeleteTransaction,
+  language = 'ar'
 }) => {
-  const greeting = getGreeting();
+  const lang = language || 'ar';
+  const t = getTranslation(lang);
+  const greeting = getGreeting(lang);
+  const isEn = lang === 'en';
 
-  // Growth percentage calculation based on actual transaction dates & periods
   const growthInfo = useMemo(() => {
     return calculateDateBasedGrowth(transactions, currency.code, exchangeRates);
   }, [transactions, currency.code, exchangeRates]);
 
-  // Compute currency balances across all wallets
   const currencyBalances = useMemo(() => {
     const map: Record<string, number> = {};
     wallets.forEach(w => {
       let balance = 0;
-      transactions.forEach(t => {
-        if (t.isDeleted) return;
-        const amt = Number(t.amount) || 0;
-        const conv = Number(t.convertedAmountInWalletCurrency) || amt;
+      transactions.forEach(tx => {
+        if (tx.isDeleted) return;
+        const amt = Number(tx.amount) || 0;
+        const conv = Number(tx.convertedAmountInWalletCurrency) || amt;
 
-        if (t.walletId === w.id) {
-          if (t.type === 'income') balance += conv;
-          else if (t.type === 'expense') balance -= conv;
-          else if (t.type === 'transfer') balance -= amt;
-          else if (t.type === 'adjustment') balance = amt;
-        } else if (t.destinationWalletId === w.id && t.type === 'transfer') {
-          const destAmt = Number(t.destinationAmount) || amt;
+        if (tx.walletId === w.id) {
+          if (tx.type === 'income') balance += conv;
+          else if (tx.type === 'expense') balance -= conv;
+          else if (tx.type === 'transfer') balance -= amt;
+          else if (tx.type === 'adjustment') balance = amt;
+        } else if (tx.destinationWalletId === w.id && tx.type === 'transfer') {
+          const destAmt = Number(tx.destinationAmount) || amt;
           balance += destAmt;
         }
       });
@@ -128,35 +131,31 @@ export const ElegantDashboard: React.FC<ElegantDashboardProps> = ({
     return map;
   }, [wallets, transactions]);
 
-  // Compute individual wallet balances in their native currencies & in base currency
   const walletRows = useMemo(() => {
     return wallets.map(wallet => {
-      // Calculate native balance for this wallet
       let balance = 0;
-      transactions.forEach(t => {
-        if (t.isDeleted) return;
-        const amt = Number(t.amount) || 0;
-        const conv = Number(t.convertedAmountInWalletCurrency) || amt;
+      transactions.forEach(tx => {
+        if (tx.isDeleted) return;
+        const amt = Number(tx.amount) || 0;
+        const conv = Number(tx.convertedAmountInWalletCurrency) || amt;
 
-        if (t.walletId === wallet.id) {
-          if (t.type === 'income') balance += conv;
-          else if (t.type === 'expense') balance -= conv;
-          else if (t.type === 'transfer') balance -= amt;
-          else if (t.type === 'adjustment') balance = amt;
-        } else if (t.destinationWalletId === wallet.id && t.type === 'transfer') {
-          const destAmt = Number(t.destinationAmount) || amt;
+        if (tx.walletId === wallet.id) {
+          if (tx.type === 'income') balance += conv;
+          else if (tx.type === 'expense') balance -= conv;
+          else if (tx.type === 'transfer') balance -= amt;
+          else if (tx.type === 'adjustment') balance = amt;
+        } else if (tx.destinationWalletId === wallet.id && tx.type === 'transfer') {
+          const destAmt = Number(tx.destinationAmount) || amt;
           balance += destAmt;
         }
       });
 
-      // Wallet currency object
       const walletCurr = currencies.find(c => c.code === wallet.currencyCode) || {
         code: wallet.currencyCode,
         symbol: wallet.currencyCode,
         name: wallet.currencyCode
       };
 
-      // Convert to selected base currency for display share
       const inBase = convertCurrency(balance, wallet.currencyCode, currency.code, exchangeRates);
 
       return {
@@ -168,11 +167,10 @@ export const ElegantDashboard: React.FC<ElegantDashboardProps> = ({
     });
   }, [wallets, transactions, currencies, currency, exchangeRates]);
 
-  // Latest 5 clean transactions (excluding deleted)
   const recentTransactions = useMemo(() => {
     return transactions
-      .filter(t => !t.isDeleted)
-      .filter(t => !selectedWalletId || t.walletId === selectedWalletId || t.destinationWalletId === selectedWalletId)
+      .filter(tx => !tx.isDeleted)
+      .filter(tx => !selectedWalletId || tx.walletId === selectedWalletId || tx.destinationWalletId === selectedWalletId)
       .slice(0, 5);
   }, [transactions, selectedWalletId]);
 
@@ -185,16 +183,16 @@ export const ElegantDashboard: React.FC<ElegantDashboardProps> = ({
       <section className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 pt-1 border-b border-white/[0.04] pb-5">
         <div>
           <span className="text-xs font-medium tracking-wide text-[#D9B978] mb-1 block">
-            {greeting.text}، {userName || 'مستخدم ثري'}
+            {greeting.text}، {userName || (isEn ? 'Thari User' : 'مستخدم ثري')}
           </span>
           <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-[#F4F1EA]">
-            المركز المالي الشامل
+            {t.comprehensiveFinancialCenter}
           </h1>
         </div>
 
         <div className="flex items-center gap-2">
           <span className="text-xs text-slate-400">
-            {new Intl.DateTimeFormat('ar-SA', { weekday: 'long', day: 'numeric', month: 'short' }).format(new Date())}
+            {new Intl.DateTimeFormat(isEn ? 'en-US' : 'ar-SA', { weekday: 'long', day: 'numeric', month: 'short' }).format(new Date())}
           </span>
         </div>
       </section>
@@ -211,7 +209,7 @@ export const ElegantDashboard: React.FC<ElegantDashboardProps> = ({
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <span className="text-xs font-medium uppercase tracking-wider text-slate-400">
-              صافي ثروتك
+              {t.netWorth}
             </span>
             {growthInfo.rate !== 0 && (
               <div className={`inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full ${
@@ -236,45 +234,42 @@ export const ElegantDashboard: React.FC<ElegantDashboardProps> = ({
           </div>
         </div>
 
-        {/* Triad Balance Metrics: Available, Receivable (Owed to me), Payable (I owe) */}
+        {/* Triad Balance Metrics: Available, Receivable, Payable */}
         <div className="grid grid-cols-3 gap-3 sm:gap-6 pt-5 border-t border-white/[0.06]">
           
-          {/* Available Cash */}
           <div className="space-y-1">
             <span className="text-[11px] sm:text-xs font-normal text-slate-400 block">
-              متاح الآن
+              {t.availableNow}
             </span>
             <p className="text-base sm:text-xl font-medium text-[#F4F1EA] font-numeric tracking-tight">
               {formatFinancialNumber(availableBalance)}
-              <span className="text-[10px] sm:text-xs text-slate-400 mr-1 font-normal">{currency.symbol}</span>
+              <span className="text-[10px] sm:text-xs text-slate-400 ms-1 font-normal">{currency.symbol}</span>
             </p>
           </div>
 
-          {/* Owed to me (Receivable) */}
           <button 
             onClick={onOpenDebts}
-            className="text-right space-y-1 group transition-colors"
+            className="text-start space-y-1 group transition-colors"
           >
             <span className="text-[11px] sm:text-xs font-normal text-slate-400 group-hover:text-[#8EB9A7] transition-colors block">
-              لك عند الآخرين
+              {t.youOweOthers}
             </span>
             <p className="text-base sm:text-xl font-medium text-[#8EB9A7] font-numeric tracking-tight">
               {formatFinancialNumber(debtsOwedToMe)}
-              <span className="text-[10px] sm:text-xs text-[#8EB9A7]/70 mr-1 font-normal">{currency.symbol}</span>
+              <span className="text-[10px] sm:text-xs text-[#8EB9A7]/70 ms-1 font-normal">{currency.symbol}</span>
             </p>
           </button>
 
-          {/* I owe (Payable) */}
           <button 
             onClick={onOpenDebts}
-            className="text-right space-y-1 group transition-colors"
+            className="text-start space-y-1 group transition-colors"
           >
             <span className="text-[11px] sm:text-xs font-normal text-slate-400 group-hover:text-[#C98387] transition-colors block">
-              عليك للآخرين
+              {t.othersOweYou}
             </span>
             <p className="text-base sm:text-xl font-medium text-[#C98387] font-numeric tracking-tight">
               {formatFinancialNumber(debtsIOwe)}
-              <span className="text-[10px] sm:text-xs text-[#C98387]/70 mr-1 font-normal">{currency.symbol}</span>
+              <span className="text-[10px] sm:text-xs text-[#C98387]/70 ms-1 font-normal">{currency.symbol}</span>
             </p>
           </button>
 
@@ -282,22 +277,7 @@ export const ElegantDashboard: React.FC<ElegantDashboardProps> = ({
       </motion.section>
 
       {/* ─────────────────────────────────────────────────────────────
-          3. CURRENCY LANDSCAPE: HORIZONTAL PERSPECTIVE
-      ───────────────────────────────────────────────────────────── */}
-      <section>
-        <CurrencyLandscape 
-          currencies={currencies}
-          selectedCurrency={currency}
-          onSelectCurrency={onChangeCurrency}
-          currencyBalances={currencyBalances}
-          wallets={wallets}
-          exchangeRates={exchangeRates}
-          baseCurrencyCode={currency.code}
-        />
-      </section>
-
-      {/* ─────────────────────────────────────────────────────────────
-          4. ACTION BAR: CLEAN DIRECT TRIGGERS
+          3. ACTION BAR: CLEAN DIRECT TRIGGERS
       ───────────────────────────────────────────────────────────── */}
       <section className="grid grid-cols-3 gap-2.5 sm:gap-4">
         <button
@@ -307,7 +287,7 @@ export const ElegantDashboard: React.FC<ElegantDashboardProps> = ({
           <div className="w-6 h-6 rounded-full bg-[#C98387]/15 flex items-center justify-center text-[#C98387] group-hover:scale-110 transition-transform">
             <ArrowDownLeft size={14} strokeWidth={2.2} />
           </div>
-          <span>صرف</span>
+          <span>{t.expenses}</span>
         </button>
 
         <button
@@ -317,7 +297,7 @@ export const ElegantDashboard: React.FC<ElegantDashboardProps> = ({
           <div className="w-6 h-6 rounded-full bg-[#8EB9A7]/15 flex items-center justify-center text-[#8EB9A7] group-hover:scale-110 transition-transform">
             <ArrowUpRight size={14} strokeWidth={2.2} />
           </div>
-          <span>إيداع</span>
+          <span>{t.income}</span>
         </button>
 
         <button
@@ -327,24 +307,24 @@ export const ElegantDashboard: React.FC<ElegantDashboardProps> = ({
           <div className="w-6 h-6 rounded-full bg-[#759BC8]/15 flex items-center justify-center text-[#759BC8] group-hover:scale-110 transition-transform">
             <ArrowLeftRight size={14} strokeWidth={2.2} />
           </div>
-          <span>تحويل</span>
+          <span>{t.transfer}</span>
         </button>
       </section>
 
       {/* ─────────────────────────────────────────────────────────────
-          5. WALLETS (محافظك): TYPOGRAPHIC LIST / ROWS
+          4. WALLETS SECTION
       ───────────────────────────────────────────────────────────── */}
       <section className="space-y-3">
         <div className="flex items-center justify-between px-1">
           <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-            محافظك
+            {t.walletsManagement}
           </h2>
           {selectedWalletId && (
             <button
               onClick={() => onSelectWallet(null)}
               className="text-[11px] text-[#D9B978] hover:underline"
             >
-              عرض كل المحافظ
+              {t.allWallets}
             </button>
           )}
         </div>
@@ -356,7 +336,7 @@ export const ElegantDashboard: React.FC<ElegantDashboardProps> = ({
               <button
                 key={w.id}
                 onClick={() => onSelectWallet(isSelected ? null : w.id)}
-                className={`w-full flex items-center justify-between py-3.5 px-2 hover:bg-white/[0.02] transition-colors rounded-xl text-right ${
+                className={`w-full flex items-center justify-between py-3.5 px-2 hover:bg-white/[0.02] transition-colors rounded-xl text-start ${
                   isSelected ? 'bg-[#D9B978]/[0.06]' : ''
                 }`}
               >
@@ -375,10 +355,10 @@ export const ElegantDashboard: React.FC<ElegantDashboardProps> = ({
                   </div>
                 </div>
 
-                <div className="text-left">
+                <div className="text-end">
                   <div className="text-sm sm:text-base font-medium text-[#F4F1EA] font-numeric tracking-tight">
                     {formatFinancialNumber(w.nativeBalance, true)}
-                    <span className="text-xs text-slate-400 mr-1.5 font-normal">
+                    <span className="text-xs text-slate-400 ms-1.5 font-normal">
                       {w.currencyObj.symbol}
                     </span>
                   </div>
@@ -395,75 +375,72 @@ export const ElegantDashboard: React.FC<ElegantDashboardProps> = ({
       </section>
 
       {/* ─────────────────────────────────────────────────────────────
-          6. THIS MONTH (هذا الشهر): CLEAN SUMMARY ROW
+          5. THIS MONTH SUMMARY
       ───────────────────────────────────────────────────────────── */}
       <section className="space-y-3">
         <div className="flex items-center justify-between px-1">
           <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-            هذا الشهر
+            {t.monthlyIncome.replace('الدخل الشهري', 'هذا الشهر')}
           </h2>
           <span className="text-[11px] text-slate-400">
-            {new Intl.DateTimeFormat('ar', { month: 'long', year: 'numeric' }).format(new Date())}
+            {new Intl.DateTimeFormat(isEn ? 'en-US' : 'ar-SA', { month: 'long', year: 'numeric' }).format(new Date())}
           </span>
         </div>
 
         <div className="grid grid-cols-3 gap-3 py-4 px-4 sm:px-6 rounded-2xl bg-[#171D24]/60 border border-white/[0.05]">
-          {/* Monthly Income */}
           <div className="space-y-1">
-            <span className="text-[11px] text-slate-400 block font-normal">الدخل</span>
+            <span className="text-[11px] text-slate-400 block font-normal">{t.income}</span>
             <div className="text-sm sm:text-base font-semibold text-[#8EB9A7] font-numeric tracking-tight">
               {formatFinancialNumber(monthlyIncome, true)}
-              <span className="text-[10px] sm:text-xs text-[#8EB9A7]/80 mr-1 font-normal">{currency.symbol}</span>
+              <span className="text-[10px] sm:text-xs text-[#8EB9A7]/80 ms-1 font-normal">{currency.symbol}</span>
             </div>
           </div>
 
-          {/* Monthly Expense */}
           <div className="space-y-1">
-            <span className="text-[11px] text-slate-400 block font-normal">المصروف</span>
+            <span className="text-[11px] text-slate-400 block font-normal">{t.expenses}</span>
             <div className="text-sm sm:text-base font-semibold text-[#C98387] font-numeric tracking-tight">
               {formatFinancialNumber(monthlyExpense, true)}
-              <span className="text-[10px] sm:text-xs text-[#C98387]/80 mr-1 font-normal">{currency.symbol}</span>
+              <span className="text-[10px] sm:text-xs text-[#C98387]/80 ms-1 font-normal">{currency.symbol}</span>
             </div>
           </div>
 
-          {/* Monthly Net */}
           <div className="space-y-1">
-            <span className="text-[11px] text-slate-400 block font-normal">الصافي</span>
+            <span className="text-[11px] text-slate-400 block font-normal">{t.net}</span>
             <div className={`text-sm sm:text-base font-semibold font-numeric tracking-tight ${
               monthlyNet >= 0 ? 'text-[#D9B978]' : 'text-[#C98387]'
             }`}>
               {monthlyNet >= 0 ? '+' : ''}{formatFinancialNumber(monthlyNet, true)}
-              <span className="text-[10px] sm:text-xs text-slate-400 mr-1 font-normal">{currency.symbol}</span>
+              <span className="text-[10px] sm:text-xs text-slate-400 ms-1 font-normal">{currency.symbol}</span>
             </div>
           </div>
         </div>
       </section>
 
       {/* ─────────────────────────────────────────────────────────────
-          7. RECENT 5 OPERATIONS (آخر 5 عمليات)
+          6. RECENT TRANSACTIONS
       ───────────────────────────────────────────────────────────── */}
       <section className="space-y-3">
         <div className="flex items-center justify-between px-1">
           <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-            آخر 5 عمليات
+            {t.recentTransactions}
           </h2>
           <button
             onClick={onOpenAllTransactions}
             className="text-xs text-[#D9B978] hover:text-[#D9B978]/80 transition-colors flex items-center gap-1 font-medium"
           >
-            <span>عرض الكل</span>
-            <ChevronLeft size={13} />
+            <span>{t.viewAll}</span>
+            {isEn ? <ChevronRight size={13} /> : <ChevronLeft size={13} />}
           </button>
         </div>
 
         {recentTransactions.length === 0 ? (
           <div className="py-8 text-center border border-dashed border-white/10 rounded-2xl">
-            <p className="text-xs text-slate-400">لا توجد معاملات مسجلة بعد</p>
+            <p className="text-xs text-slate-400">{t.noTransactionsYet}</p>
             <button
               onClick={() => onOpenNewTransaction('expense')}
               className="mt-2 text-xs font-medium text-[#D9B978] hover:underline"
             >
-              تسجيل أول حركة مالية
+              {isEn ? 'Record first financial movement' : 'تسجيل أول حركة مالية'}
             </button>
           </div>
         ) : (
@@ -496,17 +473,17 @@ export const ElegantDashboard: React.FC<ElegantDashboardProps> = ({
 
                     <div>
                       <span className="text-sm font-medium text-[#F4F1EA] group-hover:text-[#D9B978] transition-colors block">
-                        {tx.note || category?.name || (isTransfer ? 'تحويل بين المحافظ' : 'عملية مالية')}
+                        {tx.note || category?.name || (isTransfer ? (isEn ? 'Transfer between wallets' : 'تحويل بين المحافظ') : (isEn ? 'Financial operation' : 'عملية مالية'))}
                       </span>
                       <div className="flex items-center gap-2 text-[11px] text-slate-400">
-                        <span>{wallet?.name || 'محفظة'}</span>
+                        <span>{wallet?.name || t.wallet}</span>
                         <span>•</span>
                         <span>{tx.date}</span>
                       </div>
                     </div>
                   </div>
 
-                  <div className="text-left font-numeric">
+                  <div className="text-end font-numeric">
                     <span className={`text-sm sm:text-base font-semibold ${
                       isIncome 
                         ? 'text-[#8EB9A7]' 
@@ -517,7 +494,7 @@ export const ElegantDashboard: React.FC<ElegantDashboardProps> = ({
                       {isIncome ? '+' : isExpense ? '-' : ''}
                       {formatFinancialNumber(tx.amount)}
                     </span>
-                    <span className="text-xs text-slate-400 mr-1 font-normal">
+                    <span className="text-xs text-slate-400 ms-1 font-normal">
                       {tx.currency || currency.symbol}
                     </span>
                   </div>

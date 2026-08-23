@@ -9,6 +9,8 @@
  * 3. حماية ضد التلاعب (Authenticated Encryption).
  */
 
+import { deobfuscateData } from '../utils/secureStorage';
+
 const ENCODING = new TextEncoder();
 const DECODING = new TextDecoder();
 
@@ -59,7 +61,7 @@ const deriveKey = async (password: string, salt: Uint8Array): Promise<CryptoKey>
         ["deriveKey"]
     );
     
-        return await window.crypto.subtle.deriveKey(
+    return await window.crypto.subtle.deriveKey(
         {
             name: "PBKDF2",
             salt: salt as unknown as BufferSource,
@@ -78,6 +80,9 @@ const deriveKey = async (password: string, salt: Uint8Array): Promise<CryptoKey>
  */
 export const encryptData = async (data: string, password: string): Promise<string> => {
     try {
+        if (!password) {
+            throw new Error("كلمة المرور مطلوبة للتشفير");
+        }
         // 1. توليد قيم عشوائية آمنة
         const salt = window.crypto.getRandomValues(new Uint8Array(16)); // 16 bytes for PBKDF2
         const iv = window.crypto.getRandomValues(new Uint8Array(12));   // 12 bytes for AES-GCM IV
@@ -86,7 +91,6 @@ export const encryptData = async (data: string, password: string): Promise<strin
         const key = await deriveKey(password, salt);
 
         // 3. تشفير البيانات
-        // Web Crypto API يضيف AuthTag تلقائياً في نهاية الـ CipherText في وضع GCM
         const encryptedContent = await window.crypto.subtle.encrypt(
             {
                 name: "AES-GCM",
@@ -107,21 +111,38 @@ export const encryptData = async (data: string, password: string): Promise<strin
         return "THARI_AES_GCM:" + bufferToBase64(finalBuffer.buffer as unknown as ArrayBuffer);
 
     } catch (e) {
-        console.error("AES Encryption Failed:", e);
+        console.warn("AES Encryption Notice:", e);
         throw new Error("فشل التشفير الآمن. يرجى المحاولة مرة أخرى.");
     }
 };
 
 /**
- * فك تشفير البيانات
+ * فك تشفير البيانات بمرونة عالية ودعم كافة صيغ النسخ الاحتياطي
  */
 export const decryptData = async (encryptedData: string, password: string): Promise<string> => {
-    try {
-        if (encryptedData.startsWith("{") || encryptedData.startsWith("[")) return encryptedData; // JSON عادي
-        
-        if (encryptedData.startsWith("THARI_AES_GCM:")) {
-            const rawBase64 = encryptedData.replace("THARI_AES_GCM:", "");
+    if (!encryptedData) {
+        throw new Error("لا توجد بيانات لفك تشفيرها");
+    }
+
+    const trimmed = encryptedData.trim();
+
+    // 1. فحص إذا كان ملف JSON مباشر
+    if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+        return trimmed;
+    }
+
+    // 2. فحص صيغة THARI_AES_GCM المشفرة بـ AES-256-GCM
+    if (trimmed.startsWith("THARI_AES_GCM:")) {
+        if (!password) {
+            throw new Error("يرجى إدخال كلمة المرور لفك تشفير هذا الملف");
+        }
+        try {
+            const rawBase64 = trimmed.replace("THARI_AES_GCM:", "").trim();
             const fullBuffer = base64ToBuffer(rawBase64);
+
+            if (fullBuffer.length < 28) {
+                throw new Error("بيانات الملف غير مكتملة أو تالفة");
+            }
 
             // استخراج الأجزاء: Salt (16) | IV (12) | CipherText (Rest)
             const salt = fullBuffer.slice(0, 16);
@@ -142,12 +163,32 @@ export const decryptData = async (encryptedData: string, password: string): Prom
             );
 
             return DECODING.decode(decryptedBuffer);
+        } catch (e) {
+            console.warn("Decryption Attempt Failed with Provided Password:", e);
+            throw new Error("كلمة المرور غير صحيحة أو الملف تالف");
         }
-
-        throw new Error("تنسيق الملف غير مدعوم أو قديم جداً");
-
-    } catch (e) {
-        console.error("Decryption Failed:", e);
-        throw new Error("كلمة المرور غير صحيحة أو الملف تالف");
     }
+
+    // 3. فحص صيغة التخزين الآمن THR4_ أو RAW_
+    if (trimmed.startsWith("THR4_") || trimmed.startsWith("RAW_")) {
+        const deobf = deobfuscateData(trimmed);
+        if (deobf) return deobf;
+    }
+
+    // 4. محاولة فك تشفير Base64 JSON عادي
+    try {
+        const decodedBase64 = window.atob(trimmed);
+        const trimmedDecoded = decodedBase64.trim();
+        if (trimmedDecoded.startsWith("{") || trimmedDecoded.startsWith("[")) {
+            return trimmedDecoded;
+        }
+    } catch {}
+
+    // 5. محاولة قراءة JSON مباشرة
+    try {
+        JSON.parse(trimmed);
+        return trimmed;
+    } catch {}
+
+    throw new Error("تنسيق الملف غير مدعوم أو كلمة المرور غير صحيحة");
 };

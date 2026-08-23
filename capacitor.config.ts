@@ -4,7 +4,6 @@ const config: CapacitorConfig = {
   appId: 'com.thari.finance.app',
   appName: 'ثري — THARI',
   webDir: 'dist',
-  bundledWebRuntime: false,
   server: {
     androidScheme: 'https',
     cleartext: false,

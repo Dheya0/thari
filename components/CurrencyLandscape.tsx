@@ -103,37 +103,34 @@ export const CurrencyLandscape: React.FC<CurrencyLandscapeProps> = ({
   }, [currencies, currencyBalances, wallets, exchangeRates, baseCurrencyCode, selectedCurrency.code]);
 
   return (
-    <div className="w-full bg-[#0D1219] rounded-2xl md:rounded-3xl p-4 sm:p-6 border border-white/[0.08] shadow-xl space-y-5 text-right font-sans" dir="rtl">
+    <div className="w-full bg-[#0D1219] rounded-2xl md:rounded-3xl p-3 sm:p-4 border border-white/[0.08] shadow-md space-y-3 text-right font-sans" dir="rtl">
       {/* Header with Title and Current Base Indicator */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/[0.06] pb-4">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-[#D9B978]/15 text-[#D9B978] flex items-center justify-center border border-[#D9B978]/30 shadow-inner">
-            <Coins size={18} />
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/[0.06] pb-3">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-xl bg-[#D9B978]/15 text-[#D9B978] flex items-center justify-center border border-[#D9B978]/30 shadow-inner">
+            <Coins size={16} />
           </div>
           <div>
-            <h3 className="text-sm sm:text-base font-bold text-white tracking-tight flex items-center gap-2">
-              <span>المنظور الحي لتوزيع العملات</span>
-              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400">
-                محرك الصرف المحلي نشط
+            <h3 className="text-xs sm:text-sm font-bold text-white tracking-tight flex items-center gap-2">
+              <span>توزيع العملات الحي</span>
+              <span className="text-[9px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400">
+                نشط
               </span>
             </h3>
-            <p className="text-xs text-slate-300 font-medium mt-0.5">
-              التعرض المالي، الأرصدة المستقلة، والتحويل اللحظي بأسعار الصرف المحفوظة
-            </p>
           </div>
         </div>
 
         <div className="flex items-center gap-2 self-start sm:self-auto">
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/[0.05] border border-white/10 text-xs font-semibold text-slate-200">
-            <span className="text-slate-400">عملة العرض الحالية:</span>
+          <div className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white/[0.05] border border-white/10 text-[11px] font-semibold text-slate-200">
+            <span className="text-slate-400">العرض:</span>
             <span className="text-[#D9B978] font-bold font-numeric">{selectedCurrency.symbol} ({selectedCurrency.code})</span>
           </div>
         </div>
       </div>
 
       {/* Proportional Exposure Visual Spectrum Bar */}
-      <div className="space-y-2">
-        <div className="h-3 w-full bg-[#161F2B] border border-white/[0.08] rounded-full overflow-hidden flex p-0.5 gap-0.5">
+      <div className="space-y-1.5">
+        <div className="h-2 w-full bg-[#161F2B] border border-white/[0.08] rounded-full overflow-hidden flex p-0.5 gap-0.5">
           {exposureAnalysis.items.filter(i => i.amountInBase > 0).map(item => (
             <motion.div
               key={item.currency.code}
@@ -146,20 +143,10 @@ export const CurrencyLandscape: React.FC<CurrencyLandscapeProps> = ({
             />
           ))}
         </div>
-
-        <div className="flex items-center justify-between text-xs text-slate-300 font-medium px-1">
-          <span className="flex items-center gap-1.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#D9B978]" />
-            <span>توزيع الأصول النقدية</span>
-          </span>
-          <span className="font-numeric text-slate-300">
-            {exposureAnalysis.items.filter(i => i.nativeAmount !== 0).length} عملات ذات أرصدة نشطة
-          </span>
-        </div>
       </div>
 
-      {/* Living Interactive Currency Grid / Chips */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-1">
+      {/* Living Interactive Currency Grid / Chips (Compact) */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5 pt-1">
         {exposureAnalysis.items.map(item => {
           const isSelected = item.currency.code === selectedCurrency.code;
           const hasBalance = item.nativeAmount !== 0;
@@ -169,74 +156,49 @@ export const CurrencyLandscape: React.FC<CurrencyLandscapeProps> = ({
               key={item.currency.code}
               whileTap={{ scale: 0.98 }}
               onClick={() => onSelectCurrency(item.currency)}
-              className={`p-4 rounded-2xl border text-right transition-all duration-200 flex flex-col justify-between relative overflow-hidden group shadow-md ${
+              className={`p-3 rounded-xl border text-right transition-all duration-200 flex flex-col justify-between relative overflow-hidden group shadow-sm ${
                 isSelected
-                  ? 'bg-gradient-to-br from-[#231A10] via-[#161D27] to-[#10151E] border-[#D9B978] ring-1 ring-[#D9B978]/40 shadow-lg shadow-black/40'
+                  ? 'bg-gradient-to-br from-[#231A10] via-[#161D27] to-[#10151E] border-[#D9B978] ring-1 ring-[#D9B978]/40 shadow-md'
                   : 'bg-[#141B24] hover:bg-[#1A232E] border-white/10 hover:border-white/20'
               }`}
             >
               {/* Top Row: Currency Symbol & Name & Select Indicator */}
-              <div className="flex items-center justify-between w-full mb-2.5">
-                <div className="flex items-center gap-2 truncate">
+              <div className="flex items-center justify-between w-full mb-1.5">
+                <div className="flex items-center gap-1.5 truncate">
                   <span
-                    className="w-2.5 h-2.5 rounded-full shrink-0 shadow-sm"
+                    className="w-2 h-2 rounded-full shrink-0 shadow-sm"
                     style={{ backgroundColor: item.color.bar }}
                   />
-                  <span className={`text-xs sm:text-sm font-bold truncate ${isSelected ? 'text-[#E5C17B]' : 'text-white'}`}>
+                  <span className={`text-xs font-bold truncate ${isSelected ? 'text-[#E5C17B]' : 'text-white'}`}>
                     {item.currency.name}
                   </span>
                 </div>
 
-                {isSelected ? (
-                  <span className="px-2 py-0.5 rounded-full bg-[#D9B978] text-slate-950 text-[10px] font-black flex items-center gap-1 shrink-0">
-                    <Check size={11} strokeWidth={3} />
-                    <span>الأساسية</span>
-                  </span>
-                ) : (
-                  <span className="text-[11px] font-bold text-slate-300 font-numeric px-2 py-0.5 rounded-lg bg-white/[0.06] border border-white/10 shrink-0">
-                    {item.currency.code}
-                  </span>
-                )}
+                <span className="text-[10px] font-bold text-slate-300 font-numeric px-1.5 py-0.5 rounded bg-white/[0.06] border border-white/10 shrink-0">
+                  {item.currency.code}
+                </span>
               </div>
 
               {/* Native Balance Display */}
-              <div className="space-y-1 my-1">
-                <div className="flex items-baseline gap-1.5 flex-wrap">
-                  <span className={`text-base sm:text-lg font-bold font-numeric tracking-tight ${
+              <div className="space-y-0.5 my-1">
+                <div className="flex items-baseline gap-1 flex-wrap">
+                  <span className={`text-sm font-bold font-numeric tracking-tight ${
                     item.nativeAmount < 0 ? 'text-rose-400' : 'text-white'
                   }`}>
                     {formatFinancialNumber(item.nativeAmount)}
                   </span>
-                  <span className="text-xs font-bold text-slate-300">
+                  <span className="text-[10px] font-bold text-slate-300">
                     {item.currency.symbol}
                   </span>
                 </div>
 
-                {/* Sub-label: Converted equivalent in selected display currency */}
                 {!isSelected && hasBalance && (
-                  <div className="text-[11px] text-slate-300 font-numeric flex items-center gap-1 bg-black/20 px-2 py-1 rounded-lg border border-white/[0.04]">
+                  <div className="text-[10px] text-slate-300 font-numeric flex items-center gap-1 bg-black/20 px-1.5 py-0.5 rounded border border-white/[0.04]">
                     <span className="text-slate-400">يعادل:</span>
                     <span className="font-semibold text-[#E5C17B]">
                       {formatFinancialNumber(convertCurrency(item.nativeAmount, item.currency.code, selectedCurrency.code, exchangeRates))} {selectedCurrency.symbol}
                     </span>
                   </div>
-                )}
-              </div>
-
-              {/* Bottom Row: Wallet Count & Live Rate */}
-              <div className="flex items-center justify-between pt-2.5 mt-1 border-t border-white/[0.06] text-[11px] text-slate-300">
-                <span className="font-medium">
-                  {item.walletCount > 0 ? `${item.walletCount} محافظ` : 'بدون محفظة'}
-                </span>
-                
-                {item.percentage > 0 ? (
-                  <span className="font-numeric font-bold" style={{ color: item.color.text }}>
-                    {item.percentage}% من الثروة
-                  </span>
-                ) : (
-                  <span className="font-numeric text-[10px] text-slate-400">
-                    1 {item.currency.code} = {Math.round(item.exchangeRateToSelected * 100) / 100} {selectedCurrency.code}
-                  </span>
                 )}
               </div>
             </motion.button>

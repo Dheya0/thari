@@ -8,6 +8,7 @@ import { generateAndShareCSV, buildExecutiveCSVContent, exportAndShareExecutiveC
 import { saveSecureState, loadSecureState } from './utils/secureStorage';
 import { calculateConsolidatedPosition, calculateWalletBalances } from './services/balanceEngine';
 import { processDueRecurringRules } from './services/recurringService';
+import { getTranslation } from './utils/translations';
 import { Capacitor } from '@capacitor/core';
 import { App as CapApp } from '@capacitor/app';
 import { Filesystem, Directory } from '@capacitor/filesystem';
@@ -34,6 +35,7 @@ import { RecurringManagerModal } from './components/RecurringManagerModal';
 import { SystemDiagnosticsModal } from './components/SystemDiagnosticsModal';
 import { ToolsHubModal } from './components/ToolsHubModal';
 import CurrencySelectorModal from './components/CurrencySelectorModal';
+import WalletSelectorModal from './components/WalletSelectorModal';
 import SmartAlerts from './components/SmartAlerts';
 import ZakatCalculator from './components/ZakatCalculator';
 import ExecutiveInsights from './components/ExecutiveInsights';
@@ -87,6 +89,7 @@ const INITIAL_STATE: AppState = {
   autoBackupFrequency: 'daily',
   lastAutoBackupTime: '',
   syncStatus: 'SYNCED',
+  language: 'ar',
 };
 
 const App: React.FC = () => {
@@ -168,13 +171,21 @@ const App: React.FC = () => {
   const [showDiagnosticsModal, setShowDiagnosticsModal] = useState<boolean>(false);
   const [showToolsHub, setShowToolsHub] = useState<boolean>(false);
   const [showCurrencySelector, setShowCurrencySelector] = useState<boolean>(false);
+  const [showWalletSelector, setShowWalletSelector] = useState<boolean>(false);
   
   // Wallet Filter State (null = All Wallets)
   const [selectedWalletId, setSelectedWalletId] = useState<string | null>(null);
   const [timePeriodFilter, setTimePeriodFilter] = useState<'all' | 'today' | 'week' | 'month'>('all');
   const [formDefaultType, setFormDefaultType] = useState<'expense' | 'income' | 'transfer' | 'adjustment' | undefined>(undefined);
 
-  // Network Offline / Online State
+  // Sync Document Direction & Language
+  useEffect(() => {
+    const lang = state.language || 'ar';
+    document.documentElement.dir = lang === 'ar' ? 'rtl' : 'ltr';
+    document.documentElement.lang = lang;
+  }, [state.language]);
+
+  const t = getTranslation(state.language || 'ar');
   const [isOnline, setIsOnline] = useState<boolean>(typeof navigator !== 'undefined' ? navigator.onLine : true);
   const [showNetworkToast, setShowNetworkToast] = useState(false);
 
@@ -837,6 +848,24 @@ const App: React.FC = () => {
             </div>
 
             <div className="flex gap-2 items-center">
+              {/* Wallet Quick Selector Button (Same styling as Currency Button) */}
+              <button
+                type="button"
+                onClick={() => setShowWalletSelector(true)}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#141B24] hover:bg-[#1C2633] border border-[#8EB9A7]/40 hover:border-[#8EB9A7] text-white transition-all text-xs shadow-sm active:scale-95 group ring-1 ring-[#8EB9A7]/20"
+                title="المحافظ والحسابات - انقر للاختيار أو دمج المحافظ"
+              >
+                <div className="w-5 h-5 rounded-lg bg-[#8EB9A7] text-slate-950 font-black text-[11px] flex items-center justify-center shadow-xs">
+                  <WalletIcon size={12} />
+                </div>
+                <div className="flex items-baseline gap-1">
+                  <span className="font-bold text-white tracking-wide">
+                    {selectedWalletId ? state.wallets.find(w => w.id === selectedWalletId)?.name || 'Wallet' : t.allWallets}
+                  </span>
+                </div>
+                <ChevronDown size={14} className="text-[#8EB9A7] group-hover:translate-y-0.5 transition-transform" />
+              </button>
+
               {/* Currency Badge / Interactive Quick Selector */}
               <button
                 type="button"
@@ -923,6 +952,7 @@ const App: React.FC = () => {
                     onOpenAllTransactions={() => setActiveTab('transactions')}
                     onEditTransaction={handleEditTransaction}
                     onDeleteTransaction={handleDeleteTransaction}
+                    language={state.language || 'ar'}
                   />
                 )}
                 
@@ -945,6 +975,7 @@ const App: React.FC = () => {
                     zakatPayments={state.zakatPayments}
                     onSaveProfiles={(profiles) => setState(p => ({ ...p, zakatProfiles: profiles }))}
                     onSavePayments={(payments) => setState(p => ({ ...p, zakatPayments: payments }))}
+                    language={state.language || 'ar'}
                   />
                 )}
                 
@@ -1010,8 +1041,8 @@ const App: React.FC = () => {
 
         <div className="fixed bottom-0 left-0 right-0 pt-16 pb-[calc(1rem+env(safe-area-inset-bottom,0px))] px-4 md:px-0 flex justify-center pointer-events-none z-50 bg-gradient-to-t from-[#0A0D10] via-[#0A0D10]/80 to-transparent">
             <nav className="pointer-events-auto w-full md:max-w-xl bg-[#11161C]/95 backdrop-blur-2xl border border-white/10 flex items-center justify-between px-2 py-2 rounded-[2rem] shadow-[0_20px_50px_rgba(0,0,0,0.4)]">
-                <NavButton icon={<LayoutDashboard />} label="الرئيسية" active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} />
-                <NavButton icon={<Scale />} label="زكاتي" active={activeTab === 'zakat'} onClick={() => setActiveTab('zakat')} />
+                <NavButton icon={<LayoutDashboard />} label={t.dashboard} active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} />
+                <NavButton icon={<Scale />} label={t.zakat} active={activeTab === 'zakat'} onClick={() => setActiveTab('zakat')} />
                 
                 <motion.button 
                   whileHover={{ scale: 1.06 }}
@@ -1022,8 +1053,8 @@ const App: React.FC = () => {
                   <Plus size={28} strokeWidth={3.5} />
                 </motion.button>
 
-                <NavButton icon={<HandCoins />} label="ديون" active={activeTab === 'debts'} onClick={() => setActiveTab('debts')} />
-                <NavButton icon={<SettingsIcon />} label="المزيد" active={activeTab === 'settings'} onClick={() => setActiveTab('settings')} />
+                <NavButton icon={<HandCoins />} label={t.debts} active={activeTab === 'debts'} onClick={() => setActiveTab('debts')} />
+                <NavButton icon={<SettingsIcon />} label={t.more} active={activeTab === 'settings'} onClick={() => setActiveTab('settings')} />
             </nav>
         </div>
 
@@ -1144,6 +1175,18 @@ const App: React.FC = () => {
               onSelectCurrency={(curr) => setState(p => ({ ...p, currency: curr }))}
               exchangeRates={state.exchangeRates}
               onOpenSettings={() => setActiveTab('settings')}
+              language={state.language || 'ar'}
+            />
+          )}
+          {showWalletSelector && (
+            <WalletSelectorModal
+              isOpen={showWalletSelector}
+              onClose={() => setShowWalletSelector(false)}
+              wallets={state.wallets}
+              selectedWalletId={selectedWalletId}
+              onSelectWallet={setSelectedWalletId}
+              onOpenSettingsWallets={() => setActiveTab('settings')}
+              language={state.language || 'ar'}
             />
           )}
         </AnimatePresence>

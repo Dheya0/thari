@@ -329,4 +329,5 @@ export interface AppState {
   autoBackupFrequency?: 'on_open' | 'daily' | 'weekly' | 'disabled'; // Auto-backup frequency
   lastAutoBackupTime?: string; // ISO date string of last automatic backup
   syncStatus?: SyncState;
+  language?: 'ar' | 'en'; // App language (Arabic / English)
 }

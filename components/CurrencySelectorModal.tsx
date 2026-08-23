@@ -12,6 +12,7 @@ interface CurrencySelectorModalProps {
   onSelectCurrency: (currency: Currency) => void;
   exchangeRates: Record<string, number>;
   onOpenSettings?: () => void;
+  language?: 'ar' | 'en';
 }
 
 export const CurrencySelectorModal: React.FC<CurrencySelectorModalProps> = ({
@@ -21,10 +22,12 @@ export const CurrencySelectorModal: React.FC<CurrencySelectorModalProps> = ({
   selectedCurrency,
   onSelectCurrency,
   exchangeRates,
-  onOpenSettings
+  onOpenSettings,
+  language = 'ar'
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const modalRef = useRef<HTMLDivElement>(null);
+  const isEn = language === 'en';
 
   // Close on Escape
   useEffect(() => {
@@ -70,8 +73,8 @@ export const CurrencySelectorModal: React.FC<CurrencySelectorModalProps> = ({
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: -10 }}
           transition={{ duration: 0.2 }}
-          className="relative w-full max-w-md bg-[#0F141C] border border-[#D9B978]/30 rounded-2xl md:rounded-3xl shadow-[0_10px_40px_rgba(0,0,0,0.8)] overflow-hidden z-10 flex flex-col max-h-[85vh] text-right font-sans"
-          dir="rtl"
+          className={`relative w-full max-w-md bg-[#0F141C] border border-[#D9B978]/30 rounded-2xl md:rounded-3xl shadow-[0_10px_40px_rgba(0,0,0,0.8)] overflow-hidden z-10 flex flex-col max-h-[85vh] ${isEn ? 'text-left font-sans' : 'text-right font-sans'}`}
+          dir={isEn ? 'ltr' : 'rtl'}
         >
           {/* Header */}
           <div className="p-4 sm:p-5 border-b border-white/[0.08] flex items-center justify-between bg-[#141B24]">
@@ -81,20 +84,31 @@ export const CurrencySelectorModal: React.FC<CurrencySelectorModalProps> = ({
               </div>
               <div>
                 <h3 className="text-base font-bold text-white tracking-tight">
-                  تحديد العملة الأساسية للعرض
+                  {isEn ? 'Base Currency & Travel Mode' : 'تحديد العملة الأساسية ووضع السفر'}
                 </h3>
                 <p className="text-xs text-slate-300 mt-0.5">
-                  اختر العملة المعتمدة لاحتساب وتقييم المعاملات والأصول
+                  {isEn ? 'Choose base currency or destination travel currency for accurate budgeting' : 'اختر العملة المعتمدة أو عملة وجهتك السفرية لاحتساب المصروفات بدقة'}
                 </p>
               </div>
             </div>
             <button
               onClick={onClose}
               className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
-              title="إغلاق"
+              title={isEn ? 'Close' : 'إغلاق'}
             >
               <X size={18} />
             </button>
+          </div>
+
+          {/* Travel Mode Banner */}
+          <div className="mx-4 mt-3 p-3 rounded-xl bg-gradient-to-r from-amber-500/15 via-emerald-500/10 to-transparent border border-amber-500/30 flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0">
+              <Globe size={16} />
+            </div>
+            <div>
+              <h4 className="text-xs font-bold text-amber-300">{isEn ? 'International Travel & Currency Spending Mode' : 'خاصية السفر الدولي وحساب الصرفية'}</h4>
+              <p className="text-[10px] text-slate-300">{isEn ? 'When traveling, select the destination currency to track local budget and spending.' : 'عند السفر، حدد عملة الدولة لتتمكن من تتبع وحساب ميزانيتك وصرفيتك المحلية بالكامل.'}</p>
+            </div>
           </div>
 
           {/* Search Input (Shown when more than 3 currencies) */}

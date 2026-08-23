@@ -30,6 +30,7 @@ import {
 } from 'lucide-react';
 import { Wallet, Transaction, Debt, Currency, ZakatProfile, ZakatPaymentRecord } from '../types';
 import { convertCurrency, DEFAULT_EXCHANGE_RATES } from '../constants';
+import { getTranslation } from '../utils/translations';
 import { formatFinancialNumber } from './ElegantDashboard';
 import { StatsGrid, StatItem } from './StatsGrid';
 import { AssetItemRow } from './AssetItemRow';
@@ -48,6 +49,7 @@ interface ZakatCalculatorProps {
   zakatPayments?: ZakatPaymentRecord[];
   onSaveProfiles?: (profiles: ZakatProfile[]) => void;
   onSavePayments?: (payments: ZakatPaymentRecord[]) => void;
+  language?: 'ar' | 'en';
 }
 
 // Default benchmark price for 24k Gold per gram in SAR (approx 320 SAR/g)
@@ -168,8 +170,10 @@ export const ZakatCalculator: React.FC<ZakatCalculatorProps> = ({
   zakatProfiles,
   zakatPayments = [],
   onSaveProfiles,
-  onSavePayments
+  onSavePayments,
+  language = 'ar'
 }) => {
+  const t = getTranslation(language);
   const baseCurrencyCode = currentCurrency.code || 'SAR';
   const displaySymbol = currentCurrency.symbol || currencySymbol || baseCurrencyCode;
 

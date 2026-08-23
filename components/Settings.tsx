@@ -9,6 +9,7 @@ import {
   Mail, HardDrive, Shield, Activity, Clock, Laptop, ScanFace, FileCheck, Share2
 } from 'lucide-react';
 import { Currency, Wallet, Category, Transaction } from '../types';
+import { getTranslation } from '../utils/translations';
 import { encryptData, decryptData } from '../services/encryptionService';
 import { authenticateBiometrics, checkBiometricAvailable } from '../services/biometricService';
 import { getIcon, DEFAULT_EXCHANGE_RATES } from '../constants';
@@ -156,6 +157,7 @@ const Settings: React.FC<SettingsProps> = ({
   const [localAutoLockTime, setLocalAutoLockTime] = useState<'instant' | '1min' | '5min' | 'never'>(appState?.autoLockTime || 'instant');
   const [localRequireBiometricOnOpen, setLocalRequireBiometricOnOpen] = useState<boolean>(appState?.requireBiometricOnOpen !== false);
   const [localAutoBackupFreq, setLocalAutoBackupFreq] = useState<'on_open' | 'daily' | 'weekly' | 'disabled'>(appState?.autoBackupFrequency || 'daily');
+  const [localLanguage, setLocalLanguage] = useState<'ar' | 'en'>(appState?.language || 'ar');
   const [showAutoBackupHistoryModal, setShowAutoBackupHistoryModal] = useState(false);
   const [autoBackupHistory, setAutoBackupHistory] = useState<any[]>([]);
   const [isSecurityEnabled, setIsSecurityEnabled] = useState(!!pin);
@@ -234,7 +236,7 @@ const Settings: React.FC<SettingsProps> = ({
   };
 
   const handleSupportClick = () => {
-    showToast('خدمة الدعم الفني المباشر ستنطلق رسمياً مع إطلاق النسخة على متاجر التطبيقات.');
+    window.location.href = 'mailto:thari-app@inbox.ru?subject=استفسار%20تطبيق%20ثري%20-%20دعم%20المستخدمين';
   };
 
   const [toast, setToast] = useState<{message: string, type: 'success' | 'error'} | null>(null);
@@ -561,9 +563,10 @@ const Settings: React.FC<SettingsProps> = ({
       requireBiometricOnOpen: localRequireBiometricOnOpen,
       apiKey: localApiKey,
       autoLockTime: localAutoLockTime,
-      autoBackupFrequency: localAutoBackupFreq
+      autoBackupFrequency: localAutoBackupFreq,
+      language: localLanguage
     });
-    showToast("تم حفظ الملف الشخصي والبريد الإلكتروني");
+    showToast("تم حفظ الملف الشخصي وإعدادات اللغة بنجاح");
   };
 
   const handleSaveSecurity = (lockNow = false) => {
@@ -908,12 +911,14 @@ const Settings: React.FC<SettingsProps> = ({
     );
   };
 
+  const t = getTranslation(appState?.language || 'ar');
+
   // (Return Main View unchanged, just ensuring it renders correctly)
   return (
     <div className="space-y-6 pb-24 animate-fade">
       <div className="flex justify-between items-center bg-slate-900 p-5 rounded-[2.5rem] border border-slate-800">
-        <h3 className="font-black text-white text-lg">الإعدادات العامة</h3>
-        <button onClick={handleSaveProfile} className="bg-amber-500 text-slate-950 px-8 py-3 rounded-2xl font-black text-sm active:scale-95 transition-all shadow-lg shadow-amber-500/10">حفظ</button>
+        <h3 className="font-black text-white text-lg">{t.generalSettings}</h3>
+        <button onClick={handleSaveProfile} className="bg-amber-500 text-slate-950 px-8 py-3 rounded-2xl font-black text-sm active:scale-95 transition-all shadow-lg shadow-amber-500/10">{t.save}</button>
       </div>
 
       {/* PWA Section */}
@@ -960,25 +965,25 @@ const Settings: React.FC<SettingsProps> = ({
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
          <button onClick={() => setActiveSection('wallets')} className="bg-slate-900 p-5 rounded-[2rem] border border-slate-800 flex flex-col items-center gap-3 text-white font-bold hover:bg-slate-800 transition-all active:scale-95">
             <div className="w-11 h-11 bg-amber-500/10 text-amber-500 flex items-center justify-center rounded-2xl"><WalletIcon size={22} /></div>
-            <span className="text-[11px] font-black uppercase tracking-wider">المحافظ</span>
+            <span className="text-[11px] font-black uppercase tracking-wider">{t.walletsManagement}</span>
          </button>
          <button onClick={() => setActiveSection('categories')} className="bg-slate-900 p-5 rounded-[2rem] border border-slate-800 flex flex-col items-center gap-3 text-white font-bold hover:bg-slate-800 transition-all active:scale-95">
             <div className="w-11 h-11 bg-blue-500/10 text-blue-500 flex items-center justify-center rounded-2xl"><Tag size={22} /></div>
-            <span className="text-[11px] font-black uppercase tracking-wider">التصنيفات</span>
+            <span className="text-[11px] font-black uppercase tracking-wider">{t.categoriesManagement}</span>
          </button>
          <button onClick={() => setActiveSection('currencies')} className="bg-slate-900 p-5 rounded-[2rem] border border-slate-800 flex flex-col items-center gap-3 text-white font-bold hover:bg-slate-800 transition-all active:scale-95">
             <div className="w-11 h-11 bg-emerald-500/10 text-emerald-500 flex items-center justify-center rounded-2xl"><RefreshCw size={22} /></div>
-            <span className="text-[11px] font-black uppercase tracking-wider">العملات والأسعار</span>
+            <span className="text-[11px] font-black uppercase tracking-wider">{t.currenciesAndRates}</span>
          </button>
          <button onClick={() => setShowEmailBackupModal(true)} className="bg-slate-900 p-5 rounded-[2rem] border border-slate-800 flex flex-col items-center gap-3 text-white font-bold hover:bg-slate-800 transition-all active:scale-95">
             <div className="w-11 h-11 bg-indigo-500/10 text-indigo-400 flex items-center justify-center rounded-2xl"><Mail size={22} /></div>
-            <span className="text-[11px] font-black uppercase tracking-wider">نسخ للبريد</span>
+            <span className="text-[11px] font-black uppercase tracking-wider">{t.emailBackup}</span>
          </button>
       </div>
 
       <div className="space-y-4">
          {/* Accordion 1 - Profile Info, Registered Email & AI Assistance */}
-         <AccordionItem id="profile" title="الحساب والبريد الإلكتروني للنسخ والمزامنة" icon={User}>
+         <AccordionItem id="profile" title={t.accountAndEmailSync} icon={User}>
             <div className="space-y-4 text-right">
                 <div className="space-y-2">
                     <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2 block">اسم صاحب الحساب</label>
@@ -988,6 +993,36 @@ const Settings: React.FC<SettingsProps> = ({
                       onChange={e => setLocalUserName(e.target.value)} 
                       className="w-full p-4 rounded-xl bg-slate-800 text-white font-bold border-none outline-none focus:ring-1 focus:ring-amber-500 shadow-inner" 
                     />
+                </div>
+
+                <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2 block">لغة التطبيق (Language)</label>
+                    <div className="grid grid-cols-2 gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setLocalLanguage('ar')}
+                        className={`p-3.5 rounded-xl border text-xs font-black flex items-center justify-center gap-2 transition-all ${
+                          localLanguage === 'ar'
+                            ? 'bg-amber-500/20 border-amber-500 text-amber-300 shadow-lg shadow-amber-500/10'
+                            : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-750'
+                        }`}
+                      >
+                        <span>العربية (Arabic)</span>
+                        {localLanguage === 'ar' && <Check size={14} className="text-amber-400" />}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setLocalLanguage('en')}
+                        className={`p-3.5 rounded-xl border text-xs font-black flex items-center justify-center gap-2 transition-all ${
+                          localLanguage === 'en'
+                            ? 'bg-amber-500/20 border-amber-500 text-amber-300 shadow-lg shadow-amber-500/10'
+                            : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-750'
+                        }`}
+                      >
+                        <span>English (الإنجليزية)</span>
+                        {localLanguage === 'en' && <Check size={14} className="text-amber-400" />}
+                      </button>
+                    </div>
                 </div>
 
                 <div className="space-y-2">
@@ -1220,16 +1255,6 @@ const Settings: React.FC<SettingsProps> = ({
                     >
                       <ScanFace size={15} />
                       <span>{bioTestStatus === 'testing' ? 'جاري فحص المستشعر...' : 'اختبار فحص بصمة الجهاز الآن'}</span>
-                    </button>
-
-                    {/* Release Candidate Audit Verification Button */}
-                    <button
-                      type="button"
-                      onClick={() => setShowReleaseAuditModal(true)}
-                      className="w-full py-3 bg-gradient-to-r from-amber-500/20 via-indigo-500/20 to-emerald-500/20 hover:from-amber-500/30 hover:to-emerald-500/30 border border-amber-500/40 text-amber-300 rounded-xl text-xs font-black active:scale-95 transition-all flex items-center justify-center gap-2 shadow-lg shadow-amber-500/5"
-                    >
-                      <ShieldCheck size={16} className="text-amber-400" />
-                      <span>تشغيل تدقيق الجاهزية للإنتاج (Release Candidate Audit)</span>
                     </button>
 
                     {bioTestFeedback && (
