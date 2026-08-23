@@ -1,24 +1,19 @@
 # ==============================================================================
-# Codemagic CI/CD Pipeline Configuration
-# Project: THARI (ثري) — Financial Management & Ledger Suite
-# App ID: com.thari.finance.app
-# Stack: React 18 + Vite 6 + TypeScript + Capacitor 6 (iOS & Android)
+# ملف تكوين البناء والنشر الآلي لمنصة Codemagic (تطبيق ثري لإدارة الثروات والمالية الشخصية)
 # ==============================================================================
 
 workflows:
   # ----------------------------------------------------------------------------
-  # 1. Android Release & Debug Workflow (AAB / APK)
+  # 1. مسار بناء حزم أندرويد (Google Play AAB & APK)
   # ----------------------------------------------------------------------------
   android-workflow:
-    name: Android Release Build (Google Play AAB & Universal APK)
+    name: Android Release Build
     max_build_duration: 60
     instance_type: mac_mini_m2
     environment:
       node: 20.x
       java: 17
       groups:
-        # Group created in Codemagic UI: containing CM_KEYSTORE, CM_KEYSTORE_PASSWORD,
-        # CM_KEY_ALIAS, CM_KEY_PASSWORD, and GCLOUD_SERVICE_KEY (for Google Play publishing)
         - android_signing
         - google_play_credentials
       vars:
@@ -38,7 +33,7 @@ workflows:
         - pattern: 'v*'
           include: true
     scripts:
-      - name: Set up environment and print versions
+      - name: Print environment details
         script: |
           node --version
           npm --version
@@ -48,23 +43,22 @@ workflows:
         script: |
           npm ci --prefer-offline || npm install
 
-      - name: Type check and code linting
+      - name: Code quality check and linting
         script: |
           npm run lint
 
-      - name: Build Web production distribution (Vite)
+      - name: Build Web production assets
         script: |
           npm run build
 
-      - name: Capacitor Android setup & sync
+      - name: Capacitor Android synchronization
         script: |
-          # Add Android platform if not present, then sync assets & plugins
           if [ ! -d "android" ]; then
             npx cap add android
           fi
           npx cap sync android
 
-      - name: Set up Android keystore (Release Signing)
+      - name: Configure Android release keystore
         script: |
           if [ -n "$CM_KEYSTORE" ]; then
             echo "$CM_KEYSTORE" | base64 --decode > /tmp/keystore.jks
@@ -87,22 +81,22 @@ workflows:
           }
           EOF
           else
-            echo "Warning: CM_KEYSTORE variable not set, building unsigned release artifact."
+            echo "Building without explicit keystore injection"
           fi
 
-      - name: Build Android AAB (App Bundle for Google Play)
+      - name: Build Android App Bundle (AAB)
         script: |
           cd android
           ./gradlew bundleRelease --stacktrace
 
-      - name: Build Android APK (Universal / Testing)
+      - name: Build Android APK
         script: |
           cd android
           ./gradlew assembleRelease --stacktrace
     artifacts:
-      - android/app/build/outputs/bundle/release/*.aab
-      - android/app/build/outputs/apk/release/*.apk
-      - dist/**
+      - "android/app/build/outputs/bundle/release/*.aab"
+      - "android/app/build/outputs/apk/release/*.apk"
+      - "dist/**"
     publishing:
       email:
         recipients:
@@ -110,17 +104,12 @@ workflows:
         notify:
           success: true
           failure: true
-      # Uncomment to enable automatic Google Play publishing
-      # google_play:
-      #   credentials: $GCLOUD_SERVICE_KEY
-      #   track: internal # internal | alpha | beta | production
-      #   in_app_update_priority: 0
 
   # ----------------------------------------------------------------------------
-  # 2. iOS Release Workflow (TestFlight / App Store IPA)
+  # 2. مسار بناء حزم آبل iOS (TestFlight / App Store IPA)
   # ----------------------------------------------------------------------------
   ios-workflow:
-    name: iOS Release Build (App Store / TestFlight IPA)
+    name: iOS Release Build
     max_build_duration: 60
     instance_type: mac_mini_m2
     environment:
@@ -128,8 +117,6 @@ workflows:
       xcode: latest
       cocoapods: default
       groups:
-        # Group created in Codemagic UI for Apple Developer Portal credentials
-        # (APP_STORE_CONNECT_KEY_IDENTIFIER, APP_STORE_CONNECT_ISSUER_ID, APP_STORE_CONNECT_PRIVATE_KEY)
         - app_store_credentials
         - ios_signing
       vars:
@@ -151,7 +138,7 @@ workflows:
         - pattern: 'v*'
           include: true
     scripts:
-      - name: Set up environment and print versions
+      - name: Print environment details
         script: |
           node --version
           npm --version
@@ -162,45 +149,42 @@ workflows:
         script: |
           npm ci --prefer-offline || npm install
 
-      - name: Type check and code linting
+      - name: Code quality check and linting
         script: |
           npm run lint
 
-      - name: Build Web production distribution (Vite)
+      - name: Build Web production assets
         script: |
           npm run build
 
-      - name: Capacitor iOS setup & sync
+      - name: Capacitor iOS synchronization
         script: |
-          # Add iOS platform if not present, then sync assets & CocoaPods
           if [ ! -d "ios" ]; then
             npx cap add ios
           fi
           npx cap sync ios
 
-      - name: Set up code signing settings on Xcode project
+      - name: Set up code signing profiles
         script: |
           if [ -n "$APP_STORE_CONNECT_KEY_IDENTIFIER" ]; then
             xcode-project use-profiles
           else
-            echo "Skipping automated signing profile download (credentials not configured)."
+            echo "Skipping signing profile step"
           fi
 
-      - name: Build IPA for App Store distribution
+      - name: Build IPA package
         script: |
-          # Set build number based on Codemagic build run
           cd ios/App
           agvtool new-version -all $(($BUILD_NUMBER + 10200)) || true
           cd ../..
 
-          # Build .ipa package
           xcode-project build-ipa \
             --workspace "$XCODE_WORKSPACE" \
             --scheme "$XCODE_SCHEME"
     artifacts:
-      - build/ios/ipa/*.ipa
-      - /tmp/xcodebuild_logs/*.log
-      - *.dSYM.zip
+      - "build/ios/ipa/*.ipa"
+      - "/tmp/xcodebuild_logs/*.log"
+      - "*.dSYM.zip"
     publishing:
       email:
         recipients:
@@ -208,17 +192,12 @@ workflows:
         notify:
           success: true
           failure: true
-      # Uncomment to enable automatic TestFlight / App Store Connect publishing
-      # app_store_connect:
-      #   auth: integration # or api_key
-      #   submit_to_testflight: true
-      #   expire_build_submitted_for_testflight: true
 
   # ----------------------------------------------------------------------------
-  # 3. Web & PWA Verification Workflow
+  # 3. مسار التحقق من حزمة الويب (Web & PWA Verification)
   # ----------------------------------------------------------------------------
   web-verification:
-    name: Web PWA Validation & Asset Bundle
+    name: Web PWA Validation
     max_build_duration: 20
     instance_type: mac_mini_m2
     environment:
@@ -235,7 +214,7 @@ workflows:
         script: |
           npm ci --prefer-offline || npm install
 
-      - name: Static Analysis & TypeScript Typecheck
+      - name: TypeScript typecheck & linting
         script: |
           npm run lint
 
@@ -243,11 +222,11 @@ workflows:
         script: |
           npm run build
 
-      - name: Capacitor Configuration Verification
+      - name: Verify Capacitor Config
         script: |
           npx cap sync --dry-run || true
     artifacts:
-      - dist/**
+      - "dist/**"
     publishing:
       email:
         recipients:
