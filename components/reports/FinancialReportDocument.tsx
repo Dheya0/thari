@@ -39,10 +39,10 @@ export const FinancialReportDocument: React.FC<ReportDocumentProps> = ({
                 <span className="text-sm font-bold text-amber-600 font-mono">THARI</span>
               </div>
               <p className="text-[10px] font-bold text-slate-500 mt-0.5">
-                تطبيق إدارة الأصول والميزانيات المالية الذكية
+                منظومة إدارة الأصول والميزانيات المالية المتكاملة
               </p>
               <p className="text-[9px] font-medium text-slate-400">
-                Personal Financial Intelligence & Wealth Management
+                Institutional Financial Suite & Wealth Management
               </p>
             </div>
           </div>
@@ -128,7 +128,7 @@ export const FinancialReportDocument: React.FC<ReportDocumentProps> = ({
           {/* Application Information */}
           <div className="text-right sm:text-left print:text-left">
             <p className="text-xs font-black text-slate-900">ثَـــري • Thari Financial Suite</p>
-            <p className="text-[8.5px] text-slate-500 font-medium">المنظومة الذكية لإدارة الأصول والميزانيات</p>
+            <p className="text-[8.5px] text-slate-500 font-medium">المنظومة التنفيذية لإدارة الأصول والميزانيات</p>
             <p className="text-[8px] text-slate-400 font-mono mt-0.5">ISSUED: {metadata.generatedAtISO.split('T')[0]}</p>
           </div>
 

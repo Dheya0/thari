@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Plus, LayoutDashboard, History, Settings as SettingsIcon, Briefcase, HandCoins, Repeat, Coins, ArrowRight, Sparkles, Scale, Wallet as WalletIcon, Check, Plane, FileText, Download, ArrowUpRight, ArrowDownLeft, Calendar, ArrowLeftRight, Trash2, Wifi, WifiOff, Edit3 } from 'lucide-react';
+import { Plus, LayoutDashboard, History, Settings as SettingsIcon, Briefcase, HandCoins, Repeat, Coins, ArrowRight, Sparkles, Scale, Wallet as WalletIcon, Check, Plane, FileText, Download, ArrowUpRight, ArrowDownLeft, Calendar, ArrowLeftRight, Trash2, Wifi, WifiOff, Edit3, ChevronDown } from 'lucide-react';
 import { AppState, Transaction, Category, Debt, DebtPayment, Account, RecurringRule, AuditLog } from './types';
 import { INITIAL_CATEGORIES, DEFAULT_CURRENCIES, DEFAULT_EXCHANGE_RATES, convertCurrency } from './constants';
 import { generateAndShareCSV, buildExecutiveCSVContent, exportAndShareExecutiveCSV } from './utils/exportHelper';
@@ -32,6 +32,8 @@ import { ReportModal } from './components/reports/ReportModal';
 import { TrashModal } from './components/TrashModal';
 import { RecurringManagerModal } from './components/RecurringManagerModal';
 import { SystemDiagnosticsModal } from './components/SystemDiagnosticsModal';
+import { ToolsHubModal } from './components/ToolsHubModal';
+import CurrencySelectorModal from './components/CurrencySelectorModal';
 import SmartAlerts from './components/SmartAlerts';
 import ZakatCalculator from './components/ZakatCalculator';
 import ExecutiveInsights from './components/ExecutiveInsights';
@@ -164,6 +166,8 @@ const App: React.FC = () => {
   const [showTrashModal, setShowTrashModal] = useState<boolean>(false);
   const [showRecurringModal, setShowRecurringModal] = useState<boolean>(false);
   const [showDiagnosticsModal, setShowDiagnosticsModal] = useState<boolean>(false);
+  const [showToolsHub, setShowToolsHub] = useState<boolean>(false);
+  const [showCurrencySelector, setShowCurrencySelector] = useState<boolean>(false);
   
   // Wallet Filter State (null = All Wallets)
   const [selectedWalletId, setSelectedWalletId] = useState<string | null>(null);
@@ -378,9 +382,10 @@ const App: React.FC = () => {
       state.exchangeRates,
       selectedWalletId,
       null,
-      state.transactions
+      state.transactions,
+      state.debts
     );
-  }, [filteredTransactions, state.transactions, state.wallets, state.currency.code, state.exchangeRates, selectedWalletId]);
+  }, [filteredTransactions, state.transactions, state.wallets, state.currency.code, state.exchangeRates, selectedWalletId, state.debts]);
 
   // Specific calculation for current month's Cashflow (Income, Expense, Net) in current base currency
   const monthlyMetrics = useMemo(() => {
@@ -654,11 +659,16 @@ const App: React.FC = () => {
     
     const targetWallet = walletId ? state.wallets.find(w => w.id === walletId) : undefined;
     const dateToUse = paymentDate || new Date().toISOString().split('T')[0];
+    const paymentId = 'pay-' + Date.now();
+    const transactionId = 'tx-' + Date.now();
 
     let newTransaction: Transaction | null = null;
     if (walletId && amount > 0) {
         newTransaction = {
-            id: 'tx-' + Date.now(),
+            id: transactionId,
+            debtId: id,
+            debtPaymentId: paymentId,
+            isFinancing: true,
             amount: amount,
             type: debt.type === 'to_me' ? 'income' : 'expense',
             categoryId: debt.type === 'to_me' ? '11' : '4',
@@ -674,7 +684,7 @@ const App: React.FC = () => {
     }
 
     const newPayment: DebtPayment = {
-      id: 'pay-' + Date.now(),
+      id: paymentId,
       debtId: id,
       amount: amount,
       date: dateToUse,
@@ -685,9 +695,17 @@ const App: React.FC = () => {
     };
     
     setState(p => {
+        // Guard against duplicate posting by checking payment id & debtPaymentId
+        if (newTransaction && p.transactions.some(t => t.debtPaymentId === paymentId)) {
+          return p;
+        }
         const updatedDebts = p.debts.map(d => {
             if (d.id === id) {
                 const currentPayments = d.payments || [];
+                // Prevent duplicate payment entry in debt history
+                if (currentPayments.some(pay => pay.id === paymentId)) {
+                  return d;
+                }
                 const updatedPayments = [newPayment, ...currentPayments];
                 const newPaidAmount = (d.paidAmount || 0) + amount;
                 const originalTotal = d.originalAmount || d.amount || 0;
@@ -727,6 +745,8 @@ const App: React.FC = () => {
     if (walletId) {
         newTransaction = {
             id: newTransactionId,
+            debtId: newDebtId,
+            isFinancing: true,
             amount: debtData.amount,
             type: debtData.type === 'to_me' ? 'expense' : 'income',
             categoryId: debtData.type === 'to_me' ? '12' : '11', 
@@ -738,11 +758,17 @@ const App: React.FC = () => {
             createdAt: new Date().toISOString()
         };
     }
-    setState(p => ({
-        ...p,
-        debts: [newDebt, ...p.debts],
-        transactions: newTransaction ? [newTransaction, ...p.transactions] : p.transactions
-    }));
+    setState(p => {
+        // Prevent duplicate addition
+        if (p.debts.some(d => d.id === newDebtId)) {
+          return p;
+        }
+        return {
+          ...p,
+          debts: [newDebt, ...p.debts],
+          transactions: newTransaction ? [newTransaction, ...p.transactions] : p.transactions
+        };
+    });
   };
 
   const handleSettleDebt = (id: string, walletId?: string) => {
@@ -796,70 +822,63 @@ const App: React.FC = () => {
           <div className="flex justify-between items-center max-w-6xl mx-auto w-full">
             <div className="flex items-center gap-3">
               <Logo size={28} showText />
-              {/* Online/Offline status pill */}
+              {/* Online/Offline status pill - Thari is offline-first */}
               <div
-                className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold border transition-colors ${
+                className={`hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold border transition-colors ${
                   isOnline
-                    ? 'bg-[#8EB9A7]/10 border-[#8EB9A7]/30 text-[#8EB9A7]'
-                    : 'bg-[#C98387]/10 border-[#C98387]/30 text-[#C98387]'
+                    ? 'bg-[#8EB9A7]/15 border-[#8EB9A7]/40 text-[#8EB9A7]'
+                    : 'bg-[#D9B978]/15 border-[#D9B978]/40 text-[#D9B978]'
                 }`}
-                title={isOnline ? 'بياناتك محفوظة محلياً ومتصل' : 'التطبيق يعمل بكفاءة أوفلاين 100%'}
+                title={isOnline ? 'بياناتك محفوظة محلياً والتطبيق متصل' : 'التطبيق يعمل بكفاءة كاملة أوفلاين 100%'}
               >
                 {isOnline ? <Wifi size={11} /> : <WifiOff size={11} />}
-                <span>{isOnline ? 'متصل' : 'أوفلاين'}</span>
+                <span>{isOnline ? 'متصل' : 'محلي 100% (أوفلاين)'}</span>
               </div>
             </div>
 
             <div className="flex gap-2 items-center">
-              {/* System Diagnostics / Accounting Audit */}
+              {/* Currency Badge / Interactive Quick Selector */}
               <button
                 type="button"
-                onClick={() => setShowDiagnosticsModal(true)}
-                className="p-2 rounded-xl border border-white/10 text-slate-400 bg-white/5 hover:bg-white/10 hover:text-[#8EB9A7] transition-all"
-                title="فحص تكامل البيانات والتدقيق المحاسبي"
+                onClick={() => setShowCurrencySelector(true)}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#141B24] hover:bg-[#1C2633] border border-[#D9B978]/40 hover:border-[#D9B978] text-white transition-all text-xs shadow-sm active:scale-95 group ring-1 ring-[#D9B978]/20"
+                title={`العملة الأساسية الحالية: ${state.currency.name} (${state.currency.code}) - انقر للاختيار`}
               >
-                <Scale size={16} />
+                <div className="w-5 h-5 rounded-lg bg-[#D9B978] text-slate-950 font-black text-[11px] flex items-center justify-center shadow-xs">
+                  {state.currency.symbol}
+                </div>
+                <div className="flex items-baseline gap-1">
+                  <span className="font-bold text-white tracking-wide">{state.currency.code}</span>
+                  <span className="text-[10px] text-slate-400 font-normal hidden md:inline">({state.currency.name})</span>
+                </div>
+                <ChevronDown size={14} className="text-[#D9B978] group-hover:translate-y-0.5 transition-transform" />
               </button>
 
-              {/* Recurring Rules Manager */}
+              {/* Tools Hub Button */}
               <button
                 type="button"
-                onClick={() => setShowRecurringModal(true)}
+                onClick={() => setShowToolsHub(true)}
                 className="relative p-2 rounded-xl border border-white/10 text-slate-400 bg-white/5 hover:bg-white/10 hover:text-[#D9B978] transition-all"
-                title="إدارة العمليات الدورية والمجدولة"
+                title="مركز الأدوات والتقارير"
               >
-                <Repeat size={16} />
-                {(state.recurringRules?.length || 0) > 0 && (
-                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-[#D9B978] text-slate-950 rounded-full text-[9px] font-black flex items-center justify-center shadow-md">
-                    {state.recurringRules.length}
-                  </span>
+                <Sparkles size={16} />
+                {((state.recurringRules?.length || 0) > 0 || (state.trashTransactions?.length || 0) > 0) && (
+                  <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-[#D9B978] rounded-full ring-2 ring-[#0A0D10]" />
                 )}
               </button>
 
-              {/* Trash Bin Quick Access */}
-              <button
-                type="button"
-                onClick={() => setShowTrashModal(true)}
-                className="relative p-2 rounded-xl border border-white/10 text-slate-400 bg-white/5 hover:bg-white/10 hover:text-[#C98387] transition-all"
-                title="سلة المحذوفات"
-              >
-                <Trash2 size={16} />
-                {(state.trashTransactions?.length || 0) > 0 && (
-                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-[#C98387] text-white rounded-full text-[9px] font-black flex items-center justify-center shadow-md animate-pulse">
-                    {state.trashTransactions.length}
-                  </span>
-                )}
-              </button>
-
+              {/* Settings Shortcut */}
               <button 
-                onClick={() => setShowReportModal(true)} 
-                className="p-2 rounded-xl border border-white/10 text-slate-400 bg-white/5 hover:bg-white/10 hover:text-[#D9B978] transition-all" 
-                title="إصدار التقارير المالية"
+                onClick={() => setActiveTab('settings')} 
+                className={`flex items-center justify-center w-9 h-9 rounded-xl border transition-all shrink-0 active:scale-95 backdrop-blur-md ${
+                  activeTab === 'settings' 
+                    ? 'bg-[#D9B978] text-slate-950 border-[#D9B978] shadow-[0_0_20px_rgba(217,185,120,0.4)]' 
+                    : 'bg-white/5 border-white/10 text-slate-400 hover:text-[#D9B978] hover:border-[#D9B978]/50'
+                }`} 
+                title="الإعدادات"
               >
-                <FileText size={16} />
+                <SettingsIcon size={16} />
               </button>
-              <button onClick={() => setActiveTab('chat')} className={`p-2 rounded-xl border border-white/10 transition-all ${activeTab === 'chat' ? 'bg-[#D9B978] text-slate-950 shadow-[0_0_20px_rgba(217,185,120,0.4)]' : 'text-slate-400 bg-white/5 hover:bg-white/10'}`} title="المستشار المالي"><Briefcase size={16} /></button>
-              <button onClick={() => setActiveTab('settings')} className="flex items-center justify-center w-9 h-9 rounded-xl bg-white/5 border border-white/10 text-slate-400 hover:text-[#D9B978] hover:border-[#D9B978]/50 transition-all shrink-0 active:scale-95 backdrop-blur-md" title="الإعدادات"><SettingsIcon size={16} /></button>
             </div>
           </div>
         </header>
@@ -879,7 +898,7 @@ const App: React.FC = () => {
                   <ElegantDashboard
                     userName={state.userName}
                     netWorth={totals.netWorthInBase}
-                    availableBalance={totals.netWorthInBase}
+                    availableBalance={totals.availableLiquidityInBase}
                     debtsOwedToMe={debtTotals.debtsOwedToMe}
                     debtsIOwe={debtTotals.debtsIOwe}
                     monthlyIncome={monthlyMetrics.monthlyIncome}
@@ -1035,6 +1054,19 @@ const App: React.FC = () => {
         )}
 
         <AnimatePresence>
+          {showToolsHub && (
+            <ToolsHubModal
+              isOpen={showToolsHub}
+              onClose={() => setShowToolsHub(false)}
+              recurringRulesCount={state.recurringRules?.length || 0}
+              trashCount={state.trashTransactions?.length || 0}
+              onOpenReports={() => setShowReportModal(true)}
+              onOpenRecurring={() => setShowRecurringModal(true)}
+              onOpenTrash={() => setShowTrashModal(true)}
+              onOpenDiagnostics={() => setShowDiagnosticsModal(true)}
+              onOpenAIAdvisor={() => setActiveTab('chat')}
+            />
+          )}
           {showTrashModal && (
             <TrashModal
               isOpen={showTrashModal}
@@ -1103,6 +1135,17 @@ const App: React.FC = () => {
               />
           )}
           {showPrivacyPolicy && <PrivacyPolicy onBack={() => setShowPrivacyPolicy(false)} />}
+          {showCurrencySelector && (
+            <CurrencySelectorModal
+              isOpen={showCurrencySelector}
+              onClose={() => setShowCurrencySelector(false)}
+              currencies={state.currencies}
+              selectedCurrency={state.currency}
+              onSelectCurrency={(curr) => setState(p => ({ ...p, currency: curr }))}
+              exchangeRates={state.exchangeRates}
+              onOpenSettings={() => setActiveTab('settings')}
+            />
+          )}
         </AnimatePresence>
       </div>
     </div>

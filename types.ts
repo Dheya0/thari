@@ -99,6 +99,9 @@ export interface Transaction {
   accountId?: string;
   walletId: string;
   destinationWalletId?: string; // For transfers
+  debtId?: string;             // Linked debt entity ID
+  debtPaymentId?: string;      // Linked debt payment record ID
+  isFinancing?: boolean;       // True if this is financing flow (debt/loan/equity) rather than operating revenue/expense
   currency: string;
   destinationCurrency?: string; // Cross-currency transfer
   destinationAmount?: number;   // Amount in destination currency
@@ -255,15 +258,23 @@ export interface ZakatProfile {
   gold21Grams: number;
   gold18Grams: number;
   silverGrams: number;
+  customGold24Price?: number;
+  customGold21Price?: number;
+  customGold18Price?: number;
+  customSilverPrice?: number;
   tradeInventoryValue: number;
   tradingStocksValue: number;
   investmentStocksMethod: 'liquid_ratio' | 'dividends_only';
   longTermStocksValue: number;
   longTermDividendsValue: number;
+  investmentFundsValue?: number;
   realEstateTradeValue: number;
+  rentalIncomeValue?: number;
   hawlStartDate: string;
   hawlDurationDays: number;
   customDeductions?: number;
+  isScopeConfirmed?: boolean;
+  scopeConfirmedAt?: string;
   lastCalculatedAt?: string;
   createdAt: string;
   updatedAt: string;

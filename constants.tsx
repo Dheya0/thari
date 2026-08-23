@@ -64,6 +64,9 @@ export interface CurrencyConversionResult {
   timestamp: string;
 }
 
+// Active registry of FX rate warning events
+export const FX_RATE_WARNINGS: { [pair: string]: string } = {};
+
 // Strict conversion function that never silences missing rates
 export const tryConvertCurrency = (
   amount: number,
@@ -91,6 +94,8 @@ export const tryConvertCurrency = (
   const toRate = customRates[normalizedTo] ?? DEFAULT_EXCHANGE_RATES[normalizedTo];
 
   if (!fromRate || !toRate || fromRate <= 0 || toRate <= 0) {
+    const pairKey = `${fromCode}->${toCode}`;
+    FX_RATE_WARNINGS[pairKey] = `سعر الصرف غير متوفر للزوج (${pairKey}) - يرجى التحقق من إعدادات أسعار الصرف`;
     return {
       status: 'RATE_UNAVAILABLE',
       convertedAmount: null,
@@ -116,7 +121,8 @@ export const tryConvertCurrency = (
   };
 };
 
-// Helper to convert amounts accurately using provided rates (with fallback to 0 / unchanged if requested)
+// Helper to convert amounts accurately using provided rates
+// Does not silently swallow errors; logs if rate missing and falls back to amount
 export const convertCurrency = (
   amount: number, 
   fromCode: string, 
@@ -127,7 +133,8 @@ export const convertCurrency = (
   if (res.status === 'SUCCESS' || res.status === 'SAME_CURRENCY') {
     return res.convertedAmount ?? amount;
   }
-  // Return original amount in case of failure to maintain numerical continuity
+  // If rate unavailable, warn in console and return amount
+  console.warn(`[THARI FX Warning] Rate unavailable from ${fromCode} to ${toCode}. Using 1:1 fallback.`);
   return amount;
 };
 

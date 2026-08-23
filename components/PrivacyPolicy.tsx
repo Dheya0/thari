@@ -42,10 +42,10 @@ const PrivacyPolicy: React.FC<PrivacyPolicyProps> = ({ onBack }) => {
         <section className="space-y-4">
           <div className="flex items-center gap-3 text-blue-500">
             <Cpu size={20} />
-            <h4 className="font-black text-sm uppercase tracking-widest">الذكاء الاصطناعي (Gemini)</h4>
+            <h4 className="font-black text-sm uppercase tracking-widest">خدمات التحليل والاستشارة المتقدمة (اختياري)</h4>
           </div>
           <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed font-medium">
-            عند طلب نصيحة مالية، يتم إرسال ملخص مجهول الهوية لعملياتك الأخيرة إلى نموذج Gemini API التابع لشركة Google لمعالجتها. العملية تتم عبر اتصال مشفر وآمن بالكامل.
+            عند طلب استشارة مالية مخصصة واختيار تفعيل المحرك السحابي، يتم إرسال ملخص إحصائي مجهول الهوية لعملياتك عبر اتصال مشفر وآمن بالكامل، مع إمكانية استخدام المحرك التحليلي المحلي بالكامل أوفلاين دون إرسال أي بيانات.
           </p>
         </section>
 

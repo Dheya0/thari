@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Target, Plus, TrendingUp, Wallet as WalletIcon, Star, CheckCircle2, ChevronRight, BrainCircuit, Loader2, X } from 'lucide-react';
+import { Target, Plus, TrendingUp, Wallet as WalletIcon, Star, CheckCircle2, ChevronRight, Compass, Loader2, X } from 'lucide-react';
 import { Goal, Wallet, Transaction } from '../types';
 import { getGoalAdvice } from '../services/geminiService';
 
@@ -86,21 +86,21 @@ const GoalTracker: React.FC<GoalTrackerProps> = ({ goals, wallets, transactions,
               </div>
 
               {!isCompleted && (
-                <div className="bg-amber-500/5 rounded-2xl p-4 border border-amber-500/10 relative group">
+                <div className="bg-[#D9B978]/5 rounded-2xl p-4 border border-[#D9B978]/15 relative group">
                   <div className="flex items-center justify-between mb-2">
-                     <span className="text-[9px] font-black text-amber-500 uppercase tracking-widest flex items-center gap-1">
-                        <BrainCircuit size={12} /> ومضة ثري الذكية
+                     <span className="text-[9px] font-black text-[#D9B978] uppercase tracking-widest flex items-center gap-1.5">
+                        <Compass size={13} /> التوجيه المالي لتحقيق الهدف
                      </span>
                      <button 
                         onClick={() => fetchAdvice(goal)} 
-                        className="text-[8px] font-black text-slate-500 hover:text-amber-500 transition-colors"
+                        className="text-[8px] font-black text-slate-500 hover:text-[#D9B978] transition-colors"
                         disabled={advice?.loading}
                     >
-                        {advice?.loading ? <Loader2 size={10} className="animate-spin" /> : 'تحديث النصيحة'}
+                        {advice?.loading ? <Loader2 size={10} className="animate-spin" /> : 'تحديث التوجيه'}
                      </button>
                   </div>
-                  <p className="text-[11px] font-bold text-slate-300 leading-relaxed min-h-[1.5em]">
-                    {advice?.text || "ثري جاهز لتحليل هدفك وتقديم استراتيجية للوصول أسرع."}
+                  <p className="text-[11px] font-medium text-slate-300 leading-relaxed min-h-[1.5em]">
+                    {advice?.text || "المستشار المالي جاهز لدراسة هدفك واقتراح خطة تسريع إنجازه."}
                   </p>
                 </div>
               )}

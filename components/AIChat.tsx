@@ -137,15 +137,15 @@ export const AIChat: React.FC<FinancialAdvisorProps> = ({
             <Briefcase size={16} />
           </div>
           <div>
-            <h3 className="text-xs font-semibold text-[#F4F1EA]">المستشار المالي التنفيذي</h3>
+            <h3 className="text-xs font-semibold text-[#F4F1EA]">المستشار المالي الخاص</h3>
             <p className="text-[9px] text-slate-400">
-              {apiKey ? 'استشارات وتحليلات متقدمة مشفرة' : 'محرك تحليلي مالي مستقل (يعمل 100% بدون إنترنت)'}
+              {apiKey ? 'استشارات وتحليلات مالية متقدمة ومحمية' : 'محرك تحليلي مالي مستقل ومتكامل (يعمل محلياً بدون إنترنت)'}
             </p>
           </div>
         </div>
         <div className="flex items-center gap-1.5">
           <span className="w-2 h-2 rounded-full bg-[#8EB9A7] animate-pulse" />
-          <span className="text-[9px] font-semibold text-[#8EB9A7]">نشط</span>
+          <span className="text-[9px] font-semibold text-[#8EB9A7]">جاهز للاستشارة</span>
         </div>
       </div>
 

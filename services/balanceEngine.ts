@@ -6,6 +6,7 @@
 
 import { Transaction, Wallet, Currency, Debt } from '../types';
 import { convertCurrency, DEFAULT_EXCHANGE_RATES } from '../constants';
+import { safeAdd, safeSub, safeMul, safeDiv, roundToCurrency } from '../utils/mathPrecision';
 export * from './coreLedger';
 
 export interface WalletBalanceSummary {
@@ -22,12 +23,17 @@ export interface WalletBalanceSummary {
 }
 
 export interface ConsolidatedFinancialPosition {
-  netWorthInBase: number;
+  availableLiquidityInBase: number; // السيولة النقدية الفعلية المتاحة في المحافظ
+  receivablesInBase: number;        // مستحقات لك عند الآخرين
+  payablesInBase: number;           // التزامات عليك للآخرين
+  netWorthInBase: number;           // صافي الثروة = السيولة + المستحقات - الالتزامات
   totalIncomeInBase: number;
   totalExpenseInBase: number;
   netCashFlowInBase: number;
   internalTransfersInBase: number;
   savingsRate: number;
+  growthRate: number;               // نسبة النمو المقارنة بالفترة السابقة الفعلية
+  growthComparisonText: string;     // نص توضيحي للمقارنة
   isSingleCurrency: boolean;
   activeCurrencyCode: string;
   currencyBalances: Record<string, number>;
@@ -42,6 +48,82 @@ export interface ConsolidatedFinancialPosition {
  */
 export function getActiveTransactions(transactions: Transaction[]): Transaction[] {
   return (transactions || []).filter(t => !t.isDeleted);
+}
+
+/**
+ * Calculate historical period growth by comparing transaction dates
+ */
+export function calculateDateBasedGrowth(
+  transactions: Transaction[],
+  baseCurrencyCode: string = 'SAR',
+  exchangeRates: Record<string, number> = DEFAULT_EXCHANGE_RATES
+): { rate: number; comparisonText: string; currentNet: number; previousNet: number } {
+  const activeTxs = getActiveTransactions(transactions);
+  if (activeTxs.length === 0) {
+    return { rate: 0, comparisonText: 'لا توجد بيانات تاريخية كافية', currentNet: 0, previousNet: 0 };
+  }
+
+  const now = new Date();
+  const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const prevMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const prevMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
+
+  let currentMonthIncome = 0;
+  let currentMonthExpense = 0;
+  let prevMonthIncome = 0;
+  let prevMonthExpense = 0;
+
+  activeTxs.forEach(tx => {
+    // Financing flows are not operating income/expense
+    if (tx.isFinancing) return;
+    const amount = Number(tx.amount) || 0;
+    if (amount <= 0) return;
+    const txCurr = tx.currency || baseCurrencyCode;
+    const inBase = convertCurrency(amount, txCurr, baseCurrencyCode, exchangeRates);
+    const txDate = new Date(tx.date);
+
+    if (txDate >= currentMonthStart && txDate <= now) {
+      if (tx.type === 'income') currentMonthIncome += inBase;
+      else if (tx.type === 'expense') currentMonthExpense += inBase;
+    } else if (txDate >= prevMonthStart && txDate <= prevMonthEnd) {
+      if (tx.type === 'income') prevMonthIncome += inBase;
+      else if (tx.type === 'expense') prevMonthExpense += inBase;
+    }
+  });
+
+  const currentNet = currentMonthIncome - currentMonthExpense;
+  const previousNet = prevMonthIncome - prevMonthExpense;
+
+  if (prevMonthIncome === 0 && prevMonthExpense === 0) {
+    return { 
+      rate: currentNet > 0 ? 100 : 0, 
+      comparisonText: 'أول شهر مسجل في السجل المالي',
+      currentNet, 
+      previousNet 
+    };
+  }
+
+  if (previousNet === 0) {
+    const rate = currentNet > 0 ? 100 : currentNet < 0 ? -100 : 0;
+    return { 
+      rate, 
+      comparisonText: 'مقارنة بالشهر السابق (صافي صفر)',
+      currentNet, 
+      previousNet 
+    };
+  }
+
+  // Calculate percentage change in net performance
+  const diff = currentNet - previousNet;
+  const rate = Math.round((diff / Math.abs(previousNet)) * 100);
+  const clampedRate = Math.min(Math.max(rate, -999), 999);
+
+  return {
+    rate: clampedRate,
+    comparisonText: clampedRate >= 0 ? `+${clampedRate}% مقارنة بالشهر السابق` : `${clampedRate}% مقارنة بالشهر السابق`,
+    currentNet,
+    previousNet
+  };
 }
 
 /**
@@ -88,17 +170,17 @@ export function calculateWalletBalances(
         : convertCurrency(amount, txCurrency, walletCurrency, exchangeRates);
 
       if (tx.type === 'income') {
-        sourceSummary.totalIncome += amountInWalletCurrency;
-        sourceSummary.currentBalance += amountInWalletCurrency;
+        sourceSummary.totalIncome = safeAdd(sourceSummary.totalIncome, amountInWalletCurrency);
+        sourceSummary.currentBalance = safeAdd(sourceSummary.currentBalance, amountInWalletCurrency);
       } else if (tx.type === 'expense' || tx.type === 'transfer_to_goal') {
-        sourceSummary.totalExpense += amountInWalletCurrency;
-        sourceSummary.currentBalance -= amountInWalletCurrency;
+        sourceSummary.totalExpense = safeAdd(sourceSummary.totalExpense, amountInWalletCurrency);
+        sourceSummary.currentBalance = safeSub(sourceSummary.currentBalance, amountInWalletCurrency);
       } else if (tx.type === 'transfer') {
-        sourceSummary.transfersOut += amountInWalletCurrency;
-        sourceSummary.currentBalance -= amountInWalletCurrency;
+        sourceSummary.transfersOut = safeAdd(sourceSummary.transfersOut, amountInWalletCurrency);
+        sourceSummary.currentBalance = safeSub(sourceSummary.currentBalance, amountInWalletCurrency);
       } else if (tx.type === 'adjustment') {
-        sourceSummary.adjustments += amountInWalletCurrency;
-        sourceSummary.currentBalance += amountInWalletCurrency;
+        sourceSummary.adjustments = safeAdd(sourceSummary.adjustments, amountInWalletCurrency);
+        sourceSummary.currentBalance = safeAdd(sourceSummary.currentBalance, amountInWalletCurrency);
       }
     }
 
@@ -114,8 +196,8 @@ export function calculateWalletBalances(
           ? Number(tx.destinationAmount)
           : (txCurrency === destCurrency ? amount : convertCurrency(amount, txCurrency, destCurrency, exchangeRates));
 
-        destSummary.transfersIn += receivedAmount;
-        destSummary.currentBalance += receivedAmount;
+        destSummary.transfersIn = safeAdd(destSummary.transfersIn, receivedAmount);
+        destSummary.currentBalance = safeAdd(destSummary.currentBalance, receivedAmount);
       }
     }
   });
@@ -138,7 +220,8 @@ export function calculateConsolidatedPosition(
   exchangeRates: Record<string, number> = DEFAULT_EXCHANGE_RATES,
   filterWalletId?: string | null,
   filterCurrencyCode?: string | null,
-  allTransactionsForBalance?: Transaction[]
+  allTransactionsForBalance?: Transaction[],
+  debts: Debt[] = []
 ): ConsolidatedFinancialPosition {
   let periodTxs = getActiveTransactions(transactions);
   const lifetimeTxs = getActiveTransactions(allTransactionsForBalance || transactions);
@@ -177,7 +260,7 @@ export function calculateConsolidatedPosition(
 
   // Aggregate current balance per currency directly from wallet summaries
   Object.values(walletSummaries).forEach(summary => {
-    currencyBalances[summary.currencyCode] = (currencyBalances[summary.currencyCode] || 0) + summary.currentBalance;
+    currencyBalances[summary.currencyCode] = safeAdd(currencyBalances[summary.currencyCode] || 0, summary.currentBalance);
   });
 
   // Calculate Inflows, Outflows, and Internal Transfers for the given period
@@ -186,44 +269,75 @@ export function calculateConsolidatedPosition(
   let internalTransfersInBase = 0;
 
   periodTxs.forEach(tx => {
+    // Exclude financing movements from operating P&L
+    if (tx.isFinancing) return;
     const amount = Number(tx.amount) || 0;
     if (amount <= 0) return;
     const txCurr = tx.currency || baseCurrencyCode;
 
     if (tx.type === 'income') {
-      incomeByCurrency[txCurr] = (incomeByCurrency[txCurr] || 0) + amount;
-      totalIncomeInBase += convertCurrency(amount, txCurr, baseCurrencyCode, exchangeRates);
+      incomeByCurrency[txCurr] = safeAdd(incomeByCurrency[txCurr] || 0, amount);
+      totalIncomeInBase = safeAdd(totalIncomeInBase, convertCurrency(amount, txCurr, baseCurrencyCode, exchangeRates));
     } else if (tx.type === 'expense' || tx.type === 'transfer_to_goal') {
-      expenseByCurrency[txCurr] = (expenseByCurrency[txCurr] || 0) + amount;
-      totalExpenseInBase += convertCurrency(amount, txCurr, baseCurrencyCode, exchangeRates);
+      expenseByCurrency[txCurr] = safeAdd(expenseByCurrency[txCurr] || 0, amount);
+      totalExpenseInBase = safeAdd(totalExpenseInBase, convertCurrency(amount, txCurr, baseCurrencyCode, exchangeRates));
     } else if (tx.type === 'transfer') {
       // Internal transfers are tracked separately and strictly NOT added to income or expense
-      transfersByCurrency[txCurr] = (transfersByCurrency[txCurr] || 0) + amount;
-      internalTransfersInBase += convertCurrency(amount, txCurr, baseCurrencyCode, exchangeRates);
+      transfersByCurrency[txCurr] = safeAdd(transfersByCurrency[txCurr] || 0, amount);
+      internalTransfersInBase = safeAdd(internalTransfersInBase, convertCurrency(amount, txCurr, baseCurrencyCode, exchangeRates));
     }
   });
 
-  // Calculate Net Worth: valuation of all active wallets converted to base currency
-  let netWorthInBase = 0;
+  // Calculate Liquid Cash Available across wallets
+  let availableLiquidityInBase = 0;
   if (isSingleCurrency && filterCurrencyCode) {
-    netWorthInBase = currencyBalances[filterCurrencyCode] || 0;
+    availableLiquidityInBase = currencyBalances[filterCurrencyCode] || 0;
   } else {
-    netWorthInBase = Object.entries(currencyBalances).reduce((sum, [code, amount]) => {
-      return sum + convertCurrency(amount, code, baseCurrencyCode, exchangeRates);
+    availableLiquidityInBase = Object.entries(currencyBalances).reduce((sum, [code, amount]) => {
+      return safeAdd(sum, convertCurrency(amount, code, baseCurrencyCode, exchangeRates));
     }, 0);
   }
 
-  // Net Cash Flow strictly = Total Income - Total Expense (excluding transfers)
-  const netCashFlowInBase = totalIncomeInBase - totalExpenseInBase;
-  const savingsRate = totalIncomeInBase > 0 ? Math.max(0, (netCashFlowInBase / totalIncomeInBase) * 100) : 0;
+  // Calculate Debts (Receivables & Payables)
+  let receivablesInBase = 0;
+  let payablesInBase = 0;
+
+  (debts || []).forEach(d => {
+    if (d.isPaid || d.status === 'settled') return;
+    const original = Number(d.originalAmount || d.amount) || 0;
+    const paid = Number(d.paidAmount) || 0;
+    const remaining = Math.max(0, safeSub(original, paid));
+    if (remaining <= 0) return;
+    const inBase = convertCurrency(remaining, d.currency || baseCurrencyCode, baseCurrencyCode, exchangeRates);
+    if (d.type === 'to_me') {
+      receivablesInBase = safeAdd(receivablesInBase, inBase);
+    } else if (d.type === 'on_me') {
+      payablesInBase = safeAdd(payablesInBase, inBase);
+    }
+  });
+
+  // Net Worth = Liquid Cash + Receivables - Payables
+  const netWorthInBase = safeSub(safeAdd(availableLiquidityInBase, receivablesInBase), payablesInBase);
+
+  // Net Cash Flow strictly = Total Operating Income - Total Operating Expense (excluding transfers and financing)
+  const netCashFlowInBase = safeSub(totalIncomeInBase, totalExpenseInBase);
+  const savingsRate = totalIncomeInBase > 0 ? Math.max(0, Math.round((netCashFlowInBase / totalIncomeInBase) * 100)) : 0;
+
+  // Calculate Date-Based Growth
+  const growthData = calculateDateBasedGrowth(lifetimeTxs, baseCurrencyCode, exchangeRates);
 
   return {
+    availableLiquidityInBase,
+    receivablesInBase,
+    payablesInBase,
     netWorthInBase,
     totalIncomeInBase,
     totalExpenseInBase,
     netCashFlowInBase,
     internalTransfersInBase,
     savingsRate,
+    growthRate: growthData.rate,
+    growthComparisonText: growthData.comparisonText,
     isSingleCurrency,
     activeCurrencyCode: isSingleCurrency && filterCurrencyCode ? filterCurrencyCode : baseCurrencyCode,
     currencyBalances,
@@ -235,8 +349,8 @@ export function calculateConsolidatedPosition(
 }
 
 /**
- * Self-Testing Mathematical Audit Suite for the Balance Engine.
- * Verifies core accounting invariants and cross-currency spending accuracy.
+ * Self-Testing Mathematical Audit Suite for the Balance Engine & Core Ledger.
+ * Verifies core accounting invariants, debt lifecycle, FX handling, and cross-currency spending accuracy.
  */
 export function runBalanceEngineAudit(): {
   allPassed: boolean;
@@ -369,14 +483,63 @@ export function runBalanceEngineAudit(): {
     actual: position.netCashFlowInBase,
   });
 
-  // Check 7: Net Worth = Wallet A + Wallet B = 50k + 20k = 70,000
-  const netWorthPassed = position.netWorthInBase === 70000;
+  // Check 7: Liquidity vs Net Worth Separation with Debts
+  const testDebts: Debt[] = [
+    {
+      id: 'd-test-1',
+      personName: 'خالد',
+      amount: 15000,
+      originalAmount: 15000,
+      paidAmount: 5000,
+      type: 'to_me', // 10,000 remaining receivable
+      currency: 'YER_ADEN',
+      createdAt: '2026-08-01',
+      isPaid: false,
+      note: 'سلف لخالد'
+    },
+    {
+      id: 'd-test-2',
+      personName: 'شركة التوريد',
+      amount: 25000,
+      originalAmount: 25000,
+      paidAmount: 0,
+      type: 'on_me', // 25,000 remaining payable
+      currency: 'YER_ADEN',
+      createdAt: '2026-08-01',
+      isPaid: false,
+      note: 'مشتريات آجلة'
+    }
+  ];
+
+  const debtPosition = calculateConsolidatedPosition(
+    testTransactions,
+    testWallets,
+    'YER_ADEN',
+    DEFAULT_EXCHANGE_RATES,
+    null,
+    'YER_ADEN',
+    testTransactions,
+    testDebts
+  );
+
+  // Available Liquidity = Wallet A (50k) + Wallet B (20k) = 70,000 YER
+  const liquidityPassed = debtPosition.availableLiquidityInBase === 70000;
   testResults.push({
-    testName: 'Net Worth Invariance',
-    passed: netWorthPassed,
-    details: `Consolidated Net Worth must equal 70,000 YER`,
+    testName: 'Pure Available Liquidity vs Net Worth Separation',
+    passed: liquidityPassed,
+    details: `Available liquidity must represent actual cash (70k YER), not mixed with debts`,
     expected: 70000,
-    actual: position.netWorthInBase,
+    actual: debtPosition.availableLiquidityInBase
+  });
+
+  // Net Worth = 70,000 (Liquid) + 10,000 (Receivables) - 25,000 (Payables) = 55,000 YER
+  const netWorthWithDebtsPassed = debtPosition.netWorthInBase === 55000;
+  testResults.push({
+    testName: 'Net Worth Invariant with Receivables and Payables',
+    passed: netWorthWithDebtsPassed,
+    details: `Net Worth = 70k Cash + 10k Receivables - 25k Payables = 55,000 YER`,
+    expected: 55000,
+    actual: debtPosition.netWorthInBase
   });
 
   // Scenario 2: Cross-Currency Expense from Yemeni Wallet ($100 USD spent from YER_ADEN wallet)

@@ -253,9 +253,9 @@ const Settings: React.FC<SettingsProps> = ({
           return;
         }
       }
-      showToast('تم تفعيل التنبيهات الذكية بنجاح!');
+      showToast('تم تفعيل التنبيهات والرقابة المالية بنجاح!');
     } catch (e) {
-      showToast('تم تفعيل التنبيهات الذكية بنجاح!');
+      showToast('تم تفعيل التنبيهات والرقابة المالية بنجاح!');
     }
   };
   
@@ -1025,12 +1025,12 @@ const Settings: React.FC<SettingsProps> = ({
                 </div>
 
                 <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2 block">مفتاح الاستشارات الموسعة (Gemini Pro - اختياري)</label>
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2 block">مفتاح خدمة الاستشارات الموسعة (اختياري للتحليلات الإضافية)</label>
                     <input 
                       type="password" 
                       value={localApiKey} 
                       onChange={e => setLocalApiKey(e.target.value)} 
-                      placeholder="Gemini API Key" 
+                      placeholder="مفتاح API اختياري" 
                       className="text-center w-full p-4 rounded-xl bg-slate-800 text-white font-bold border-none outline-none focus:ring-1 focus:ring-amber-500 shadow-inner text-sm" 
                     />
                 </div>
@@ -1450,7 +1450,7 @@ const Settings: React.FC<SettingsProps> = ({
          </AccordionItem>
 
          {/* Accordion 3 - Notifications & Reminders */}
-         <AccordionItem id="notifications" title="الإشعارات والتذكيرات الذكية" icon={Bell}>
+         <AccordionItem id="notifications" title="الإشعارات والتنبيهات المالية" icon={Bell}>
             <div className="space-y-4 text-right">
                 <div className="space-y-3">
                     <div className="flex justify-between items-center bg-slate-950/40 p-3 rounded-2xl border border-white/5">

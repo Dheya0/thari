@@ -203,7 +203,7 @@ const BudgetManager: React.FC<BudgetManagerProps> = ({ budgets, categories, tran
                     </div>
                     <div>
                       <span className="font-black text-white text-sm block leading-none mb-1">{b.category?.name}</span>
-                      {isCritical && <span className="text-[9px] font-black text-rose-500 uppercase tracking-widest">تجاوز صريح للحد الذكي!</span>}
+                      {isCritical && <span className="text-[9px] font-black text-rose-500 uppercase tracking-widest">تجاوز لسقف الميزانية المعتمد!</span>}
                       {isWarning && !isCritical && <span className="text-[9px] font-black text-amber-500 uppercase tracking-widest">تنبيه بالاقتراب من السقف</span>}
                     </div>
                   </div>

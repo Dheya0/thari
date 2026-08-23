@@ -376,7 +376,7 @@ export const ReleaseAuditModal: React.FC<ReleaseAuditModalProps> = ({ onClose })
                     <div className="bg-slate-950 p-3.5 rounded-2xl border border-slate-800 flex items-start gap-3">
                       <CheckCircle2 size={18} className="text-emerald-400 shrink-0 mt-0.5" />
                       <div>
-                        <h4 className="text-xs font-black text-white">أمان الذكاء الاصطناعي والمفاتيح (AI Key Handling)</h4>
+                        <h4 className="text-xs font-black text-white">أمان وحماية مفاتيح الخدمات السحابية (API Key Handling)</h4>
                         <p className="text-[11px] text-slate-400 font-bold mt-0.5">{report.securityAuditSummary.aiKeyHandlingStatus}</p>
                       </div>
                     </div>

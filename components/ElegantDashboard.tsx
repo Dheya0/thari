@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { Wallet, Transaction, Category, Currency, Debt } from '../types';
 import { convertCurrency, DEFAULT_EXCHANGE_RATES } from '../constants';
+import { calculateDateBasedGrowth } from '../services/balanceEngine';
 import CurrencyLandscape from './CurrencyLandscape';
 
 interface ElegantDashboardProps {
@@ -97,14 +98,10 @@ export const ElegantDashboard: React.FC<ElegantDashboardProps> = ({
 }) => {
   const greeting = getGreeting();
 
-  // Growth percentage calculation (current month net vs total wealth or baseline)
-  const growthRate = useMemo(() => {
-    if (netWorth <= 0 && monthlyIncome <= 0) return 0;
-    const base = netWorth - monthlyNet;
-    if (base <= 0) return monthlyNet > 0 ? 100 : 0;
-    const rate = ((monthlyNet) / base) * 100;
-    return Math.min(Math.max(rate, -99.9), 999);
-  }, [netWorth, monthlyNet, monthlyIncome]);
+  // Growth percentage calculation based on actual transaction dates & periods
+  const growthInfo = useMemo(() => {
+    return calculateDateBasedGrowth(transactions, currency.code, exchangeRates);
+  }, [transactions, currency.code, exchangeRates]);
 
   // Compute currency balances across all wallets
   const currencyBalances = useMemo(() => {
@@ -216,15 +213,15 @@ export const ElegantDashboard: React.FC<ElegantDashboardProps> = ({
             <span className="text-xs font-medium uppercase tracking-wider text-slate-400">
               صافي ثروتك
             </span>
-            {growthRate !== 0 && (
+            {growthInfo.rate !== 0 && (
               <div className={`inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full ${
-                growthRate > 0 
+                growthInfo.rate > 0 
                   ? 'text-[#8EB9A7] bg-[#8EB9A7]/10' 
                   : 'text-[#C98387] bg-[#C98387]/10'
               }`}>
-                {growthRate > 0 ? <ArrowUp size={12} strokeWidth={2.5} /> : <ArrowDown size={12} strokeWidth={2.5} />}
-                <span dir="ltr">{Math.abs(growthRate).toFixed(1)}%</span>
-                <span className="text-[10px] font-normal opacity-80">هذا الشهر</span>
+                {growthInfo.rate > 0 ? <ArrowUp size={12} strokeWidth={2.5} /> : <ArrowDown size={12} strokeWidth={2.5} />}
+                <span dir="ltr">{Math.abs(growthInfo.rate)}%</span>
+                <span className="text-[10px] font-normal opacity-80">{growthInfo.comparisonText}</span>
               </div>
             )}
           </div>
@@ -293,6 +290,9 @@ export const ElegantDashboard: React.FC<ElegantDashboardProps> = ({
           selectedCurrency={currency}
           onSelectCurrency={onChangeCurrency}
           currencyBalances={currencyBalances}
+          wallets={wallets}
+          exchangeRates={exchangeRates}
+          baseCurrencyCode={currency.code}
         />
       </section>
 

@@ -22,6 +22,7 @@ import {
   DebtPayment 
 } from '../types';
 import { convertCurrency, DEFAULT_EXCHANGE_RATES } from '../constants';
+import { safeAdd, safeSub, safeMul, safeDiv, roundToCurrency } from '../utils/mathPrecision';
 
 export interface LedgerWalletBalance {
   walletId: string;
