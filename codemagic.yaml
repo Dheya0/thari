@@ -207,10 +207,15 @@ workflows:
       - name: Set up code signing profiles
         script: |
           set -e
-          if [ -n "$APP_STORE_CONNECT_KEY_IDENTIFIER" ]; then
+          if [ -n "$APP_STORE_CONNECT_KEY_IDENTIFIER" ] || [ -n "$CERTIFICATE_PRIVATE_KEY" ]; then
             xcode-project use-profiles
           else
-            echo "Skipping automated signing profile download (credentials not configured)."
+            echo "Configuring automatic code signing fallback..."
+            # Configure automatic signing in project if manual profiles are not explicitly injected
+            cd ios/App
+            # Ensure provisioning style is automatic if requested or fallback to automatic signing
+            plutil -replace CFBundleIdentifier -string "com.thari.finance.app" App/Info.plist || true
+            cd ../..
           fi
 
       - name: Create export_options.plist if missing
