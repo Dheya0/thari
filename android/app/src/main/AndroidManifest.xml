@@ -14,18 +14,9 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
-    <!-- 4. Camera & Media Access (Receipt Scanning & Document Attachments) -->
-    <uses-permission android:name="android.permission.CAMERA" />
-    <uses-feature android:name="android.hardware.camera" android:required="false" />
-    <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
+    <!-- Optional Hardware Features Declaration -->
     <uses-feature android:name="android.hardware.fingerprint" android:required="false" />
     <uses-feature android:name="android.hardware.biometrics" android:required="false" />
-
-    <!-- 5. Storage (Encrypted Backups, PDF/CSV Export to Downloads) -->
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29" />
-    <!-- Android 13+ Granular Photo Media Access -->
-    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
 
     <application
         android:allowBackup="false"
@@ -36,8 +27,7 @@
         android:theme="@style/AppTheme.NoActionBar"
         android:usesCleartextTraffic="false"
         android:hardwareAccelerated="true"
-        android:largeHeap="true"
-        android:requestLegacyExternalStorage="true">
+        android:largeHeap="true">
 
         <activity
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode"
@@ -76,3 +66,4 @@
         </provider>
     </application>
 </manifest>
+
