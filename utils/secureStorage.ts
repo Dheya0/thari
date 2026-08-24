@@ -93,21 +93,70 @@ export function deobfuscateData(encodedString: string): string | null {
 }
 
 /**
+ * Synchronous instant write to LocalStorage with encryption for critical events
+ */
+export function saveSecureStateSync(primaryKey: string, stateObj: any): void {
+  try {
+    if (!stateObj) return;
+    const jsonStr = JSON.stringify(stateObj);
+    const encryptedData = obfuscateData(jsonStr);
+
+    try {
+      // 1. Instant Primary synchronous write
+      localStorage.setItem(primaryKey, encryptedData);
+
+      // 2. Rotating Snapshot synchronous write
+      const snapIndex = Math.floor(Date.now() / (1000 * 60 * 60)) % SNAPSHOT_KEYS.length;
+      const targetSnapKey = SNAPSHOT_KEYS[snapIndex];
+      localStorage.setItem(targetSnapKey, encryptedData);
+      localStorage.setItem('thari_last_save_ts', Date.now().toString());
+    } catch (quotaErr) {
+      // Emergency Quota Recovery: prune older snapshots and retry
+      console.warn('SecureStorage: Storage quota exceeded, executing emergency pruning...');
+      for (const key of SNAPSHOT_KEYS) {
+        try { localStorage.removeItem(key); } catch {}
+      }
+      try {
+        localStorage.setItem(primaryKey, encryptedData);
+      } catch (retryErr) {
+        console.error('SecureStorage: Critical sync write failure after quota pruning', retryErr);
+      }
+    }
+  } catch (err) {
+    console.error('SecureStorage: Error in sync state save', err);
+  }
+}
+
+/**
  * Save application state securely with rotating snapshots
  */
 export async function saveSecureState(primaryKey: string, stateObj: any): Promise<void> {
   try {
+    if (!stateObj) return;
     const jsonStr = JSON.stringify(stateObj);
     const encryptedData = obfuscateData(jsonStr);
 
-    // 1. Primary write
-    localStorage.setItem(primaryKey, encryptedData);
+    try {
+      // 1. Primary write
+      localStorage.setItem(primaryKey, encryptedData);
 
-    // 2. Rotating Snapshot
-    const snapIndex = Math.floor(Date.now() / (1000 * 60 * 60)) % SNAPSHOT_KEYS.length;
-    const targetSnapKey = SNAPSHOT_KEYS[snapIndex];
-    localStorage.setItem(targetSnapKey, encryptedData);
-    localStorage.setItem('thari_last_save_ts', Date.now().toString());
+      // 2. Rotating Snapshot
+      const snapIndex = Math.floor(Date.now() / (1000 * 60 * 60)) % SNAPSHOT_KEYS.length;
+      const targetSnapKey = SNAPSHOT_KEYS[snapIndex];
+      localStorage.setItem(targetSnapKey, encryptedData);
+      localStorage.setItem('thari_last_save_ts', Date.now().toString());
+    } catch (quotaErr) {
+      // Prune snapshots on quota overflow
+      console.warn('SecureStorage: Storage quota exceeded during async save, clearing older snapshots...');
+      for (const key of SNAPSHOT_KEYS) {
+        try { localStorage.removeItem(key); } catch {}
+      }
+      try {
+        localStorage.setItem(primaryKey, encryptedData);
+      } catch (retryErr) {
+        console.error('SecureStorage: Critical write failure after pruning', retryErr);
+      }
+    }
 
     // 3. Native Mobile Storage (iOS & Android File Vault)
     if (Capacitor.isNativePlatform()) {
@@ -119,7 +168,7 @@ export async function saveSecureState(primaryKey: string, stateObj: any): Promis
           encoding: Encoding.UTF8,
         });
       } catch (nativeErr) {
-        // Silent catch for native write
+        console.warn('SecureStorage: Native filesystem vault write notice', nativeErr);
       }
     }
   } catch (err) {

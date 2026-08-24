@@ -56,6 +56,8 @@
             padding: 0;
             background-color: #0A0D10;
             overflow: hidden;
+            overscroll-behavior: none;
+            -webkit-overflow-scrolling: touch;
         }
 
         body { 
@@ -67,7 +69,7 @@
             -webkit-user-select: none;
             -webkit-tap-highlight-color: transparent;
             -webkit-touch-callout: none;
-            overscroll-behavior-y: none;
+            overscroll-behavior: none;
         }
         
         .font-numeric {
@@ -87,6 +89,7 @@
             position: relative;
             z-index: 10;
             overflow: hidden;
+            overscroll-behavior: none;
         }
         @media (min-width: 768px) {
             #root {
@@ -445,6 +448,18 @@
         window.addEventListener('load', updateViewportHeight);
         setTimeout(updateViewportHeight, 200);
         setTimeout(updateViewportHeight, 1000);
+
+        // Native Virtual Keyboard Input Scroll-Into-View Handling
+        document.addEventListener('focusin', function (e) {
+            var target = e.target;
+            if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT')) {
+                setTimeout(function () {
+                    try {
+                        target.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+                    } catch (err) {}
+                }, 300);
+            }
+        });
     </script>
 </head>
 <body>

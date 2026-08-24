@@ -13,7 +13,6 @@ import { Wallet, Transaction, Category, Currency, Debt } from '../types';
 import { convertCurrency } from '../constants';
 import { calculateDateBasedGrowth } from '../services/balanceEngine';
 import { getTranslation } from '../utils/translations';
-import CurrencyLandscape from './CurrencyLandscape';
 
 interface ElegantDashboardProps {
   userName: string;
@@ -42,9 +41,14 @@ interface ElegantDashboardProps {
   language?: 'ar' | 'en';
 }
 
-export const formatFinancialNumber = (num: number, useCompact: boolean = false): string => {
-  const safeNum = Math.abs(num || 0);
+export const formatFinancialNumber = (num: number | string | undefined | null, useCompact: boolean = false): string => {
+  const parsed = typeof num === 'number' ? num : parseFloat(String(num ?? 0));
+  const safeNum = isNaN(parsed) ? 0 : Math.abs(parsed);
   if (useCompact) {
+    if (safeNum >= 1_000_000_000) {
+      const val = safeNum / 1_000_000_000;
+      return (val % 1 === 0 ? val.toFixed(0) : val.toFixed(1)) + 'B';
+    }
     if (safeNum >= 1_000_000) {
       const val = safeNum / 1_000_000;
       return (val % 1 === 0 ? val.toFixed(0) : val.toFixed(1)) + 'M';
@@ -175,14 +179,14 @@ export const ElegantDashboard: React.FC<ElegantDashboardProps> = ({
   }, [transactions, selectedWalletId]);
 
   return (
-    <div className="w-full max-w-4xl mx-auto space-y-8 sm:space-y-10 pb-12 font-sans selection:bg-[#D9B978]/20">
+    <div className="w-full max-w-4xl mx-auto space-y-7 sm:space-y-9 pb-16 font-sans selection:bg-[#D9B978]/20">
       
       {/* ─────────────────────────────────────────────────────────────
           1. HEADER: QUIET GREETING & STATUS
       ───────────────────────────────────────────────────────────── */}
-      <section className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 pt-1 border-b border-white/[0.04] pb-5">
-        <div>
-          <span className="text-xs font-medium tracking-wide text-[#D9B978] mb-1 block">
+      <section className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 pt-2 border-b border-white/[0.04] pb-5">
+        <div className="space-y-1">
+          <span className="text-xs font-medium tracking-wide text-[#D9B978] block">
             {greeting.text}، {userName || (isEn ? 'Thari User' : 'مستخدم ثري')}
           </span>
           <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-[#F4F1EA]">
@@ -191,7 +195,7 @@ export const ElegantDashboard: React.FC<ElegantDashboardProps> = ({
         </div>
 
         <div className="flex items-center gap-2">
-          <span className="text-xs text-slate-400">
+          <span className="text-xs text-slate-400 font-normal">
             {new Intl.DateTimeFormat(isEn ? 'en-US' : 'ar-SA', { weekday: 'long', day: 'numeric', month: 'short' }).format(new Date())}
           </span>
         </div>
@@ -203,8 +207,8 @@ export const ElegantDashboard: React.FC<ElegantDashboardProps> = ({
       <motion.section 
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3 }}
-        className="p-6 sm:p-8 rounded-[2rem] bg-gradient-to-b from-[#171D24] to-[#11161C] border border-white/[0.06] shadow-[0_25px_80px_rgba(0,0,0,0.28)] space-y-6"
+        transition={{ duration: 0.3, ease: 'easeOut' }}
+        className="p-6 sm:p-8 rounded-3xl bg-gradient-to-b from-[#171D24] to-[#11161C] border border-white/[0.06] shadow-[0_20px_60px_rgba(0,0,0,0.25)] space-y-6"
       >
         <div className="space-y-2">
           <div className="flex items-center justify-between">
@@ -212,20 +216,26 @@ export const ElegantDashboard: React.FC<ElegantDashboardProps> = ({
               {t.netWorth}
             </span>
             {growthInfo.rate !== 0 && (
-              <div className={`inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full ${
+              <div className={`inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full ${
                 growthInfo.rate > 0 
                   ? 'text-[#8EB9A7] bg-[#8EB9A7]/10' 
                   : 'text-[#C98387] bg-[#C98387]/10'
               }`}>
-                {growthInfo.rate > 0 ? <ArrowUp size={12} strokeWidth={2.5} /> : <ArrowDown size={12} strokeWidth={2.5} />}
+                {growthInfo.rate > 0 ? <ArrowUp size={12} strokeWidth={2.2} /> : <ArrowDown size={12} strokeWidth={2.2} />}
                 <span dir="ltr">{Math.abs(growthInfo.rate)}%</span>
                 <span className="text-[10px] font-normal opacity-80">{growthInfo.comparisonText}</span>
               </div>
             )}
           </div>
 
-          <div className="flex items-baseline gap-3 flex-wrap">
-            <span className="text-4xl sm:text-5xl md:text-6xl font-light tracking-tight text-[#F4F1EA] font-numeric">
+          <div className="flex items-baseline gap-2.5 sm:gap-3 flex-wrap">
+            <span className={`font-light tracking-tight text-[#F4F1EA] font-numeric break-all ${
+              String(Math.round(Math.abs(netWorth || 0))).length > 12
+                ? 'text-2xl sm:text-3xl md:text-4xl'
+                : String(Math.round(Math.abs(netWorth || 0))).length > 8
+                ? 'text-3xl sm:text-4xl md:text-5xl'
+                : 'text-4xl sm:text-5xl md:text-6xl'
+            }`}>
               {formatFinancialNumber(netWorth)}
             </span>
             <span className="text-lg sm:text-2xl font-normal text-[#D9B978]">
@@ -235,13 +245,13 @@ export const ElegantDashboard: React.FC<ElegantDashboardProps> = ({
         </div>
 
         {/* Triad Balance Metrics: Available, Receivable, Payable */}
-        <div className="grid grid-cols-3 gap-3 sm:gap-6 pt-5 border-t border-white/[0.06]">
+        <div className="grid grid-cols-3 gap-2.5 sm:gap-4 pt-5 border-t border-white/[0.05]">
           
-          <div className="space-y-1">
-            <span className="text-[11px] sm:text-xs font-normal text-slate-400 block">
+          <div className="p-3 sm:p-3.5 rounded-2xl bg-white/[0.02] border border-white/[0.03] space-y-1">
+            <span className="text-[11px] sm:text-xs font-normal text-slate-400 block truncate">
               {t.availableNow}
             </span>
-            <p className="text-base sm:text-xl font-medium text-[#F4F1EA] font-numeric tracking-tight">
+            <p className="text-base sm:text-xl font-medium text-[#F4F1EA] font-numeric tracking-tight truncate">
               {formatFinancialNumber(availableBalance)}
               <span className="text-[10px] sm:text-xs text-slate-400 ms-1 font-normal">{currency.symbol}</span>
             </p>
@@ -249,12 +259,12 @@ export const ElegantDashboard: React.FC<ElegantDashboardProps> = ({
 
           <button 
             onClick={onOpenDebts}
-            className="text-start space-y-1 group transition-colors"
+            className="p-3 sm:p-3.5 rounded-2xl bg-white/[0.02] hover:bg-[#8EB9A7]/5 border border-white/[0.03] hover:border-[#8EB9A7]/20 text-start space-y-1 group transition-all duration-200 active:scale-[0.98] min-h-[48px]"
           >
-            <span className="text-[11px] sm:text-xs font-normal text-slate-400 group-hover:text-[#8EB9A7] transition-colors block">
+            <span className="text-[11px] sm:text-xs font-normal text-slate-400 group-hover:text-[#8EB9A7] transition-colors block truncate">
               {t.youOweOthers}
             </span>
-            <p className="text-base sm:text-xl font-medium text-[#8EB9A7] font-numeric tracking-tight">
+            <p className="text-base sm:text-xl font-medium text-[#8EB9A7] font-numeric tracking-tight truncate">
               {formatFinancialNumber(debtsOwedToMe)}
               <span className="text-[10px] sm:text-xs text-[#8EB9A7]/70 ms-1 font-normal">{currency.symbol}</span>
             </p>
@@ -262,12 +272,12 @@ export const ElegantDashboard: React.FC<ElegantDashboardProps> = ({
 
           <button 
             onClick={onOpenDebts}
-            className="text-start space-y-1 group transition-colors"
+            className="p-3 sm:p-3.5 rounded-2xl bg-white/[0.02] hover:bg-[#C98387]/5 border border-white/[0.03] hover:border-[#C98387]/20 text-start space-y-1 group transition-all duration-200 active:scale-[0.98] min-h-[48px]"
           >
-            <span className="text-[11px] sm:text-xs font-normal text-slate-400 group-hover:text-[#C98387] transition-colors block">
+            <span className="text-[11px] sm:text-xs font-normal text-slate-400 group-hover:text-[#C98387] transition-colors block truncate">
               {t.othersOweYou}
             </span>
-            <p className="text-base sm:text-xl font-medium text-[#C98387] font-numeric tracking-tight">
+            <p className="text-base sm:text-xl font-medium text-[#C98387] font-numeric tracking-tight truncate">
               {formatFinancialNumber(debtsIOwe)}
               <span className="text-[10px] sm:text-xs text-[#C98387]/70 ms-1 font-normal">{currency.symbol}</span>
             </p>
@@ -277,37 +287,37 @@ export const ElegantDashboard: React.FC<ElegantDashboardProps> = ({
       </motion.section>
 
       {/* ─────────────────────────────────────────────────────────────
-          3. ACTION BAR: CLEAN DIRECT TRIGGERS
+          3. ACTION BAR: CLEAN DIRECT TRIGGERS (THUMB ZONE OPTIMIZED)
       ───────────────────────────────────────────────────────────── */}
       <section className="grid grid-cols-3 gap-2.5 sm:gap-4">
         <button
           onClick={() => onOpenNewTransaction('expense')}
-          className="flex items-center justify-center gap-2 py-3.5 px-3 rounded-2xl bg-[#171D24]/80 hover:bg-[#C98387]/15 border border-white/[0.06] hover:border-[#C98387]/30 text-white/90 hover:text-[#C98387] transition-all duration-200 group text-xs sm:text-sm font-medium shadow-sm"
+          className="flex items-center justify-center gap-2 py-4 px-3.5 rounded-2xl bg-[#171D24]/90 hover:bg-[#C98387]/15 border border-white/[0.06] hover:border-[#C98387]/30 text-white/90 hover:text-[#C98387] transition-all duration-200 active:scale-95 active:opacity-80 group text-xs sm:text-sm font-medium shadow-sm min-h-[50px]"
         >
           <div className="w-6 h-6 rounded-full bg-[#C98387]/15 flex items-center justify-center text-[#C98387] group-hover:scale-110 transition-transform">
             <ArrowDownLeft size={14} strokeWidth={2.2} />
           </div>
-          <span>{t.expenses}</span>
+          <span className="truncate">{t.expenses}</span>
         </button>
 
         <button
           onClick={() => onOpenNewTransaction('income')}
-          className="flex items-center justify-center gap-2 py-3.5 px-3 rounded-2xl bg-[#171D24]/80 hover:bg-[#8EB9A7]/15 border border-white/[0.06] hover:border-[#8EB9A7]/30 text-white/90 hover:text-[#8EB9A7] transition-all duration-200 group text-xs sm:text-sm font-medium shadow-sm"
+          className="flex items-center justify-center gap-2 py-4 px-3.5 rounded-2xl bg-[#171D24]/90 hover:bg-[#8EB9A7]/15 border border-white/[0.06] hover:border-[#8EB9A7]/30 text-white/90 hover:text-[#8EB9A7] transition-all duration-200 active:scale-95 active:opacity-80 group text-xs sm:text-sm font-medium shadow-sm min-h-[50px]"
         >
           <div className="w-6 h-6 rounded-full bg-[#8EB9A7]/15 flex items-center justify-center text-[#8EB9A7] group-hover:scale-110 transition-transform">
             <ArrowUpRight size={14} strokeWidth={2.2} />
           </div>
-          <span>{t.income}</span>
+          <span className="truncate">{t.income}</span>
         </button>
 
         <button
           onClick={() => onOpenNewTransaction('transfer')}
-          className="flex items-center justify-center gap-2 py-3.5 px-3 rounded-2xl bg-[#171D24]/80 hover:bg-[#759BC8]/15 border border-white/[0.06] hover:border-[#759BC8]/30 text-white/90 hover:text-[#759BC8] transition-all duration-200 group text-xs sm:text-sm font-medium shadow-sm"
+          className="flex items-center justify-center gap-2 py-4 px-3.5 rounded-2xl bg-[#171D24]/90 hover:bg-[#759BC8]/15 border border-white/[0.06] hover:border-[#759BC8]/30 text-white/90 hover:text-[#759BC8] transition-all duration-200 active:scale-95 active:opacity-80 group text-xs sm:text-sm font-medium shadow-sm min-h-[50px]"
         >
           <div className="w-6 h-6 rounded-full bg-[#759BC8]/15 flex items-center justify-center text-[#759BC8] group-hover:scale-110 transition-transform">
             <ArrowLeftRight size={14} strokeWidth={2.2} />
           </div>
-          <span>{t.transfer}</span>
+          <span className="truncate">{t.transfer}</span>
         </button>
       </section>
 
@@ -322,34 +332,34 @@ export const ElegantDashboard: React.FC<ElegantDashboardProps> = ({
           {selectedWalletId && (
             <button
               onClick={() => onSelectWallet(null)}
-              className="text-[11px] text-[#D9B978] hover:underline"
+              className="text-xs text-[#D9B978] hover:underline p-1 min-h-[36px] flex items-center"
             >
               {t.allWallets}
             </button>
           )}
         </div>
 
-        <div className="divide-y divide-white/[0.04] border-y border-white/[0.06]">
+        <div className="divide-y divide-white/[0.04] border-y border-white/[0.05]">
           {walletRows.map(w => {
             const isSelected = selectedWalletId === w.id;
             return (
               <button
                 key={w.id}
                 onClick={() => onSelectWallet(isSelected ? null : w.id)}
-                className={`w-full flex items-center justify-between py-3.5 px-2 hover:bg-white/[0.02] transition-colors rounded-xl text-start ${
-                  isSelected ? 'bg-[#D9B978]/[0.06]' : ''
+                className={`w-full flex items-center justify-between py-4 px-3 hover:bg-white/[0.03] transition-all duration-200 active:scale-[0.99] rounded-xl text-start min-h-[52px] ${
+                  isSelected ? 'bg-[#D9B978]/[0.08] border-s-2 border-[#D9B978]' : ''
                 }`}
               >
                 <div className="flex items-center gap-3">
                   <div 
-                    className="w-2.5 h-2.5 rounded-full shrink-0" 
+                    className="w-3 h-3 rounded-full shrink-0 shadow-sm" 
                     style={{ backgroundColor: w.color || '#D9B978' }} 
                   />
                   <div>
                     <span className="text-sm font-medium text-[#F4F1EA] block">
                       {w.name}
                     </span>
-                    <span className="text-[11px] text-slate-400">
+                    <span className="text-xs text-slate-400">
                       {w.currencyObj.name}
                     </span>
                   </div>
@@ -382,14 +392,14 @@ export const ElegantDashboard: React.FC<ElegantDashboardProps> = ({
           <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-400">
             {t.monthlyIncome.replace('الدخل الشهري', 'هذا الشهر')}
           </h2>
-          <span className="text-[11px] text-slate-400">
+          <span className="text-xs text-slate-400">
             {new Intl.DateTimeFormat(isEn ? 'en-US' : 'ar-SA', { month: 'long', year: 'numeric' }).format(new Date())}
           </span>
         </div>
 
         <div className="grid grid-cols-3 gap-3 py-4 px-4 sm:px-6 rounded-2xl bg-[#171D24]/60 border border-white/[0.05]">
           <div className="space-y-1">
-            <span className="text-[11px] text-slate-400 block font-normal">{t.income}</span>
+            <span className="text-xs text-slate-400 block font-normal">{t.income}</span>
             <div className="text-sm sm:text-base font-semibold text-[#8EB9A7] font-numeric tracking-tight">
               {formatFinancialNumber(monthlyIncome, true)}
               <span className="text-[10px] sm:text-xs text-[#8EB9A7]/80 ms-1 font-normal">{currency.symbol}</span>
@@ -397,7 +407,7 @@ export const ElegantDashboard: React.FC<ElegantDashboardProps> = ({
           </div>
 
           <div className="space-y-1">
-            <span className="text-[11px] text-slate-400 block font-normal">{t.expenses}</span>
+            <span className="text-xs text-slate-400 block font-normal">{t.expenses}</span>
             <div className="text-sm sm:text-base font-semibold text-[#C98387] font-numeric tracking-tight">
               {formatFinancialNumber(monthlyExpense, true)}
               <span className="text-[10px] sm:text-xs text-[#C98387]/80 ms-1 font-normal">{currency.symbol}</span>
@@ -405,7 +415,7 @@ export const ElegantDashboard: React.FC<ElegantDashboardProps> = ({
           </div>
 
           <div className="space-y-1">
-            <span className="text-[11px] text-slate-400 block font-normal">{t.net}</span>
+            <span className="text-xs text-slate-400 block font-normal">{t.net}</span>
             <div className={`text-sm sm:text-base font-semibold font-numeric tracking-tight ${
               monthlyNet >= 0 ? 'text-[#D9B978]' : 'text-[#C98387]'
             }`}>
@@ -426,7 +436,7 @@ export const ElegantDashboard: React.FC<ElegantDashboardProps> = ({
           </h2>
           <button
             onClick={onOpenAllTransactions}
-            className="text-xs text-[#D9B978] hover:text-[#D9B978]/80 transition-colors flex items-center gap-1 font-medium"
+            className="text-xs text-[#D9B978] hover:text-[#D9B978]/80 transition-colors flex items-center gap-1 font-medium p-1 min-h-[36px]"
           >
             <span>{t.viewAll}</span>
             {isEn ? <ChevronRight size={13} /> : <ChevronLeft size={13} />}
@@ -434,17 +444,17 @@ export const ElegantDashboard: React.FC<ElegantDashboardProps> = ({
         </div>
 
         {recentTransactions.length === 0 ? (
-          <div className="py-8 text-center border border-dashed border-white/10 rounded-2xl">
+          <div className="py-10 text-center border border-dashed border-white/10 rounded-2xl">
             <p className="text-xs text-slate-400">{t.noTransactionsYet}</p>
             <button
               onClick={() => onOpenNewTransaction('expense')}
-              className="mt-2 text-xs font-medium text-[#D9B978] hover:underline"
+              className="mt-3 text-xs font-medium text-[#D9B978] hover:underline min-h-[44px] inline-flex items-center"
             >
               {isEn ? 'Record first financial movement' : 'تسجيل أول حركة مالية'}
             </button>
           </div>
         ) : (
-          <div className="divide-y divide-white/[0.04] border-y border-white/[0.06]">
+          <div className="divide-y divide-white/[0.04] border-y border-white/[0.05]">
             {recentTransactions.map(tx => {
               const category = categories.find(c => c.id === tx.categoryId);
               const wallet = wallets.find(w => w.id === tx.walletId);
@@ -456,34 +466,34 @@ export const ElegantDashboard: React.FC<ElegantDashboardProps> = ({
                 <div
                   key={tx.id}
                   onClick={() => onEditTransaction(tx)}
-                  className="flex items-center justify-between py-3.5 px-2 hover:bg-white/[0.02] transition-colors rounded-xl cursor-pointer group"
+                  className="flex items-center justify-between py-4 px-3 hover:bg-white/[0.03] transition-all duration-200 active:scale-[0.99] rounded-xl cursor-pointer group min-h-[54px]"
                 >
-                  <div className="flex items-center gap-3">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${
                       isIncome 
                         ? 'bg-[#8EB9A7]/15 text-[#8EB9A7]' 
                         : isExpense 
                         ? 'bg-[#C98387]/15 text-[#C98387]' 
                         : 'bg-[#759BC8]/15 text-[#759BC8]'
                     }`}>
-                      {isIncome && <ArrowUpRight size={15} />}
-                      {isExpense && <ArrowDownLeft size={15} />}
-                      {isTransfer && <ArrowLeftRight size={15} />}
+                      {isIncome && <ArrowUpRight size={16} />}
+                      {isExpense && <ArrowDownLeft size={16} />}
+                      {isTransfer && <ArrowLeftRight size={16} />}
                     </div>
 
-                    <div>
-                      <span className="text-sm font-medium text-[#F4F1EA] group-hover:text-[#D9B978] transition-colors block">
+                    <div className="min-w-0">
+                      <span className="text-sm font-medium text-[#F4F1EA] group-hover:text-[#D9B978] transition-colors block truncate">
                         {tx.note || category?.name || (isTransfer ? (isEn ? 'Transfer between wallets' : 'تحويل بين المحافظ') : (isEn ? 'Financial operation' : 'عملية مالية'))}
                       </span>
-                      <div className="flex items-center gap-2 text-[11px] text-slate-400">
-                        <span>{wallet?.name || t.wallet}</span>
+                      <div className="flex items-center gap-2 text-xs text-slate-400">
+                        <span className="truncate">{wallet?.name || t.wallet}</span>
                         <span>•</span>
-                        <span>{tx.date}</span>
+                        <span className="shrink-0">{tx.date}</span>
                       </div>
                     </div>
                   </div>
 
-                  <div className="text-end font-numeric">
+                  <div className="text-end font-numeric shrink-0 ms-3">
                     <span className={`text-sm sm:text-base font-semibold ${
                       isIncome 
                         ? 'text-[#8EB9A7]' 

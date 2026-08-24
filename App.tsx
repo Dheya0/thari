@@ -5,7 +5,7 @@ import { Plus, LayoutDashboard, History, Settings as SettingsIcon, Briefcase, Ha
 import { AppState, Transaction, Category, Debt, DebtPayment, Account, RecurringRule } from './types';
 import { INITIAL_CATEGORIES, DEFAULT_CURRENCIES, DEFAULT_EXCHANGE_RATES, convertCurrency } from './constants';
 import { buildExecutiveCSVContent, exportAndShareExecutiveCSV } from './utils/exportHelper';
-import { saveSecureState, loadSecureState } from './utils/secureStorage';
+import { saveSecureState, saveSecureStateSync, loadSecureState } from './utils/secureStorage';
 import { calculateConsolidatedPosition } from './services/balanceEngine';
 import { processDueRecurringRules } from './services/recurringService';
 import { getTranslation, getLocalizedCurrency } from './utils/translations';
@@ -78,8 +78,8 @@ const INITIAL_STATE: AppState = {
   isDarkMode: true,
   pin: null,
   isLocked: false,
-  isBiometricEnabled: true,
-  requireBiometricOnOpen: true,
+  isBiometricEnabled: false,
+  requireBiometricOnOpen: false,
   isTravelMode: false,
   showSeparateCurrencies: false,
   hasAcceptedTerms: false,
@@ -225,19 +225,19 @@ const App: React.FC = () => {
 
   // Check and process due recurring transactions on initial mount
   useEffect(() => {
-    if (state.recurringRules && state.recurringRules.length > 0) {
+    setState(prev => {
+      if (!prev.recurringRules || prev.recurringRules.length === 0) return prev;
       const { newTransactions, updatedRules } = processDueRecurringRules(
-        state.recurringRules,
-        state.transactions
+        prev.recurringRules,
+        prev.transactions
       );
-      if (newTransactions.length > 0) {
-        setState(prev => ({
-          ...prev,
-          transactions: [...newTransactions, ...prev.transactions],
-          recurringRules: updatedRules
-        }));
-      }
-    }
+      if (newTransactions.length === 0) return prev;
+      return {
+        ...prev,
+        transactions: [...newTransactions, ...prev.transactions],
+        recurringRules: updatedRules,
+      };
+    });
   }, []);
 
   useEffect(() => {
@@ -304,10 +304,35 @@ const App: React.FC = () => {
     };
   }, [showAddForm, showPrivacyPolicy, activeTab]);
 
+  const stateRef = useRef(state);
+  useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
+
   // Dual Encrypted Offline-Safe Persistence to LocalStorage & Filesystem
   useEffect(() => {
+    // 1. Synchronous atomic write for zero data loss on sudden shutdown
+    saveSecureStateSync(STORAGE_KEY, state);
+    // 2. Async persistent write for Native Filesystem vault
     saveSecureState(STORAGE_KEY, state);
   }, [state]);
+
+  // Flush state immediately on page unload or native lifecycle termination
+  useEffect(() => {
+    const handleImmediateFlush = () => {
+      if (stateRef.current) {
+        saveSecureStateSync(STORAGE_KEY, stateRef.current);
+      }
+    };
+
+    window.addEventListener('beforeunload', handleImmediateFlush);
+    window.addEventListener('pagehide', handleImmediateFlush);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleImmediateFlush);
+      window.removeEventListener('pagehide', handleImmediateFlush);
+    };
+  }, []);
 
   // Timed Auto-lock when user leaves or backgrounds the app (Native iOS, Android & Web)
   useEffect(() => {
@@ -676,19 +701,68 @@ const App: React.FC = () => {
   };
 
   const handleTriggerRecurringCatchup = () => {
-    if (state.recurringRules && state.recurringRules.length > 0) {
+    setState(prev => {
+      if (!prev.recurringRules || prev.recurringRules.length === 0) return prev;
       const { newTransactions, updatedRules } = processDueRecurringRules(
-        state.recurringRules,
-        state.transactions
+        prev.recurringRules,
+        prev.transactions
       );
-      if (newTransactions.length > 0) {
-        setState(prev => ({
-          ...prev,
-          transactions: [...newTransactions, ...prev.transactions],
-          recurringRules: updatedRules,
-        }));
-      }
+      if (newTransactions.length === 0) return prev;
+      return {
+        ...prev,
+        transactions: [...newTransactions, ...prev.transactions],
+        recurringRules: updatedRules,
+      };
+    });
+  };
+
+  const handleRestoreState = (rawRestoredData: any) => {
+    if (!rawRestoredData || typeof rawRestoredData !== 'object') return;
+    
+    // Schema Sanitization and Normalization
+    let restoredCurrency = rawRestoredData.currency;
+    if (typeof restoredCurrency === 'string') {
+      restoredCurrency = DEFAULT_CURRENCIES.find(c => c.code === restoredCurrency) || DEFAULT_CURRENCIES[0];
+    } else if (!restoredCurrency || !restoredCurrency.code) {
+      restoredCurrency = DEFAULT_CURRENCIES[0];
     }
+
+    const restoredCurrencies = (rawRestoredData.currencies && Array.isArray(rawRestoredData.currencies) && rawRestoredData.currencies.length > 0)
+      ? rawRestoredData.currencies
+      : DEFAULT_CURRENCIES;
+
+    const restoredCategories = (rawRestoredData.categories && Array.isArray(rawRestoredData.categories) && rawRestoredData.categories.length > 0)
+      ? rawRestoredData.categories
+      : INITIAL_CATEGORIES;
+
+    const restoredWallets = (rawRestoredData.wallets && Array.isArray(rawRestoredData.wallets) && rawRestoredData.wallets.length > 0)
+      ? rawRestoredData.wallets
+      : INITIAL_STATE.wallets;
+
+    const restoredExchangeRates = (rawRestoredData.exchangeRates && typeof rawRestoredData.exchangeRates === 'object')
+      ? { ...DEFAULT_EXCHANGE_RATES, ...rawRestoredData.exchangeRates }
+      : DEFAULT_EXCHANGE_RATES;
+
+    const sanitizedState: AppState = {
+      ...INITIAL_STATE,
+      ...rawRestoredData,
+      currency: restoredCurrency,
+      currencies: restoredCurrencies,
+      categories: restoredCategories,
+      wallets: restoredWallets,
+      exchangeRates: restoredExchangeRates,
+      transactions: Array.isArray(rawRestoredData.transactions) ? rawRestoredData.transactions : [],
+      trashTransactions: Array.isArray(rawRestoredData.trashTransactions) ? rawRestoredData.trashTransactions : [],
+      debts: Array.isArray(rawRestoredData.debts) ? rawRestoredData.debts : [],
+      budgets: Array.isArray(rawRestoredData.budgets) ? rawRestoredData.budgets : [],
+      goals: Array.isArray(rawRestoredData.goals) ? rawRestoredData.goals : [],
+      subscriptions: Array.isArray(rawRestoredData.subscriptions) ? rawRestoredData.subscriptions : [],
+      recurringRules: Array.isArray(rawRestoredData.recurringRules) ? rawRestoredData.recurringRules : [],
+      isLocked: !!rawRestoredData.pin,
+    };
+
+    setState(sanitizedState);
+    saveSecureStateSync(STORAGE_KEY, sanitizedState);
   };
 
   const handleApplyRepairedState = (repairedState: AppState) => {
@@ -855,12 +929,12 @@ const App: React.FC = () => {
   };
 
   if (!state.hasAcceptedTerms) return <WelcomeScreen onAccept={() => setState(p => ({ ...p, hasAcceptedTerms: true }))} onShowPrivacy={() => setShowPrivacyPolicy(true)} />;
-  if (state.isLocked && (state.pin || state.isBiometricEnabled !== false)) {
+  if (state.isLocked && (!!state.pin || state.isBiometricEnabled === true)) {
     return (
       <LockScreen 
         savedPin={state.pin || ''} 
         pinSalt={state.pinSalt}
-        isBiometricEnabled={state.isBiometricEnabled !== false} 
+        isBiometricEnabled={state.isBiometricEnabled === true} 
         onUnlock={() => setState(p => ({ ...p, isLocked: false }))} 
         onRehashPin={(newPinHash, newSalt) => setState(p => ({ ...p, pin: newPinHash, pinSalt: newSalt }))}
       />
@@ -1095,7 +1169,7 @@ const App: React.FC = () => {
                         onAddCategory={(c) => setState(p => ({ ...p, categories: [...p.categories, { ...c, id: 'c-' + Date.now() }] }))}
                         onUpdateCategory={(id, updates) => setState(p => ({ ...p, categories: p.categories.map(c => c.id === id ? { ...c, ...updates } : c) }))}
                         onRemoveCategory={(id) => setState(p => ({ ...p, categories: p.categories.filter(c => c.id !== id) }))}
-                        onRestore={(data) => setState(p => ({ ...INITIAL_STATE, ...data, isLocked: !!data.pin }))} 
+                        onRestore={handleRestoreState} 
                         onClearData={() => setState(p => ({...p, transactions: [], debts: [], budgets: [], subscriptions: [], chatHistory: [], goals: []}))} 
                         onShowPrivacyPolicy={() => setShowPrivacyPolicy(true)} 
                         onPrint={handlePrint}

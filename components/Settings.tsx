@@ -225,7 +225,7 @@ export default function Settings({
   const [restorePassword, setRestorePassword] = useState('');
   const [pendingRestoreContent, setPendingRestoreContent] = useState<string | null>(null);
 
-  const [isBiometricEnabled, setIsBiometricEnabled] = useState(appState?.isBiometricEnabled !== false);
+  const [isBiometricEnabled, setIsBiometricEnabled] = useState(appState?.isBiometricEnabled === true);
   const [debtAlertsEnabled, setDebtAlertsEnabled] = useState(true);
   const [dailyLoggerEnabled, setDailyLoggerEnabled] = useState(true);
   const [budgetAlertsEnabled, setBudgetAlertsEnabled] = useState(true);

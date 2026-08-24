@@ -401,7 +401,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
                   setSelectedEvent(null);
                   setErrorMessage('');
                 }}
-                className="w-9 h-9 rounded-xl bg-[#11161C] hover:bg-[#D9B978]/15 text-[#F4F1EA] flex items-center justify-center transition-colors border border-[#D9B978]/20"
+                className="w-11 h-11 rounded-xl bg-[#11161C] hover:bg-[#D9B978]/15 text-[#F4F1EA] flex items-center justify-center transition-all duration-200 active:scale-95 border border-[#D9B978]/20"
                 title="الرجوع لقائمة الأحداث"
               >
                 <ChevronRight size={20} />
@@ -430,7 +430,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-2">
             {!selectedEvent && transactions.length > 0 && !initialData && (
               <button
                 type="button"
@@ -440,13 +440,13 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
                     handleSelectTxForEdit(transactions[0].id);
                   }
                 }}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1 border ${
+                className={`px-3.5 min-h-[44px] rounded-xl text-xs font-bold transition-all duration-200 active:scale-95 flex items-center gap-1.5 border ${
                   isEditingExisting 
                     ? 'bg-[#D9B978]/20 text-[#D9B978] border-[#D9B978]/40' 
                     : 'bg-[#11161C] text-[#F4F1EA]/80 border-[#D9B978]/20 hover:text-[#F4F1EA]'
                 }`}
               >
-                <Edit3 size={13} />
+                <Edit3 size={14} />
                 <span>{t.editPrevious}</span>
               </button>
             )}
@@ -454,7 +454,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
             <button 
               type="button"
               onClick={onClose}
-              className="w-9 h-9 rounded-xl bg-[#11161C] hover:bg-[#D9B978]/15 text-[#F4F1EA]/70 hover:text-[#F4F1EA] flex items-center justify-center transition-colors border border-[#D9B978]/20"
+              className="w-11 h-11 rounded-xl bg-[#11161C] hover:bg-[#D9B978]/15 text-[#F4F1EA]/70 hover:text-[#F4F1EA] flex items-center justify-center transition-all duration-200 active:scale-95 border border-[#D9B978]/20"
             >
               <X size={18} />
             </button>
@@ -1398,7 +1398,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
               <button
                 type="submit"
                 disabled={isSubmitting || (selectedEvent === 'debt_repayment' && activeDebts.length === 0)}
-                className="w-full py-3.5 px-4 rounded-2xl font-black text-xs sm:text-sm transition-all shadow-lg active:scale-98 flex items-center justify-center gap-2 bg-[#D9B978] hover:bg-[#D9B978]/90 text-[#0A0D10] shadow-[#D9B978]/20"
+                className="w-full min-h-[50px] py-3.5 px-4 rounded-2xl font-black text-xs sm:text-sm transition-all duration-200 shadow-lg active:scale-95 flex items-center justify-center gap-2 bg-[#D9B978] hover:bg-[#D9B978]/90 text-[#0A0D10] shadow-[#D9B978]/20"
               >
                 <Check size={18} strokeWidth={3} />
                 <span>
