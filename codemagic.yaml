@@ -359,6 +359,58 @@ workflows:
             cp -f release/ios/Info.plist ios/App/App/Info.plist
           fi
 
+      - name: Fix Assets and AppIcon
+        script: |
+          set -e
+          # تنظيف وتجهيز الأصول الصالحة لتفادي أي أخطاء في actool
+          cd ios/App/App/Assets.xcassets
+          
+          # معالجة Splash.imageset
+          if [ -d "Splash.imageset" ]; then
+            rm -rf Splash.imageset
+            mkdir -p Splash.imageset
+            cat <<EOF > Splash.imageset/Contents.json
+          {
+            "images" : [
+              {
+                "idiom" : "universal",
+                "scale" : "1x"
+              },
+              {
+                "idiom" : "universal",
+                "scale" : "2x"
+              },
+              {
+                "idiom" : "universal",
+                "scale" : "3x"
+              }
+            ],
+            "info" : {
+              "author" : "xcode",
+              "version" : 1
+            }
+          }
+          EOF
+          fi
+
+          # تجهيز مصفوفة AppIcon نظيفة وصالحة
+          mkdir -p AppIcon.appiconset
+          cat <<EOF > AppIcon.appiconset/Contents.json
+          {
+            "images" : [
+              {
+                "idiom" : "universal",
+                "platform" : "ios",
+                "size" : "1024x1024"
+              }
+            ],
+            "info" : {
+              "author" : "xcode",
+              "version" : 1
+            }
+          }
+          EOF
+
       - name: Build iOS Application Package (Ad-Hoc / Sideloading)
         script: |
           set -e

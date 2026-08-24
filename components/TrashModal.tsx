@@ -1,8 +1,8 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Trash2, RotateCcw, X, AlertTriangle, Coins, ArrowLeftRight, Check } from 'lucide-react';
+import { Trash2, RotateCcw, X, ArrowLeftRight } from 'lucide-react';
 import { Transaction, Category, Wallet, Currency } from '../types';
-import { getIcon, DEFAULT_CURRENCIES } from '../constants';
+import { getIcon } from '../constants';
 
 interface TrashModalProps {
   isOpen: boolean;
@@ -14,7 +14,39 @@ interface TrashModalProps {
   onRestore: (id: string) => void;
   onPermanentDelete: (id: string) => void;
   onEmptyTrash: () => void;
+  language?: 'ar' | 'en';
 }
+
+const STRINGS = {
+  ar: {
+    title: 'سلة المحذوفات',
+    subtitle: (count: number) => `العمليات المحذوفة مؤقتاً (${count})`,
+    banner: 'يمكنك استعادة أي عملية محذوفة بالضغط على زر الاستعادة',
+    emptyTrashBtn: 'تفريغ السلة نهائياً',
+    emptyTitle: 'سلة المحذوفات فارغة تماماً',
+    transferTitle: 'تحويل مالي',
+    uncategorized: 'غير مصنف',
+    walletFallback: 'محفظة',
+    deletedOn: 'حذف',
+    restoreTitle: 'استعادة المعاملة',
+    deleteTitle: 'حذف نهائي',
+    close: 'إغلاق',
+  },
+  en: {
+    title: 'Recycle Bin',
+    subtitle: (count: number) => `Temporarily deleted records (${count})`,
+    banner: 'You can recover any deleted transaction by clicking the restore button',
+    emptyTrashBtn: 'Empty Bin Permanently',
+    emptyTitle: 'Recycle Bin is completely empty',
+    transferTitle: 'Wallet Transfer',
+    uncategorized: 'Uncategorized',
+    walletFallback: 'Wallet',
+    deletedOn: 'Deleted',
+    restoreTitle: 'Restore Transaction',
+    deleteTitle: 'Permanent Delete',
+    close: 'Close',
+  }
+};
 
 export const TrashModal: React.FC<TrashModalProps> = ({
   isOpen,
@@ -26,21 +58,26 @@ export const TrashModal: React.FC<TrashModalProps> = ({
   onRestore,
   onPermanentDelete,
   onEmptyTrash,
+  language = 'ar',
 }) => {
   if (!isOpen) return null;
+
+  const isRTL = language === 'ar';
+  const t = STRINGS[language] || STRINGS.ar;
 
   return (
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
+      dir={isRTL ? 'rtl' : 'ltr'}
       className="fixed inset-0 bg-slate-950/85 backdrop-blur-md z-[500] flex items-center justify-center p-3 sm:p-4 no-print"
     >
       <motion.div
         initial={{ scale: 0.95, y: 15, opacity: 0 }}
         animate={{ scale: 1, y: 0, opacity: 1 }}
         exit={{ scale: 0.95, y: 15, opacity: 0 }}
-        className="bg-slate-900 w-full max-w-lg mx-auto rounded-3xl p-5 sm:p-6 shadow-2xl border border-white/10 flex flex-col max-h-[85vh] overflow-hidden text-right"
+        className="bg-slate-900 w-full max-w-lg mx-auto rounded-3xl p-5 sm:p-6 shadow-2xl border border-white/10 flex flex-col max-h-[85vh] overflow-hidden text-start"
       >
         {/* Header */}
         <div className="flex justify-between items-center pb-3 border-b border-white/10 shrink-0">
@@ -49,15 +86,16 @@ export const TrashModal: React.FC<TrashModalProps> = ({
               <Trash2 size={18} />
             </div>
             <div>
-              <h3 className="text-base font-black text-white">سلة المحذوفات</h3>
+              <h3 className="text-base font-black text-white">{t.title}</h3>
               <p className="text-[11px] text-slate-400 font-bold">
-                العمليات المحذوفة مؤقتاً ({trashTransactions.length})
+                {t.subtitle(trashTransactions.length)}
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
             className="p-2 rounded-xl bg-slate-800 text-slate-400 hover:text-white"
+            title={t.close}
           >
             <X size={16} />
           </button>
@@ -65,17 +103,17 @@ export const TrashModal: React.FC<TrashModalProps> = ({
 
         {/* Action toolbar if items exist */}
         {trashTransactions.length > 0 && (
-          <div className="py-2.5 flex items-center justify-between shrink-0 border-b border-white/5">
-            <span className="text-[11px] font-bold text-slate-400">
-              يمكنك استعادة أي عملية محذوفة بالضغط على زر الاستعادة
+          <div className="py-2.5 flex items-center justify-between shrink-0 border-b border-white/5 gap-2">
+            <span className="text-[11px] font-bold text-slate-400 truncate">
+              {t.banner}
             </span>
             <button
               type="button"
               onClick={onEmptyTrash}
-              className="text-xs font-black text-rose-400 hover:text-rose-300 flex items-center gap-1 bg-rose-500/10 px-2.5 py-1.5 rounded-xl border border-rose-500/20 active:scale-95 transition-all"
+              className="text-xs font-black text-rose-400 hover:text-rose-300 flex items-center gap-1 bg-rose-500/10 px-2.5 py-1.5 rounded-xl border border-rose-500/20 active:scale-95 transition-all shrink-0"
             >
               <Trash2 size={13} />
-              <span>تفريغ السلة نهائياً</span>
+              <span>{t.emptyTrashBtn}</span>
             </button>
           </div>
         )}
@@ -85,7 +123,7 @@ export const TrashModal: React.FC<TrashModalProps> = ({
           {trashTransactions.length === 0 ? (
             <div className="text-center py-12 text-slate-500 space-y-2">
               <Trash2 size={36} className="mx-auto text-slate-600 opacity-50" />
-              <p className="text-xs font-bold">سلة المحذوفات فارغة تماماً</p>
+              <p className="text-xs font-bold">{t.emptyTitle}</p>
             </div>
           ) : (
             trashTransactions.map((tx) => {
@@ -116,21 +154,21 @@ export const TrashModal: React.FC<TrashModalProps> = ({
                     <div className="truncate">
                       <div className="flex items-center gap-1.5">
                         <span className="text-xs font-black text-white truncate">
-                          {isTransfer ? 'تحويل مالي' : category?.name || 'غير مصنف'}
+                          {isTransfer ? t.transferTitle : category?.name || t.uncategorized}
                         </span>
                         {tx.note && (
                           <span className="text-[10px] text-slate-400 truncate">({tx.note})</span>
                         )}
                       </div>
                       <div className="flex items-center gap-1.5 text-[9px] text-slate-400 mt-0.5">
-                        <span>{wallet?.name || 'محفظة'}</span>
+                        <span>{wallet?.name || t.walletFallback}</span>
                         <span>•</span>
                         <span>{tx.date}</span>
                         {tx.deletedAt && (
                           <>
                             <span>•</span>
                             <span className="text-rose-400/80">
-                              حذف: {new Date(tx.deletedAt).toLocaleDateString('ar-SA')}
+                              {t.deletedOn}: {new Date(tx.deletedAt).toLocaleDateString(language === 'ar' ? 'ar-SA' : 'en-US')}
                             </span>
                           </>
                         )}
@@ -151,7 +189,7 @@ export const TrashModal: React.FC<TrashModalProps> = ({
                       type="button"
                       onClick={() => onRestore(tx.id)}
                       className="p-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 rounded-xl border border-emerald-500/20 active:scale-95 transition-all"
-                      title="استعادة المعاملة"
+                      title={t.restoreTitle}
                     >
                       <RotateCcw size={14} />
                     </button>
@@ -159,7 +197,7 @@ export const TrashModal: React.FC<TrashModalProps> = ({
                       type="button"
                       onClick={() => onPermanentDelete(tx.id)}
                       className="p-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 rounded-xl border border-rose-500/20 active:scale-95 transition-all"
-                      title="حذف نهائي"
+                      title={t.deleteTitle}
                     >
                       <Trash2 size={14} />
                     </button>
@@ -177,7 +215,7 @@ export const TrashModal: React.FC<TrashModalProps> = ({
             onClick={onClose}
             className="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-bold text-xs"
           >
-            إغلاق
+            {t.close}
           </button>
         </div>
       </motion.div>

@@ -1059,7 +1059,7 @@ const App: React.FC = () => {
                         onRemoveCategory={(id) => setState(p => ({ ...p, categories: p.categories.filter(c => c.id !== id) }))}
                         onRestore={(data) => setState(p => ({ ...INITIAL_STATE, ...data, isLocked: !!data.pin }))} 
                         onClearData={() => setState(p => ({...p, transactions: [], debts: [], budgets: [], subscriptions: [], chatHistory: [], goals: []}))} 
-                        onShowPrivacyPolicy={() => setShowPrivacyPolicy(false)} 
+                        onShowPrivacyPolicy={() => setShowPrivacyPolicy(true)} 
                         onPrint={handlePrint}
                         onShare={handleShare}
                         onExportExcel={handleExportExcelReport}
@@ -1130,6 +1130,7 @@ const App: React.FC = () => {
               onOpenTrash={() => setShowTrashModal(true)}
               onOpenDiagnostics={() => setShowDiagnosticsModal(true)}
               onOpenAIAdvisor={() => setActiveTab('chat')}
+              language={state.language || 'ar'}
             />
           )}
           {showTrashModal && (
@@ -1143,6 +1144,7 @@ const App: React.FC = () => {
               onRestore={handleRestoreTransaction}
               onPermanentDelete={handlePermanentDelete}
               onEmptyTrash={handleEmptyTrash}
+              language={state.language || 'ar'}
             />
           )}
           {showReportModal && (
@@ -1174,6 +1176,7 @@ const App: React.FC = () => {
               onDeleteRule={handleDeleteRecurringRule}
               onAddRule={handleAddRecurringRule}
               onTriggerCatchup={handleTriggerRecurringCatchup}
+              language={state.language || 'ar'}
             />
           )}
           {showDiagnosticsModal && (
@@ -1182,6 +1185,7 @@ const App: React.FC = () => {
               onClose={() => setShowDiagnosticsModal(false)}
               state={state}
               onApplyRepairedState={handleApplyRepairedState}
+              language={state.language || 'ar'}
             />
           )}
           {showAddForm && (
@@ -1201,7 +1205,7 @@ const App: React.FC = () => {
                 t={t}
               />
           )}
-          {showPrivacyPolicy && <PrivacyPolicy onBack={() => setShowPrivacyPolicy(false)} />}
+          {showPrivacyPolicy && <PrivacyPolicy onBack={() => setShowPrivacyPolicy(false)} language={state.language || 'ar'} />}
           {showCurrencySelector && (
             <CurrencySelectorModal
               isOpen={showCurrencySelector}
