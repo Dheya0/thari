@@ -124,7 +124,8 @@ const App: React.FC = () => {
               ? { ...DEFAULT_EXCHANGE_RATES, ...parsed.exchangeRates }
               : DEFAULT_EXCHANGE_RATES;
 
-          const shouldLockOnOpen = !!parsed.pin && parsed.requireBiometricOnOpen !== false && parsed.autoLockTime !== 'never';
+          const isSecurityProtected = !!parsed.pin || parsed.isBiometricEnabled === true;
+          const shouldLockOnOpen = isSecurityProtected && parsed.requireBiometricOnOpen !== false && parsed.autoLockTime !== 'never';
           
           return {
             ...INITIAL_STATE,
@@ -308,33 +309,70 @@ const App: React.FC = () => {
     saveSecureState(STORAGE_KEY, state);
   }, [state]);
 
-  // Timed Auto-lock when user leaves or backgrounds the app
+  // Timed Auto-lock when user leaves or backgrounds the app (Native iOS, Android & Web)
   useEffect(() => {
-    const handleVisibilityChange = () => {
-      // If user disabled biometric/PIN lock on open/background
-      if (state.requireBiometricOnOpen === false) return;
+    const isSecurityConfigured = !!state.pin || state.isBiometricEnabled === true;
+    if (!isSecurityConfigured || state.requireBiometricOnOpen === false) return;
 
-      if (document.visibilityState === 'hidden') {
-        backgroundedAtRef.current = Date.now();
-        if (state.pin && (!state.autoLockTime || state.autoLockTime === 'instant')) {
-          setState(p => ({ ...p, isLocked: true }));
-        }
-      } else if (document.visibilityState === 'visible') {
-        if (state.pin && backgroundedAtRef.current && state.autoLockTime && state.autoLockTime !== 'never' && state.autoLockTime !== 'instant') {
-          const elapsedMs = Date.now() - backgroundedAtRef.current;
-          const thresholdMs = state.autoLockTime === '1min' ? 60000 : 300000;
-          if (elapsedMs >= thresholdMs) {
-            setState(p => ({ ...p, isLocked: true }));
-          }
-        }
-        backgroundedAtRef.current = null;
+    const onAppBackgrounded = () => {
+      backgroundedAtRef.current = Date.now();
+      if (!state.autoLockTime || state.autoLockTime === 'instant') {
+        setState(p => ({ ...p, isLocked: true }));
       }
     };
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
+
+    const onAppForegrounded = () => {
+      if (backgroundedAtRef.current && state.autoLockTime && state.autoLockTime !== 'never' && state.autoLockTime !== 'instant') {
+        const elapsedMs = Date.now() - backgroundedAtRef.current;
+        const thresholdMs = state.autoLockTime === '1min' ? 60000 : 300000;
+        if (elapsedMs >= thresholdMs) {
+          setState(p => ({ ...p, isLocked: true }));
+        }
+      } else if (!state.autoLockTime || state.autoLockTime === 'instant') {
+        setState(p => ({ ...p, isLocked: true }));
+      }
+      backgroundedAtRef.current = null;
     };
-  }, [state.pin, state.autoLockTime, state.requireBiometricOnOpen]);
+
+    // 1. Native Capacitor lifecycle (iOS & Android)
+    let appListenerHandle: any = null;
+    try {
+      CapApp.addListener('appStateChange', (appState) => {
+        if (!appState.isActive) {
+          onAppBackgrounded();
+        } else {
+          onAppForegrounded();
+        }
+      }).then(handle => {
+        appListenerHandle = handle;
+      });
+    } catch (e) {}
+
+    // 2. Web / PWA Document & Window visibility lifecycle
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        onAppBackgrounded();
+      } else if (document.visibilityState === 'visible') {
+        onAppForegrounded();
+      }
+    };
+
+    const handlePageHide = () => onAppBackgrounded();
+    const handlePageShow = () => onAppForegrounded();
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('pagehide', handlePageHide);
+    window.addEventListener('pageshow', handlePageShow);
+
+    return () => {
+      if (appListenerHandle && typeof appListenerHandle.remove === 'function') {
+        appListenerHandle.remove();
+      }
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('pagehide', handlePageHide);
+      window.removeEventListener('pageshow', handlePageShow);
+    };
+  }, [state.pin, state.isBiometricEnabled, state.autoLockTime, state.requireBiometricOnOpen]);
 
   // Automated Periodic / On-Open Snapshot Backup Runner
   useEffect(() => {
@@ -817,10 +855,10 @@ const App: React.FC = () => {
   };
 
   if (!state.hasAcceptedTerms) return <WelcomeScreen onAccept={() => setState(p => ({ ...p, hasAcceptedTerms: true }))} onShowPrivacy={() => setShowPrivacyPolicy(true)} />;
-  if (state.pin && state.isLocked) {
+  if (state.isLocked && (state.pin || state.isBiometricEnabled !== false)) {
     return (
       <LockScreen 
-        savedPin={state.pin} 
+        savedPin={state.pin || ''} 
         pinSalt={state.pinSalt}
         isBiometricEnabled={state.isBiometricEnabled !== false} 
         onUnlock={() => setState(p => ({ ...p, isLocked: false }))} 

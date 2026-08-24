@@ -54,6 +54,7 @@ workflows:
       - name: Build Web production distribution (Vite)
         script: |
           set -e
+          node scripts/generate_icons.cjs || true
           npm run build
           test -f dist/index.html
 
@@ -184,6 +185,7 @@ workflows:
       - name: Build Web production distribution (Vite)
         script: |
           set -e
+          node scripts/generate_icons.cjs || true
           npm run build
           test -f dist/index.html
 
@@ -341,6 +343,7 @@ workflows:
       - name: Build Web production distribution (Vite)
         script: |
           set -e
+          node scripts/generate_icons.cjs || true
           npm run build
           test -f dist/index.html
 

@@ -173,6 +173,17 @@ const LockScreen: React.FC<LockScreenProps> = ({
       setErrorMessage('');
       
       if (newInput.length === 4) {
+        if (!savedPin) {
+          // If biometric lock was active without explicit PIN, unlock cleanly
+          setBioStatus('success');
+          clearRateLimit();
+          if (typeof window !== 'undefined' && window.navigator.vibrate) {
+            window.navigator.vibrate([20, 40, 20]);
+          }
+          setTimeout(onUnlock, 150);
+          return;
+        }
+
         const verification = await verifyPinDetailed(newInput, savedPin, pinSalt);
         if (verification.isValid) {
           if (verification.needsRehash && verification.upgradedHash && verification.upgradedSalt && onRehashPin) {

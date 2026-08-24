@@ -98,6 +98,44 @@ const ConfirmDialog = ({ confirmData, onCancel, t }: { confirmData: { message: s
   );
 };
 
+const AccordionItem = ({ 
+  title, 
+  icon: Icon, 
+  isOpen, 
+  onToggle, 
+  children 
+}: { 
+  id?: string;
+  title: string; 
+  icon: any; 
+  isOpen: boolean; 
+  onToggle: () => void; 
+  children: React.ReactNode;
+}) => {
+  return (
+    <div className="bg-[#11161C] rounded-[2rem] border border-white/10 overflow-hidden transition-all duration-300 shadow-xl">
+      <button 
+        onClick={onToggle}
+        className="w-full p-5 flex justify-between items-center text-[#F4F1EA] hover:bg-white/[0.02] transition-colors text-start"
+        type="button"
+      >
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-[#D9B978]/10 text-[#D9B978] flex items-center justify-center shrink-0">
+            <Icon size={20} />
+          </div>
+          <span className="font-black text-sm md:text-base">{title}</span>
+        </div>
+        <ChevronDown size={18} className={`text-slate-400 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`} />
+      </button>
+      {isOpen && (
+        <div className="p-6 border-t border-white/5 bg-[#0A0D10]/50 space-y-5 animate-slide-down text-start">
+          {children}
+        </div>
+      )}
+    </div>
+  );
+};
+
 interface SettingsProps {
   userName: string;
   pin: string | null;
@@ -273,14 +311,26 @@ export default function Settings({
   };
 
   const handleSaveSecurity = (shouldLock = false) => {
+    if (isSecurityEnabled && localPin && localPin.length > 0 && localPin.length < 4) {
+      showToast('يرجى إدخال رمز PIN مكون من 4 أرقام بالضبط', 'error');
+      return;
+    }
+
+    const effectivePin = isSecurityEnabled && localPin && localPin.length === 4 ? localPin : (isSecurityEnabled ? pin : null);
+
     onUpdateSettings({
-      pin: isSecurityEnabled ? localPin : null,
+      pin: effectivePin,
       isLocked: shouldLock,
       autoLockTime: localAutoLockTime,
       isBiometricEnabled: isBiometricEnabled,
       requireBiometricOnOpen: localRequireBiometricOnOpen
     });
-    showToast('تم تحديث إعدادات الأمان وقفل التطبيق بنجاح');
+
+    if (shouldLock) {
+      showToast('تم قفل التطبيق بنجاح!');
+    } else {
+      showToast('تم تحديث إعدادات الأمان بنجاح');
+    }
   };
 
   const handleRunBiometricTest = async () => {
@@ -452,32 +502,6 @@ export default function Settings({
   };
 
   const t = getTranslation(appState?.language || 'ar');
-
-  const AccordionItem = ({ id, title, icon: Icon, children }: { id: string, title: string, icon: any, children: React.ReactNode }) => {
-    const isOpen = openAccordion === id;
-    return (
-        <div className="bg-[#11161C] rounded-[2rem] border border-white/10 overflow-hidden transition-all duration-300 shadow-xl">
-            <button 
-                onClick={() => setOpenAccordion(isOpen ? null : id)}
-                className="w-full p-5 flex justify-between items-center text-[#F4F1EA] hover:bg-white/[0.02] transition-colors text-start"
-                type="button"
-            >
-                <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-[#D9B978]/10 text-[#D9B978] flex items-center justify-center shrink-0">
-                        <Icon size={20} />
-                    </div>
-                    <span className="font-black text-sm md:text-base">{title}</span>
-                </div>
-                <ChevronDown size={18} className={`text-slate-400 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`} />
-            </button>
-            {isOpen && (
-                <div className="p-6 border-t border-white/5 bg-[#0A0D10]/50 space-y-5 animate-slide-down text-start">
-                    {children}
-                </div>
-            )}
-        </div>
-    );
-  };
 
   if (activeSection === 'wallets') {
     return (
@@ -715,7 +739,13 @@ export default function Settings({
       </div>
 
       <div className="space-y-4">
-         <AccordionItem id="profile" title={t.accountAndEmailSync} icon={User}>
+         <AccordionItem 
+            id="profile" 
+            title={t.accountAndEmailSync} 
+            icon={User}
+            isOpen={openAccordion === 'profile'}
+            onToggle={() => setOpenAccordion(openAccordion === 'profile' ? null : 'profile')}
+         >
             <div className="space-y-4">
                 <div className="space-y-2">
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2 block">{t.accountOwnerName}</label>
@@ -723,6 +753,7 @@ export default function Settings({
                       type="text" 
                       value={localUserName} 
                       onChange={e => setLocalUserName(e.target.value)} 
+                      onBlur={() => onUpdateSettings({ userName: localUserName })}
                       className="w-full p-4 rounded-xl bg-[#0A0D10] text-[#F4F1EA] font-bold border border-white/10 outline-none focus:border-[#D9B978] shadow-inner" 
                     />
                 </div>
@@ -732,7 +763,10 @@ export default function Settings({
                     <div className="grid grid-cols-2 gap-3">
                       <button
                         type="button"
-                        onClick={() => setLocalLanguage('ar')}
+                        onClick={() => {
+                          setLocalLanguage('ar');
+                          onUpdateSettings({ language: 'ar' });
+                        }}
                         className={`p-3.5 rounded-xl border text-xs font-black flex items-center justify-center gap-2 transition-all ${
                           localLanguage === 'ar'
                             ? 'bg-[#D9B978]/20 border-[#D9B978] text-[#D9B978] shadow-lg shadow-[#D9B978]/10'
@@ -744,7 +778,10 @@ export default function Settings({
                       </button>
                       <button
                         type="button"
-                        onClick={() => setLocalLanguage('en')}
+                        onClick={() => {
+                          setLocalLanguage('en');
+                          onUpdateSettings({ language: 'en' });
+                        }}
                         className={`p-3.5 rounded-xl border text-xs font-black flex items-center justify-center gap-2 transition-all ${
                           localLanguage === 'en'
                             ? 'bg-[#D9B978]/20 border-[#D9B978] text-[#D9B978] shadow-lg shadow-[#D9B978]/10'
@@ -773,6 +810,7 @@ export default function Settings({
                         type="email" 
                         value={localUserEmail} 
                         onChange={e => setLocalUserEmail(e.target.value)} 
+                        onBlur={() => onUpdateSettings({ userEmail: localUserEmail })}
                         placeholder="example@domain.com"
                         className="flex-1 p-4 rounded-xl bg-[#0A0D10] text-[#F4F1EA] font-bold border border-white/10 outline-none focus:border-[#D9B978] shadow-inner text-sm dir-ltr text-start" 
                       />
@@ -793,14 +831,32 @@ export default function Settings({
                       type="password" 
                       value={localApiKey} 
                       onChange={e => setLocalApiKey(e.target.value)} 
+                      onBlur={() => onUpdateSettings({ apiKey: localApiKey })}
                       placeholder={t.apiKeyOptionalPlaceholder} 
                       className="text-center w-full p-4 rounded-xl bg-[#0A0D10] text-[#F4F1EA] font-bold border border-white/10 outline-none focus:border-[#D9B978] shadow-inner text-sm" 
                     />
                 </div>
+
+                <div className="pt-2">
+                  <button
+                    type="button"
+                    onClick={handleSaveProfile}
+                    className="w-full py-3.5 bg-[#D9B978] hover:bg-[#D9B978]/90 text-[#0A0D10] rounded-xl font-black text-xs active:scale-95 transition-all flex items-center justify-center gap-2 shadow-lg shadow-[#D9B978]/20"
+                  >
+                    <Check size={16} strokeWidth={3} />
+                    <span>{t.save}</span>
+                  </button>
+                </div>
             </div>
          </AccordionItem>
 
-         <AccordionItem id="security" title={t.securityBiometricWeb} icon={Lock}>
+         <AccordionItem 
+            id="security" 
+            title={t.securityBiometricWeb} 
+            icon={Lock}
+            isOpen={openAccordion === 'security'}
+            onToggle={() => setOpenAccordion(openAccordion === 'security' ? null : 'security')}
+         >
             <div className="space-y-5 divide-y divide-white/5">
                 <div className="pb-4">
                     <button 
@@ -866,11 +922,19 @@ export default function Settings({
                           <input 
                               type="password" 
                               value={localPin} 
-                              onChange={e => setLocalPin(e.target.value.replace(/\D/g, '').slice(0, 4))} 
+                              onChange={e => {
+                                const val = e.target.value.replace(/\D/g, '').slice(0, 4);
+                                setLocalPin(val);
+                                if (val.length === 4) {
+                                  onUpdateSettings({ pin: val });
+                                  showToast('تم حفظ الرمز السري بنجاح');
+                                }
+                              }} 
                               className="w-full p-4 rounded-xl bg-[#0A0D10] text-[#F4F1EA] font-black text-center text-2xl tracking-[0.5em] border border-white/10 focus:border-[#D9B978] focus:outline-none" 
                               placeholder="****" 
                               maxLength={4}
                           />
+                          <p className="text-[10px] text-slate-400 text-center font-bold">أدخل 4 أرقام لتأمين الدخول واستعادة الحساب</p>
                         </div>
                     )}
                 </div>
@@ -920,22 +984,37 @@ export default function Settings({
                   </div>
                 </div>
 
-                {isSecurityEnabled && (
-                  <div className="pt-4 flex flex-col sm:flex-row gap-2">
+                {(isSecurityEnabled || isBiometricEnabled) && (
+                  <div className="pt-4 grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                     <button
                       type="button"
                       onClick={() => handleSaveSecurity(false)}
-                      className="flex-1 py-3 bg-[#D9B978] text-[#0A0D10] rounded-xl font-black text-xs active:scale-95 shadow-md transition-all flex items-center justify-center gap-2"
+                      className="py-3.5 bg-[#D9B978] hover:bg-[#c9a764] text-[#0A0D10] rounded-xl font-black text-xs active:scale-95 shadow-md transition-all flex items-center justify-center gap-2"
                     >
                       <ShieldCheck size={16} />
                       <span>{t.saveSecuritySettings}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleSaveSecurity(true)}
+                      className="py-3.5 bg-[#141B24] hover:bg-[#1C2633] text-[#F4F1EA] border border-white/10 rounded-xl font-bold text-xs active:scale-95 transition-all flex items-center justify-center gap-2"
+                    >
+                      <Lock size={15} className="text-[#D9B978]" />
+                      <span>قفل التطبيق الآن</span>
                     </button>
                   </div>
                 )}
             </div>
          </AccordionItem>
 
-         <AccordionItem id="data" title={t.backupEmailOffline} icon={HardDrive}>
+         <AccordionItem 
+            id="data" 
+            title={t.backupEmailOffline} 
+            icon={HardDrive}
+            isOpen={openAccordion === 'data'}
+            onToggle={() => setOpenAccordion(openAccordion === 'data' ? null : 'data')}
+         >
             <div className="space-y-4">
                  <div className="bg-[#0A0D10] p-4 rounded-2xl border border-white/10 space-y-3">
                    <div className="flex items-center justify-between">
@@ -981,7 +1060,13 @@ export default function Settings({
             </div>
          </AccordionItem>
 
-         <AccordionItem id="notifications" title={t.smartAlertsNotifications} icon={Bell}>
+         <AccordionItem 
+            id="notifications" 
+            title={t.smartAlertsNotifications} 
+            icon={Bell}
+            isOpen={openAccordion === 'notifications'}
+            onToggle={() => setOpenAccordion(openAccordion === 'notifications' ? null : 'notifications')}
+         >
             <div className="space-y-4">
                 <div className="space-y-3">
                     <div className="flex justify-between items-center bg-[#0A0D10] p-3.5 rounded-2xl border border-white/5">
@@ -999,7 +1084,13 @@ export default function Settings({
             </div>
          </AccordionItem>
 
-         <AccordionItem id="store" title={t.storeRatingTitle} icon={Star}>
+         <AccordionItem 
+            id="store" 
+            title={t.storeRatingTitle} 
+            icon={Star}
+            isOpen={openAccordion === 'store'}
+            onToggle={() => setOpenAccordion(openAccordion === 'store' ? null : 'store')}
+         >
             <div className="space-y-3.5">
                 <div className="bg-gradient-to-br from-[#D9B978]/10 to-orange-500/10 p-4 rounded-2xl border border-[#D9B978]/20 flex items-center justify-between">
                     <div className="flex items-center gap-3">
@@ -1030,7 +1121,13 @@ export default function Settings({
             </div>
          </AccordionItem>
 
-         <AccordionItem id="danger" title={t.systemMaintenanceAndClear} icon={Trash2}>
+         <AccordionItem 
+            id="danger" 
+            title={t.systemMaintenanceAndClear} 
+            icon={Trash2}
+            isOpen={openAccordion === 'danger'}
+            onToggle={() => setOpenAccordion(openAccordion === 'danger' ? null : 'danger')}
+         >
             <div className="space-y-4">
                 <p className="text-[10px] text-slate-400 leading-relaxed">
                     {t.clearDataWarning}
