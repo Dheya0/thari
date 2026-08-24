@@ -339,44 +339,59 @@ workflows:
         script: |
           set -e
           npm run build
+          test -f dist/index.html
 
       - name: Capacitor iOS platform preparation and CocoaPods sync
         script: |
           set -e
           if [ ! -f "ios/App/Podfile" ]; then
+            echo "Creating Capacitor iOS project..."
+            rm -rf ios
             npx cap add ios
           fi
           npx cap sync ios
           
-          # تطبيق ملف Info.plist المعتمد إن وجد
+          # تطبيق ملف Info.plist المعتمد
           if [ -f "release/ios/Info.plist" ]; then
             cp -f release/ios/Info.plist ios/App/App/Info.plist
           fi
 
-      - name: Build unsigned iOS app (Bypass Code Signing)
+      - name: Build unsigned iOS archive (Bypass Code Signing)
         script: |
           set -e
           cd ios/App
-          # بناء التطبيق مع إجبار النظام على تجاهل فحص التوقيع والشهادات
-          xcodebuild build \
+          pod install
+          
+          # استخدام xcodebuild archive لتجنب أخطاء تضييق الأصول (asset catalog thinning) وضمان اكتمال الحزمة
+          xcodebuild archive \
             -workspace App.xcworkspace \
             -scheme App \
             -configuration Release \
-            -sdk iphoneos \
-            -derivedDataPath $CM_BUILD_DIR/build \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$CM_BUILD_DIR/App.xcarchive" \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=NO
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGN_ENTITLEMENTS="" \
+            COMPILER_INDEX_STORE_ENABLE=NO
 
       - name: Package to Unsigned IPA
         script: |
           set -e
-          # الدخول لمجلد مخرجات البناء، إنشاء مجلد Payload، وضغطه ليصبح ipa
-          cd $CM_BUILD_DIR/build/Build/Products/Release-iphoneos
+          cd "$CM_BUILD_DIR"
+          rm -rf Payload thari_unsigned_app.ipa
           mkdir -p Payload
-          mv App.app Payload/
-          zip -r ../../../../thari_unsigned_app.ipa Payload
+          cp -R App.xcarchive/Products/Applications/App.app Payload/
+          zip -qr thari_unsigned_app.ipa Payload
+          echo "Unsigned IPA package created successfully at $CM_BUILD_DIR/thari_unsigned_app.ipa"
           
     artifacts:
       - thari_unsigned_app.ipa
+    publishing:
+      email:
+        recipients:
+          - Dia840990@gmail.com
+        notify:
+          success: true
+          failure: true
 
