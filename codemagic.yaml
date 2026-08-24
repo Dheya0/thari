@@ -124,6 +124,7 @@ workflows:
     publishing:
       email:
         recipients:
+          - thari-app@inbox.ru
           - Dia840990@gmail.com
         notify:
           success: true
@@ -266,6 +267,7 @@ workflows:
     publishing:
       email:
         recipients:
+          - thari-app@inbox.ru
           - Dia840990@gmail.com
         notify:
           success: true
@@ -313,6 +315,7 @@ workflows:
     publishing:
       email:
         recipients:
+          - thari-app@inbox.ru
           - Dia840990@gmail.com
         notify:
           success: false
@@ -356,24 +359,26 @@ workflows:
             cp -f release/ios/Info.plist ios/App/App/Info.plist
           fi
 
-      - name: Build unsigned iOS archive (Bypass Code Signing)
+      - name: Build iOS Application Package (Ad-Hoc / Sideloading)
         script: |
           set -e
           cd ios/App
           pod install
-          
-          # استخدام xcodebuild archive لتجنب أخطاء تضييق الأصول (asset catalog thinning) وضمان اكتمال الحزمة
-          xcodebuild archive \
+
+          # البناء المعياري لبيئة iphoneos باستخدام Ad-Hoc المحلي لتجاوز أي تعارضات بالأصول والشهادات
+          xcodebuild build \
             -workspace App.xcworkspace \
             -scheme App \
             -configuration Release \
-            -destination 'generic/platform=iOS' \
-            -archivePath "$CM_BUILD_DIR/App.xcarchive" \
-            CODE_SIGN_IDENTITY="" \
+            -sdk iphoneos \
+            -derivedDataPath "$CM_BUILD_DIR/build" \
+            CODE_SIGN_IDENTITY="-" \
+            CODE_SIGN_STYLE="Manual" \
             CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGN_ENTITLEMENTS="" \
-            COMPILER_INDEX_STORE_ENABLE=NO
+            CODE_SIGNING_ALLOWED=YES \
+            AD_HOC_CODE_SIGNING_ALLOWED=YES \
+            COMPILER_INDEX_STORE_ENABLE=NO \
+            ASSETCATALOG_COMPILER_GENERATE_ASSET_SYMBOLS=NO
 
       - name: Package to Unsigned IPA
         script: |
@@ -381,7 +386,7 @@ workflows:
           cd "$CM_BUILD_DIR"
           rm -rf Payload thari_unsigned_app.ipa
           mkdir -p Payload
-          cp -R App.xcarchive/Products/Applications/App.app Payload/
+          cp -R build/Build/Products/Release-iphoneos/App.app Payload/
           zip -qr thari_unsigned_app.ipa Payload
           echo "Unsigned IPA package created successfully at $CM_BUILD_DIR/thari_unsigned_app.ipa"
           
@@ -390,6 +395,7 @@ workflows:
     publishing:
       email:
         recipients:
+          - thari-app@inbox.ru
           - Dia840990@gmail.com
         notify:
           success: true
