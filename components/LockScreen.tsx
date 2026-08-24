@@ -209,28 +209,28 @@ const LockScreen: React.FC<LockScreenProps> = ({
   const BiometricIcon = isFaceId ? ScanFace : Fingerprint;
 
   return (
-    <div className="fixed inset-0 bg-slate-950 z-[9999] flex flex-col items-center justify-center p-6 sm:p-8 select-none overflow-y-auto">
-      <div className="absolute inset-0 bg-gradient-to-b from-amber-500/10 via-transparent to-slate-950 pointer-events-none" />
+    <div className="fixed inset-0 bg-[#0A0D10] text-[#F4F1EA] z-[9999] flex flex-col items-center justify-center p-6 sm:p-8 select-none overflow-y-auto">
+      <div className="absolute inset-0 bg-gradient-to-b from-[#D9B978]/10 via-transparent to-[#0A0D10] pointer-events-none" />
       
       <div className="mb-4 sm:mb-6 text-center space-y-1.5 relative z-10">
         <Logo size={64} />
-        <div className="flex items-center justify-center gap-1.5 text-amber-500 mt-2">
+        <div className="flex items-center justify-center gap-1.5 text-[#D9B978] mt-2">
           <ShieldCheck size={16} />
-          <span className="text-[11px] font-black uppercase tracking-widest">نظام حماية ثري المشفر</span>
+          <span className="text-[11px] font-bold uppercase tracking-widest">نظام حماية ثري المشفر</span>
         </div>
       </div>
 
       <div className="space-y-4 sm:space-y-5 text-center w-full max-w-xs relative z-10">
         <div>
-          <h2 className="text-xl font-black text-white">أدخل رمز الدخول السري</h2>
-          <p className="text-xs text-slate-400 font-bold mt-0.5">لحماية بياناتك ومعاملاتك المالية</p>
+          <h2 className="text-xl font-bold text-[#F4F1EA]">أدخل رمز الدخول السري</h2>
+          <p className="text-xs text-slate-400 font-medium mt-0.5">لحماية بياناتك ومعاملاتك المالية</p>
         </div>
 
         {/* Rate Limiting Cooldown Banner */}
         {cooldownRemaining > 0 && (
-          <div className="bg-rose-950/60 border border-rose-500/50 py-2 px-3.5 rounded-2xl flex items-center justify-center gap-2 text-rose-300 animate-pulse">
-            <Timer size={16} className="shrink-0 text-rose-400" />
-            <span className="text-xs font-black">انتظر {cooldownRemaining} ثانية لإعادة المحاولة</span>
+          <div className="bg-[#C98387]/15 border border-[#C98387]/40 py-2 px-3.5 rounded-2xl flex items-center justify-center gap-2 text-[#C98387] animate-pulse">
+            <Timer size={16} className="shrink-0 text-[#C98387]" />
+            <span className="text-xs font-bold">انتظر {cooldownRemaining} ثانية لإعادة المحاولة</span>
           </div>
         )}
 
@@ -238,19 +238,19 @@ const LockScreen: React.FC<LockScreenProps> = ({
         {biometricAvailable && isBiometricEnabled && cooldownRemaining === 0 && (
           <div className="transition-all duration-300">
             {bioStatus === 'scanning' && (
-              <div className="flex items-center justify-center gap-2.5 bg-emerald-950/40 border border-emerald-500/40 py-2.5 px-4 rounded-2xl shadow-[0_0_20px_rgba(16,185,129,0.15)] animate-pulse">
+              <div className="flex items-center justify-center gap-2.5 bg-[#8EB9A7]/15 border border-[#8EB9A7]/40 py-2.5 px-4 rounded-2xl shadow-[0_0_20px_rgba(142,185,167,0.15)] animate-pulse">
                 <div className="relative flex items-center justify-center">
-                  <BiometricIcon size={22} className="text-emerald-400 animate-spin-slow" />
-                  <span className="absolute -inset-1 rounded-full border-2 border-emerald-400/50 animate-ping opacity-60 pointer-events-none" />
+                  <BiometricIcon size={22} className="text-[#8EB9A7] animate-spin-slow" />
+                  <span className="absolute -inset-1 rounded-full border-2 border-[#8EB9A7]/50 animate-ping opacity-60 pointer-events-none" />
                 </div>
-                <span className="text-xs font-bold text-emerald-300">{bioFeedback}</span>
+                <span className="text-xs font-bold text-[#8EB9A7]">{bioFeedback}</span>
               </div>
             )}
 
             {bioStatus === 'success' && (
-              <div className="flex items-center justify-center gap-2 bg-emerald-500/20 border border-emerald-500/50 py-2.5 px-4 rounded-2xl shadow-lg">
-                <CheckCircle2 size={20} className="text-emerald-400" />
-                <span className="text-xs font-black text-emerald-300">تم التحقق بنجاح، جاري الدخول...</span>
+              <div className="flex items-center justify-center gap-2 bg-[#8EB9A7]/20 border border-[#8EB9A7]/50 py-2.5 px-4 rounded-2xl shadow-lg">
+                <CheckCircle2 size={20} className="text-[#8EB9A7]" />
+                <span className="text-xs font-bold text-[#8EB9A7]">تم التحقق بنجاح، جاري الدخول...</span>
               </div>
             )}
 
@@ -258,13 +258,13 @@ const LockScreen: React.FC<LockScreenProps> = ({
               <button
                 type="button"
                 onClick={() => triggerBiometricAuth(false)}
-                className="w-full flex items-center justify-between bg-rose-950/40 border border-rose-500/40 py-2.5 px-4 rounded-2xl shadow-[0_0_15px_rgba(244,63,94,0.15)] active:scale-95 transition-transform group text-right"
+                className="w-full flex items-center justify-between bg-[#C98387]/15 border border-[#C98387]/40 py-2.5 px-4 rounded-2xl shadow-[0_0_15px_rgba(201,131,135,0.15)] active:scale-95 transition-transform group text-right"
               >
-                <div className="flex items-center gap-2 text-rose-300">
-                  <AlertCircle size={18} className="shrink-0 text-rose-400" />
+                <div className="flex items-center gap-2 text-[#C98387]">
+                  <AlertCircle size={18} className="shrink-0 text-[#C98387]" />
                   <span className="text-xs font-bold leading-tight">{bioFeedback}</span>
                 </div>
-                <span className="flex items-center gap-1 text-[11px] font-black text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-1 rounded-xl shrink-0">
+                <span className="flex items-center gap-1 text-[11px] font-bold text-[#D9B978] bg-[#D9B978]/10 border border-[#D9B978]/20 px-2 py-1 rounded-xl shrink-0">
                   <RefreshCw size={12} className="group-hover:rotate-180 transition-transform duration-500" />
                   إعادة
                 </span>
@@ -275,7 +275,7 @@ const LockScreen: React.FC<LockScreenProps> = ({
               <button
                 type="button"
                 onClick={() => triggerBiometricAuth(false)}
-                className="w-full flex items-center justify-center gap-2 bg-slate-900/90 border border-emerald-500/30 hover:border-emerald-500/60 py-2.5 px-4 rounded-2xl text-emerald-400 active:scale-95 transition-all shadow-md group"
+                className="w-full flex items-center justify-center gap-2 bg-[#11161C] border border-[#8EB9A7]/30 hover:border-[#8EB9A7]/60 py-2.5 px-4 rounded-2xl text-[#8EB9A7] active:scale-95 transition-all shadow-md group"
               >
                 <BiometricIcon size={18} className="group-hover:scale-110 transition-transform" />
                 <span className="text-xs font-bold">الفتح بـ {biometricType}</span>
@@ -291,15 +291,15 @@ const LockScreen: React.FC<LockScreenProps> = ({
               key={i} 
               className={`w-4 h-4 rounded-full border-2 transition-all duration-300 ${
                 input.length > i 
-                  ? 'bg-amber-500 border-amber-500 scale-125 shadow-[0_0_12px_rgba(245,158,11,0.6)]' 
-                  : 'border-slate-700 bg-slate-900/60'
-              } ${error ? 'border-rose-500 bg-rose-500 animate-bounce shadow-[0_0_12px_rgba(244,63,94,0.8)]' : ''}`}
+                  ? 'bg-[#D9B978] border-[#D9B978] scale-125 shadow-[0_0_12px_rgba(217,185,120,0.6)]' 
+                  : 'border-white/10 bg-[#11161C]'
+              } ${error ? 'border-[#C98387] bg-[#C98387] animate-bounce shadow-[0_0_12px_rgba(201,131,135,0.8)]' : ''}`}
             />
           ))}
         </div>
 
         {errorMessage && (
-          <p className="text-xs font-bold text-rose-400 flex items-center justify-center gap-1.5 animate-shake text-center">
+          <p className="text-xs font-bold text-[#C98387] flex items-center justify-center gap-1.5 animate-shake text-center">
             <AlertCircle size={14} className="shrink-0" />
             <span>{errorMessage}</span>
           </p>
@@ -320,15 +320,15 @@ const LockScreen: React.FC<LockScreenProps> = ({
                   title="الفتح بالبصمة أو Face ID"
                   className={`w-16 h-16 sm:w-18 sm:h-18 rounded-full border flex items-center justify-center transition-all active:scale-90 shadow-md mx-auto relative ${
                     isScanning
-                      ? 'bg-emerald-500/20 border-emerald-400 text-emerald-300 ring-2 ring-emerald-500/40 animate-pulse'
+                      ? 'bg-[#8EB9A7]/20 border-[#8EB9A7] text-[#8EB9A7] ring-2 ring-[#8EB9A7]/40 animate-pulse'
                       : isFailed
-                      ? 'bg-rose-500/10 border-rose-500/40 text-rose-400 hover:bg-rose-500/20'
-                      : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 active:bg-emerald-500 active:text-slate-950 disabled:opacity-30'
+                      ? 'bg-[#C98387]/15 border-[#C98387]/40 text-[#C98387] hover:bg-[#C98387]/25'
+                      : 'bg-[#8EB9A7]/10 border-[#8EB9A7]/30 text-[#8EB9A7] active:bg-[#8EB9A7] active:text-[#0A0D10] disabled:opacity-30'
                   }`}
                 >
                   <BiometricIcon size={28} className={isScanning ? 'animate-pulse scale-110' : ''} />
                   {isScanning && (
-                    <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-emerald-500 rounded-full animate-ping" />
+                    <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-[#8EB9A7] rounded-full animate-ping" />
                   )}
                 </button>
               );
@@ -344,7 +344,7 @@ const LockScreen: React.FC<LockScreenProps> = ({
                     setErrorMessage('');
                   }}
                   title="مسح"
-                  className="w-16 h-16 sm:w-18 sm:h-18 rounded-full flex items-center justify-center text-slate-400 active:bg-slate-900 active:scale-90 transition-all mx-auto disabled:opacity-30"
+                  className="w-16 h-16 sm:w-18 sm:h-18 rounded-full flex items-center justify-center text-slate-400 active:bg-[#11161C] active:scale-90 transition-all mx-auto disabled:opacity-30"
                 >
                   <ChevronLeft size={26} />
                 </button>
@@ -356,7 +356,7 @@ const LockScreen: React.FC<LockScreenProps> = ({
                 type="button"
                 disabled={cooldownRemaining > 0}
                 onClick={() => handleKeyPress(key)}
-                className="w-16 h-16 sm:w-18 sm:h-18 rounded-full bg-slate-900/80 border border-slate-800 flex items-center justify-center text-2xl font-black text-white hover:border-amber-500/40 active:bg-amber-500 active:text-slate-950 transition-all active:scale-90 shadow-sm mx-auto disabled:opacity-30"
+                className="w-16 h-16 sm:w-18 sm:h-18 rounded-full bg-[#11161C] border border-white/[0.08] flex items-center justify-center text-2xl font-bold text-[#F4F1EA] hover:border-[#D9B978]/40 active:bg-[#D9B978] active:text-[#0A0D10] transition-all active:scale-90 shadow-sm mx-auto disabled:opacity-30"
               >
                 {key}
               </button>

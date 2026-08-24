@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Check, X, Wallet as WalletIcon, Layers, Plus } from 'lucide-react';
 import { Wallet } from '../types';
+import { getLocalizedCurrency, LanguageKey } from '../utils/translations';
 
 interface WalletSelectorModalProps {
   isOpen: boolean;
@@ -10,7 +11,8 @@ interface WalletSelectorModalProps {
   selectedWalletId: string | null;
   onSelectWallet: (walletId: string | null) => void;
   onOpenSettingsWallets?: () => void;
-  language?: 'ar' | 'en';
+  language?: LanguageKey;
+  t: any;
 }
 
 export const WalletSelectorModal: React.FC<WalletSelectorModalProps> = ({
@@ -20,10 +22,10 @@ export const WalletSelectorModal: React.FC<WalletSelectorModalProps> = ({
   selectedWalletId,
   onSelectWallet,
   onOpenSettingsWallets,
-  language = 'ar'
+  language = 'ar',
+  t
 }) => {
   const modalRef = useRef<HTMLDivElement>(null);
-  const isEn = language === 'en';
 
   // Close on Escape
   useEffect(() => {
@@ -57,8 +59,7 @@ export const WalletSelectorModal: React.FC<WalletSelectorModalProps> = ({
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: -10 }}
           transition={{ duration: 0.2 }}
-          className={`relative w-full max-w-md bg-[#0F141C] border border-[#8EB9A7]/30 rounded-2xl md:rounded-3xl shadow-[0_10px_40px_rgba(0,0,0,0.8)] overflow-hidden z-10 flex flex-col max-h-[85vh] ${isEn ? 'text-left font-sans' : 'text-right font-sans'}`}
-          dir={isEn ? 'ltr' : 'rtl'}
+          className="relative w-full max-w-md bg-[#0F141C] border border-[#8EB9A7]/30 rounded-2xl md:rounded-3xl shadow-[0_10px_40px_rgba(0,0,0,0.8)] overflow-hidden z-10 flex flex-col max-h-[85vh] font-sans"
         >
           {/* Header */}
           <div className="p-4 sm:p-5 border-b border-white/[0.08] flex items-center justify-between bg-[#141B24]">
@@ -68,17 +69,17 @@ export const WalletSelectorModal: React.FC<WalletSelectorModalProps> = ({
               </div>
               <div>
                 <h3 className="text-base font-bold text-white tracking-tight">
-                  {isEn ? 'Wallets & Accounts Management' : 'إدارة وعرض المحافظ والحسابات'}
+                  {t.walletAccounts}
                 </h3>
                 <p className="text-xs text-slate-300 mt-0.5">
-                  {isEn ? 'Choose to view all wallets consolidated or filter transactions' : 'اختر عرض جميع المحافظ مجمعة أو تصفية المعاملات حسب محفظة معينة'}
+                  {t.selectWalletOrAll}
                 </p>
               </div>
             </div>
             <button
               onClick={onClose}
               className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
-              title={isEn ? 'Close' : 'إغلاق'}
+              title={t.close}
             >
               <X size={18} />
             </button>
@@ -93,7 +94,7 @@ export const WalletSelectorModal: React.FC<WalletSelectorModalProps> = ({
                 onSelectWallet(null);
                 onClose();
               }}
-              className={`w-full p-3.5 rounded-2xl border ${isEn ? 'text-left' : 'text-right'} transition-all flex items-center justify-between group ${
+              className={`w-full p-3.5 rounded-2xl border transition-all flex items-center justify-between group ${
                 selectedWalletId === null
                   ? 'bg-gradient-to-r from-[#8EB9A7]/20 via-[#141B24] to-[#141B24] border-[#8EB9A7] ring-1 ring-[#8EB9A7]/40 shadow-md'
                   : 'bg-[#141B24] hover:bg-[#1A232E] border-white/10 hover:border-white/20'
@@ -105,12 +106,12 @@ export const WalletSelectorModal: React.FC<WalletSelectorModalProps> = ({
                 }`}>
                   <Layers size={18} />
                 </div>
-                <div>
+                <div className="text-start">
                   <h4 className="text-sm font-bold text-white group-hover:text-[#8EB9A7] transition-colors">
-                    {isEn ? 'All Wallets (Consolidated & Total View)' : 'جميع المحافظ (عرض مدمج وإجمالي)'}
+                    {t.allWallets}
                   </h4>
                   <p className="text-[11px] text-slate-400">
-                    {isEn ? 'Merge all accounts and balances into one comprehensive view' : 'دمج كافة الحسابات والأرصدة في عرض واحد شامل'}
+                    {t.consolidatedView}
                   </p>
                 </div>
               </div>
@@ -133,7 +134,7 @@ export const WalletSelectorModal: React.FC<WalletSelectorModalProps> = ({
                     onSelectWallet(wallet.id);
                     onClose();
                   }}
-                  className={`w-full p-3.5 rounded-2xl border ${isEn ? 'text-left' : 'text-right'} transition-all flex items-center justify-between group ${
+                  className={`w-full p-3.5 rounded-2xl border transition-all flex items-center justify-between group ${
                     isSelected
                       ? 'bg-gradient-to-r from-[#8EB9A7]/20 via-[#141B24] to-[#141B24] border-[#8EB9A7] ring-1 ring-[#8EB9A7]/40 shadow-md'
                       : 'bg-[#141B24] hover:bg-[#1A232E] border-white/10 hover:border-white/20'
@@ -146,12 +147,12 @@ export const WalletSelectorModal: React.FC<WalletSelectorModalProps> = ({
                     >
                       <WalletIcon size={16} />
                     </div>
-                    <div>
+                    <div className="text-start">
                       <h4 className="text-sm font-bold text-white group-hover:text-[#8EB9A7] transition-colors">
                         {wallet.name}
                       </h4>
                       <p className="text-[11px] text-slate-400 capitalize">
-                        {wallet.type === 'bank' ? (isEn ? 'Bank Account' : 'حساب بنكي') : wallet.type === 'cash' ? (isEn ? 'Cash' : 'نقد (كاش)') : wallet.type === 'savings' ? (isEn ? 'Savings' : 'حساب توفير') : (isEn ? 'Investment' : 'استثمار وأصول')} • {wallet.currencyCode}
+                        {wallet.type === 'bank' ? (t.bankAccount || 'حساب بنكي') : wallet.type === 'cash' ? (t.cashWallet || 'نقد (كاش)') : wallet.type === 'savings' ? (t.savingsAccount || 'حساب توفير') : (t.investmentAssets || 'استثمار وأصول')} • {getLocalizedCurrency(wallet.currencyCode, wallet.currencyCode, undefined, language || 'ar').symbol} ({wallet.currencyCode})
                       </p>
                     </div>
                   </div>
@@ -167,7 +168,7 @@ export const WalletSelectorModal: React.FC<WalletSelectorModalProps> = ({
 
             {wallets.length === 0 && (
               <div className="p-6 text-center text-slate-400 text-xs">
-                {isEn ? 'No wallets added yet. You can add wallets from account settings.' : 'لا توجد محافظ مضافة حالياً. يمكنك إتمام إضافة محافظ من إعدادات الحسابات.'}
+                {t.noWalletsFound || 'لا توجد محافظ مضافة حالياً. يمكنك إضافة محافظ من إعدادات الحسابات.'}
               </div>
             )}
           </div>
@@ -175,7 +176,7 @@ export const WalletSelectorModal: React.FC<WalletSelectorModalProps> = ({
           {/* Footer actions */}
           <div className="p-3 sm:p-4 bg-[#141B24] border-t border-white/[0.08] flex items-center justify-between">
             <span className="text-xs text-slate-400">
-              {isEn ? 'Total Wallets: ' : 'إجمالي المحافظ: '} <strong className="text-white font-numeric">{wallets.length}</strong>
+              {t.totalWalletsCount ? t.totalWalletsCount.replace('{count}', String(wallets.length)) : `إجمالي المحافظ: ${wallets.length}`}
             </span>
             {onOpenSettingsWallets && (
               <button
@@ -186,7 +187,7 @@ export const WalletSelectorModal: React.FC<WalletSelectorModalProps> = ({
                 className="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-200 text-xs font-bold transition-colors flex items-center gap-1.5 border border-white/10"
               >
                 <Plus size={14} />
-                <span>{isEn ? 'Manage Wallets in Settings' : 'إدارة المحافظ في الإعدادات'}</span>
+                <span>{t.manageWalletsSettings || 'إدارة المحافظ في الإعدادات'}</span>
               </button>
             )}
           </div>

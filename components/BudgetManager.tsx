@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Target, TriangleAlert, Award, TrendingUp, Sparkles, AlertCircle, Coins, ShieldCheck, Play } from 'lucide-react';
 import { Budget, Category, Transaction } from '../types';
+import { getLocalizedCurrency, getTranslation, LanguageKey } from '../utils/translations';
 
 interface BudgetManagerProps {
   budgets: Budget[];
@@ -8,11 +9,28 @@ interface BudgetManagerProps {
   transactions: Transaction[];
   onSetBudget: (catId: string, amount: number) => void;
   currencySymbol: string;
+  currencyCode?: string;
+  language?: LanguageKey;
 }
 
-const BudgetManager: React.FC<BudgetManagerProps> = ({ budgets, categories, transactions, onSetBudget, currencySymbol }) => {
+const BudgetManager: React.FC<BudgetManagerProps> = ({ 
+  budgets, 
+  categories, 
+  transactions, 
+  onSetBudget, 
+  currencySymbol,
+  currencyCode = 'SAR',
+  language = 'ar'
+}) => {
+  const t = getTranslation(language);
+  const isRtl = language === 'ar';
   const [selectedCat, setSelectedCat] = useState('');
   const [amount, setAmount] = useState('');
+
+  const locCurr = useMemo(() => {
+    return getLocalizedCurrency(currencyCode, undefined, currencySymbol, language);
+  }, [currencyCode, currencySymbol, language]);
+  const resolvedSymbol = locCurr.symbol;
 
   const expenseCategories = categories.filter(c => c.type === 'expense');
 
@@ -159,7 +177,7 @@ const BudgetManager: React.FC<BudgetManagerProps> = ({ budgets, categories, tran
                 onChange={e => setAmount(e.target.value)}
                 className="w-full p-3.5 rounded-xl bg-slate-950 border border-white/5 outline-none text-white font-black text-xs"
               />
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-500">{currencySymbol}</span>
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-500">{resolvedSymbol}</span>
             </div>
             <button 
               onClick={() => {
@@ -171,7 +189,7 @@ const BudgetManager: React.FC<BudgetManagerProps> = ({ budgets, categories, tran
               }}
               className="bg-indigo-500 hover:bg-indigo-600 text-slate-950 px-5 font-black text-xs rounded-xl active:scale-95 transition-all shadow-lg hover:shadow-indigo-500/20"
             >
-              حفظ وتطبيق
+              {isRtl ? 'حفظ وتطبيق' : 'Save & Apply'}
             </button>
           </div>
         </div>
@@ -179,11 +197,11 @@ const BudgetManager: React.FC<BudgetManagerProps> = ({ budgets, categories, tran
 
       {/* Monitoring Budgets with high design fidelity */}
       <div className="space-y-4">
-        <h4 className="font-black text-white px-2 text-xs uppercase tracking-widest text-slate-500">رصد حدود الإنفاق والتشغيل الحالية بالبوابات</h4>
+        <h4 className="font-black text-white px-2 text-xs uppercase tracking-widest text-slate-500">{isRtl ? 'رصد حدود الإنفاق والتشغيل الحالية بالبوابات' : 'Current Spending Limits'}</h4>
         
         {budgetStats.length === 0 && (
           <div className="text-center py-12 bg-slate-900/20 rounded-2xl border-2 border-dashed border-white/5">
-            <p className="text-slate-500 font-bold text-xs">لا توجد حدود إنفاق تشغيلية محددة حالياً.</p>
+            <p className="text-slate-500 font-bold text-xs">{isRtl ? 'لا توجد حدود إنفاق تشغيلية محددة حالياً.' : 'No active budget limits set.'}</p>
           </div>
         )}
         
@@ -203,16 +221,16 @@ const BudgetManager: React.FC<BudgetManagerProps> = ({ budgets, categories, tran
                     </div>
                     <div>
                       <span className="font-black text-white text-sm block leading-none mb-1">{b.category?.name}</span>
-                      {isCritical && <span className="text-[9px] font-black text-rose-500 uppercase tracking-widest">تجاوز لسقف الميزانية المعتمد!</span>}
-                      {isWarning && !isCritical && <span className="text-[9px] font-black text-amber-500 uppercase tracking-widest">تنبيه بالاقتراب من السقف</span>}
+                      {isCritical && <span className="text-[9px] font-black text-rose-500 uppercase tracking-widest">{isRtl ? 'تجاوز لسقف الميزانية المعتمد!' : 'Budget Limit Exceeded!'}</span>}
+                      {isWarning && !isCritical && <span className="text-[9px] font-black text-amber-500 uppercase tracking-widest">{isRtl ? 'تنبيه بالاقتراب من السقف' : 'Approaching Budget Limit'}</span>}
                     </div>
                   </div>
-                  <div className="text-left leading-none">
+                  <div className="text-start sm:text-end leading-none">
                      <p className="text-xs font-black text-white">
-                      {b.spent.toLocaleString()} / {b.amount.toLocaleString()} <span className="text-[10px] text-slate-500">{currencySymbol}</span>
+                      {b.spent.toLocaleString()} / {b.amount.toLocaleString()} <span className="text-[10px] text-slate-500">{resolvedSymbol}</span>
                     </p>
                     <p className={`text-[11px] font-bold mt-1.5 ${isCritical ? 'text-rose-500' : 'text-slate-400'}`}>
-                      {isCritical ? 'سقف مستهلك' : `تبقي ${(b.amount - b.spent).toLocaleString()} ${currencySymbol}`}
+                      {isCritical ? (isRtl ? 'سقف مستهلك' : 'Limit exceeded') : (isRtl ? `تبقي ${(b.amount - b.spent).toLocaleString()} ${resolvedSymbol}` : `Remaining ${(b.amount - b.spent).toLocaleString()} ${resolvedSymbol}`)}
                     </p>
                   </div>
                 </div>

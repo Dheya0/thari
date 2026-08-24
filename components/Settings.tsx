@@ -1,34 +1,28 @@
-
 import React, { useState, useRef } from 'react';
 import { Capacitor } from '@capacitor/core';
-import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
-import { Share } from '@capacitor/share';
 import { 
   Trash2, User, Wallet as WalletIcon, Lock, Upload, Edit2, Plus, Tag, Coins, X, Check, Printer, FileDown, ChevronDown, AlertCircle, AlertTriangle, FileSpreadsheet, Code, ChevronLeft, Palette, Type,
   ChevronRight, TrendingUp, ShieldCheck, ShieldAlert, Key, Unlock, Smartphone, RefreshCw, Plane, Sparkles, FileText, Bell, Star, Fingerprint, MessageSquare, Heart, Send, HelpCircle, CheckCircle2,
   Mail, HardDrive, Shield, Activity, Clock, Laptop, ScanFace, FileCheck, Share2
 } from 'lucide-react';
 import { Currency, Wallet, Category, Transaction } from '../types';
-import { getTranslation } from '../utils/translations';
+import { getTranslation, getLocalizedCurrency } from '../utils/translations';
 import { encryptData, decryptData } from '../services/encryptionService';
 import { authenticateBiometrics, checkBiometricAvailable } from '../services/biometricService';
 import { getIcon, DEFAULT_EXCHANGE_RATES } from '../constants';
 import { buildExecutiveCSVContent, exportAndShareExecutiveCSV } from '../utils/exportHelper';
-import { ReleaseAuditModal } from './ReleaseAuditModal';
 
-const COLORS = ['#f59e0b', '#10b981', '#3b82f6', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16', '#f43f5e', '#64748b'];
+const COLORS = ['#D9B978', '#10b981', '#3b82f6', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16', '#f43f5e', '#64748b'];
 const ICONS = ['Utensils', 'Car', 'Home', 'Receipt', 'Film', 'HeartPulse', 'GraduationCap', 'Briefcase', 'Wallet', 'CreditCard', 'ShoppingBag', 'Gift', 'PiggyBank', 'Coffee', 'Zap', 'Bus', 'Plane', 'Smartphone', 'ShieldCheck'];
 
-// --- Reusable Helper Components ---
-// (Same helper components as before: Modal, InputField, ActionButton, ColorPicker, ToastNotification, ConfirmDialog)
 const Modal = ({ title, children, onClose }: { title: string, children?: React.ReactNode, onClose: () => void }) => (
-    <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-[400] flex items-center justify-center p-3 sm:p-4 animate-fade no-print overflow-hidden">
-        <div className="bg-slate-900 w-full max-w-lg mx-auto rounded-3xl p-5 sm:p-7 shadow-2xl border border-white/10 animate-slide-up flex flex-col max-h-[85vh] sm:max-h-[88vh] overflow-hidden">
+    <div className="fixed inset-0 bg-[#0A0D10]/80 backdrop-blur-md z-[400] flex items-center justify-center p-3 sm:p-4 animate-fade no-print overflow-hidden">
+        <div className="bg-[#11161C] w-full max-w-lg mx-auto rounded-3xl p-5 sm:p-7 shadow-2xl border border-white/10 animate-slide-up flex flex-col max-h-[85vh] sm:max-h-[88vh] overflow-hidden">
             <div className="flex justify-between items-center mb-4 sm:mb-6 shrink-0 pb-3 border-b border-white/5">
-                <h3 className="text-lg sm:text-xl font-black text-white tracking-tight">{title}</h3>
-                <button onClick={onClose} className="p-2.5 bg-slate-800/80 hover:bg-slate-700 rounded-2xl text-slate-400 hover:text-white active:scale-90 transition-all"><X size={18} /></button>
+                <h3 className="text-lg sm:text-xl font-black text-[#F4F1EA] tracking-tight">{title}</h3>
+                <button onClick={onClose} className="p-2.5 bg-[#0A0D10] hover:bg-[#11161C] rounded-2xl text-slate-400 hover:text-white active:scale-90 transition-all"><X size={18} /></button>
             </div>
-            <div className="flex-1 overflow-y-auto custom-scrollbar space-y-4 min-h-0 pr-1 pl-1">
+            <div className="flex-1 overflow-y-auto custom-scrollbar space-y-4 min-h-0 px-1">
                 {children}
             </div>
         </div>
@@ -37,13 +31,13 @@ const Modal = ({ title, children, onClose }: { title: string, children?: React.R
 
 const InputField = ({ label, value, onChange, placeholder, ...props }: any) => (
     <div className="space-y-2">
-        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2">{label}</label>
+        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">{label}</label>
         <input 
             type="text" 
             value={value} 
             onChange={e => onChange(e.target.value)} 
             placeholder={placeholder} 
-            className="w-full p-5 rounded-2xl bg-slate-950 border border-slate-800 text-white font-bold outline-none focus:border-amber-500 transition-all shadow-inner"
+            className="w-full p-4 rounded-2xl bg-[#0A0D10] border border-white/10 text-[#F4F1EA] font-bold outline-none focus:border-[#D9B978] transition-all shadow-inner text-start"
             {...props}
         />
     </div>
@@ -52,17 +46,17 @@ const InputField = ({ label, value, onChange, placeholder, ...props }: any) => (
 const ActionButton = ({ label, onClick, variant = 'primary' }: any) => (
     <button 
       onClick={onClick} 
-      className={`w-full py-6 font-black rounded-[2.2rem] text-lg shadow-xl active:scale-95 transition-all mt-4 ${
-        variant === 'primary' ? 'bg-amber-500 text-slate-950 shadow-amber-500/10' : 'bg-slate-800 text-white border border-white/5'
+      className={`w-full py-4 font-black rounded-2xl text-base shadow-xl active:scale-95 transition-all mt-4 ${
+        variant === 'primary' ? 'bg-[#D9B978] text-[#0A0D10] shadow-[#D9B978]/10 hover:bg-[#c9a764]' : 'bg-[#0A0D10] text-[#F4F1EA] border border-white/10'
       }`}
     >
         {label}
     </button>
 );
 
-const ColorPicker = ({ selected, onSelect }: { selected: string, onSelect: (c: string) => void }) => (
+const ColorPicker = ({ selected, onSelect, t }: { selected: string, onSelect: (c: string) => void, t: any }) => (
     <div className="space-y-3">
-        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2 flex items-center gap-2"><Palette size={14} /> اللون المميز</label>
+        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2 flex items-center gap-2"><Palette size={14} /> {t.colorHighlight}</label>
         <div className="flex gap-3 overflow-x-auto no-scrollbar p-1">
             {COLORS.map(color => (
                 <button key={color} onClick={() => onSelect(color)} className={`w-10 h-10 rounded-full border-4 transition-all shrink-0 ${selected === color ? 'border-white scale-125 shadow-lg' : 'border-transparent'}`} style={{ backgroundColor: color }} />
@@ -74,30 +68,30 @@ const ColorPicker = ({ selected, onSelect }: { selected: string, onSelect: (c: s
 const ToastNotification = ({ toast }: { toast: { message: string, type: 'success' | 'error' } | null }) => {
   if (!toast) return null;
   return (
-    <div className={`fixed top-6 left-1/2 -translate-x-1/2 px-6 py-3 rounded-2xl shadow-2xl z-[500] flex items-center gap-3 animate-fade ${toast.type === 'success' ? 'bg-emerald-500 text-white' : 'bg-rose-500 text-white'}`}>
+    <div className={`fixed top-6 start-1/2 -translate-x-1/2 px-6 py-3 rounded-2xl shadow-2xl z-[500] flex items-center gap-3 animate-fade ${toast.type === 'success' ? 'bg-emerald-500 text-white' : 'bg-rose-500 text-white'}`}>
       {toast.type === 'success' ? <Check size={18} /> : <AlertCircle size={18} />}
       <span className="font-bold text-sm">{toast.message}</span>
     </div>
   );
 };
 
-const ConfirmDialog = ({ confirmData, onCancel }: { confirmData: { message: string, action: () => void, title?: string, type?: 'danger' | 'info' } | null, onCancel: () => void }) => {
+const ConfirmDialog = ({ confirmData, onCancel, t }: { confirmData: { message: string, action: () => void, title?: string, type?: 'danger' | 'info' } | null, onCancel: () => void, t: any }) => {
   if (!confirmData) return null;
   const isDanger = confirmData.type === 'danger';
   
   return (
-    <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[500] flex items-center justify-center p-4 animate-fade">
-      <div className="bg-slate-900 p-8 rounded-[2.5rem] max-w-sm w-full border border-slate-800 shadow-2xl space-y-6 text-center">
-        <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto ${isDanger ? 'bg-rose-500/10 text-rose-500' : 'bg-amber-500/10 text-amber-500'}`}>
+    <div className="fixed inset-0 bg-[#0A0D10]/80 backdrop-blur-sm z-[500] flex items-center justify-center p-4 animate-fade">
+      <div className="bg-[#11161C] p-8 rounded-[2.5rem] max-w-sm w-full border border-white/10 shadow-2xl space-y-6 text-center">
+        <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto ${isDanger ? 'bg-rose-500/10 text-rose-500' : 'bg-[#D9B978]/10 text-[#D9B978]'}`}>
            {isDanger ? <Trash2 size={32} /> : <AlertTriangle size={32} />}
         </div>
         <div className="space-y-2">
-            {confirmData.title && <h3 className="text-white font-black text-lg">{confirmData.title}</h3>}
+            {confirmData.title && <h3 className="text-[#F4F1EA] font-black text-lg">{confirmData.title}</h3>}
             <p className="text-slate-400 font-bold text-sm leading-relaxed">{confirmData.message}</p>
         </div>
         <div className="grid grid-cols-2 gap-3">
-           <button onClick={onCancel} className="py-4 bg-slate-950 text-slate-400 rounded-2xl font-black text-sm hover:bg-slate-800 transition-colors">إلغاء</button>
-           <button onClick={() => { confirmData.action(); onCancel(); }} className={`py-4 rounded-2xl font-black text-sm shadow-lg transition-colors ${isDanger ? 'bg-rose-500 text-white shadow-rose-500/20 hover:bg-rose-400' : 'bg-amber-500 text-slate-950 shadow-amber-500/20 hover:bg-amber-400'}`}>تأكيد</button>
+           <button onClick={onCancel} className="py-4 bg-[#0A0D10] text-slate-400 rounded-2xl font-black text-sm hover:bg-[#11161C] transition-colors">{t.cancel}</button>
+           <button onClick={() => { confirmData.action(); onCancel(); }} className={`py-4 rounded-2xl font-black text-sm shadow-lg transition-colors ${isDanger ? 'bg-rose-500 text-white shadow-rose-500/20 hover:bg-rose-400' : 'bg-[#D9B978] text-[#0A0D10] shadow-[#D9B978]/20 hover:bg-[#c9a764]'}`}>{t.confirm || 'تأكيد'}</button>
         </div>
       </div>
     </div>
@@ -129,20 +123,18 @@ interface SettingsProps {
   onPrint?: (type: 'summary' | 'detailed', currencyFilter?: string | null) => void;
   onShare?: (type: 'summary' | 'detailed', currencyFilter?: string | null) => void;
   onExportExcel?: (type: 'summary' | 'detailed', currencyFilter?: string | null) => void;
-  
-  // PWA optional props
   installPrompt?: any;
   isUpdateAvailable?: boolean;
   swRegistration?: ServiceWorkerRegistration | null;
 }
 
-const Settings: React.FC<SettingsProps> = ({ 
+export default function Settings({ 
   userName = '', pin = '', currency, currencies, wallets, categories, apiKey = '', exchangeRates = {}, appState = {}, onUpdateSettings, 
   onAddCurrency, onRemoveCurrency, onAddWallet, onUpdateWallet, onRemoveWallet,
   onAddCategory, onUpdateCategory, onRemoveCategory,
   onRestore, onClearData, onShowPrivacyPolicy, onPrint, onShare, onExportExcel,
   installPrompt = null, isUpdateAvailable = false, swRegistration = null
-}) => {
+}: SettingsProps) {
   const safeCurrencies = currencies || [];
   const safeWallets = wallets || [];
   const safeCategories = categories || [];
@@ -161,120 +153,49 @@ const Settings: React.FC<SettingsProps> = ({
   const [showAutoBackupHistoryModal, setShowAutoBackupHistoryModal] = useState(false);
   const [autoBackupHistory, setAutoBackupHistory] = useState<any[]>([]);
   const [isSecurityEnabled, setIsSecurityEnabled] = useState(!!pin);
-  const [isTravelMode, setIsTravelMode] = useState(appState?.showSeparateCurrencies || false); // Local state for immediate feedback
+  const [isTravelMode, setIsTravelMode] = useState(appState?.showSeparateCurrencies || false);
   const [isExporting, setIsExporting] = useState(false);
   const [activeSection, setActiveSection] = useState<'main' | 'wallets' | 'categories' | 'currencies'>('main');
   const [showCurrencyModal, setShowCurrencyModal] = useState(false);
   const [openAccordion, setOpenAccordion] = useState<string | null>('profile');
   
-  // Email Backup Modal State
   const [showEmailBackupModal, setShowEmailBackupModal] = useState(false);
   const [emailBackupPassword, setEmailBackupPassword] = useState('');
   const [emailBackupType, setEmailBackupType] = useState<'encrypted' | 'plain'>('encrypted');
 
-  // Biometric Diagnostics & Live Test State
   const [isBioHardwareAvailable, setIsBioHardwareAvailable] = useState(false);
-  const [biometryTypeTitle, setBiometryTypeTitle] = useState('Face ID / البصمة الحيوية');
+  const [biometryTypeTitle, setBiometryTypeTitle] = useState('Face ID / Touch ID');
   const [bioTestStatus, setBioTestStatus] = useState<'idle' | 'testing' | 'success' | 'failed'>('idle');
   const [bioTestFeedback, setBioTestFeedback] = useState('');
 
-  // Report Configuration State
   const [showReportModal, setShowReportModal] = useState(false);
   const [reportConfig, setReportConfig] = useState<{
       type: 'summary' | 'detailed';
-      currencyFilter: string | null; // null = All Currencies
+      currencyFilter: string | null;
       action: 'print' | 'share' | 'excel';
   }>({ type: 'detailed', currencyFilter: null, action: 'print' });
 
-  // Exchange Rate Editing
   const [editingRateCode, setEditingRateCode] = useState<string | null>(null);
   const [rateInputValue, setRateInputValue] = useState('');
 
-  // Data Display Modal State
   const [showDataModal, setShowDataModal] = useState(false);
   const [dataModalContent, setDataModalContent] = useState<{title: string, content: string}>({title: '', content: ''});
 
-  // Backup/Restore Modals State
   const [showBackupModal, setShowBackupModal] = useState(false);
   const [backupPassword, setBackupPassword] = useState('');
   const [showRestoreModal, setShowRestoreModal] = useState(false);
   const [restorePassword, setRestorePassword] = useState('');
   const [pendingRestoreContent, setPendingRestoreContent] = useState<string | null>(null);
 
-  // Store Readiness States (Biometrics, Notifications, App Rating & Support)
   const [isBiometricEnabled, setIsBiometricEnabled] = useState(appState?.isBiometricEnabled !== false);
   const [debtAlertsEnabled, setDebtAlertsEnabled] = useState(true);
   const [dailyLoggerEnabled, setDailyLoggerEnabled] = useState(true);
   const [budgetAlertsEnabled, setBudgetAlertsEnabled] = useState(true);
 
-  React.useEffect(() => {
-    let isMounted = true;
-    checkBiometricAvailable().then((res) => {
-      if (isMounted) {
-        setIsBioHardwareAvailable(res.isAvailable);
-        if (res.biometryType) {
-          setBiometryTypeTitle(res.biometryType);
-        }
-      }
-    });
-    return () => { isMounted = false; };
-  }, []);
-  
-  const [showReleaseAuditModal, setShowReleaseAuditModal] = useState(false);
-
-  // Direct App Store / Play Store Rating Redirect
-  const handleDirectStoreRating = () => {
-    const isIOSPlatform = typeof window !== 'undefined' && (/iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
-    
-    showToast('جاري التحويل لصفحة تقييم التطبيق في المتجر...');
-    
-    if (isIOSPlatform) {
-      window.open('https://apps.apple.com/app/id64762459927?action=write-review', '_blank');
-    } else {
-      window.open('https://play.google.com/store/apps/details?id=com.thari.finance.app', '_blank');
-    }
-  };
-
-  const handleSupportClick = () => {
-    window.location.href = 'mailto:thari-app@inbox.ru?subject=استفسار%20تطبيق%20ثري%20-%20دعم%20المستخدمين';
-  };
-
-  const [toast, setToast] = useState<{message: string, type: 'success' | 'error'} | null>(null);
-  const [confirmData, setConfirmData] = useState<{message: string, action: () => void, title?: string, type?: 'danger' | 'info'} | null>(null);
-
-  const handleTestNotification = async () => {
-    try {
-      if ('Notification' in window) {
-        const perm = await Notification.requestPermission();
-        if (perm === 'granted') {
-          new Notification('تطبيق ثري - تنبيه تجريبي', {
-            body: 'تم تفعيل التنبيهات المباشرة بنجاح! ستصلك إشعارات الديون والالتزامات.',
-            icon: '/icon.png'
-          });
-          showToast('تم إرسال إشعار تجريبي بنجاح!');
-          return;
-        }
-      }
-      showToast('تم تفعيل التنبيهات والرقابة المالية بنجاح!');
-    } catch (e) {
-      showToast('تم تفعيل التنبيهات والرقابة المالية بنجاح!');
-    }
-  };
-  
-  const [showAddCurrencyForm, setShowAddCurrencyForm] = useState(false);
-  const [newCurrency, setNewCurrency] = useState({ name: '', code: '', symbol: '' });
-  const [crossAlertPreference, setCrossAlertPreference] = useState(() => {
-    try {
-      return localStorage.getItem('thari_hide_cross_currency_alert') === 'true';
-    } catch {
-      return false;
-    }
-  });
-
   // Wallet Form State
   const [showWalletForm, setShowWalletForm] = useState(false);
   const [editingWallet, setEditingWallet] = useState<Wallet | null>(null);
-  const [walletData, setWalletData] = useState({ name: '', currencyCode: currency?.code || 'SAR', color: COLORS[0] });
+  const [walletData, setWalletData] = useState({ name: '', currencyCode: currency?.code || 'SAR', color: COLORS[0], type: 'cash' as Wallet['type'] });
 
   // Category Form State
   const [showCategoryForm, setShowCategoryForm] = useState(false);
@@ -302,6 +223,36 @@ const Settings: React.FC<SettingsProps> = ({
     }
   };
 
+  React.useEffect(() => {
+    let isMounted = true;
+    checkBiometricAvailable().then((res) => {
+      if (isMounted) {
+        setIsBioHardwareAvailable(res.isAvailable);
+        if (res.biometryType) {
+          setBiometryTypeTitle(res.biometryType);
+        }
+      }
+    });
+    return () => { isMounted = false; };
+  }, []);
+
+  const handleDirectStoreRating = () => {
+    const isIOSPlatform = typeof window !== 'undefined' && (/iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
+    showToast('جاري التحويل لصفحة تقييم التطبيق في المتجر...');
+    if (isIOSPlatform) {
+      window.open('https://apps.apple.com/app/id64762459927?action=write-review', '_blank');
+    } else {
+      window.open('https://play.google.com/store/apps/details?id=com.thari.finance.app', '_blank');
+    }
+  };
+
+  const handleSupportClick = () => {
+    window.location.href = 'mailto:thari-app@inbox.ru?subject=استفسار%20تطبيق%20ثري%20-%20دعم%20المستخدمين';
+  };
+
+  const [toast, setToast] = useState<{message: string, type: 'success' | 'error'} | null>(null);
+  const [confirmData, setConfirmData] = useState<{message: string, action: () => void, title?: string, type?: 'danger' | 'info'} | null>(null);
+
   const showToast = (message: string, type: 'success' | 'error' = 'success') => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 3000);
@@ -311,599 +262,216 @@ const Settings: React.FC<SettingsProps> = ({
     setConfirmData({ message, action, title, type });
   };
 
-  // ... (Export/Import Functions unchanged) ...
-  const copyToClipboard = async (text: string, title: string = "البيانات") => {
-      // For this specific Android WebView issue, always show the modal first as it's 100% reliable
-      setDataModalContent({ title, content: text });
-      setShowDataModal(true);
+  const handleSaveProfile = () => {
+    onUpdateSettings({ 
+      userName: localUserName, 
+      userEmail: localUserEmail,
+      apiKey: localApiKey,
+      language: localLanguage 
+    });
+    showToast('تم حفظ الملف الشخصي والتفضيلات بنجاح');
   };
 
-  const downloadFile = (content: string, fileName: string, mimeType: string) => {
-      const blob = new Blob([content], { type: mimeType });
-      const url = window.URL.createObjectURL(blob);
-      
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = fileName;
-      link.style.display = 'none';
-      document.body.appendChild(link);
-      link.click();
-      
-      setTimeout(() => {
-          document.body.removeChild(link);
-          window.URL.revokeObjectURL(url);
-      }, 200);
-      
-      showToast("جاري التنزيل... إذا لم يبدأ التنزيل، يرجى تفعيل السماح بالتنزيل التلقائي أو استخدام زر النسخ اليدوي");
-  };
-
-  const shareOrDownload = async (content: string, fileName: string, mimeType: string) => {
-      // Always try copy first for text data in this specific WebView context if requested
-      // But here we try share first
-      try {
-          const file = new File([content], fileName, { type: mimeType });
-          if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-              await navigator.share({
-                  files: [file],
-                  title: 'تصدير بيانات ثري',
-                  text: 'ملف بيانات من تطبيق ثري'
-              });
-              showToast("تمت المشاركة بنجاح");
-          } else {
-              // If share fails, try download
-              downloadFile(content, fileName, mimeType);
-          }
-      } catch (e) {
-          console.error("Share failed", e);
-          downloadFile(content, fileName, mimeType);
-      }
-  };
-
-  const executeExport = async (password: string | null) => {
-    setIsExporting(true);
-    setShowBackupModal(false);
-    try {
-        const dataStr = JSON.stringify(appState);
-        const dateStr = new Date().toISOString().split('T')[0];
-        if (!password) {
-            // Display data for easy copying and trigger download/share natively
-            copyToClipboard(dataStr, "نسخة احتياطية (JSON) - تم بدء التحميل والمشاركة");
-            await shareOrDownload(dataStr, `Thari_Backup_${dateStr}.json`, 'application/json');
-        } else {
-            const encrypted = await encryptData(dataStr, password);
-            copyToClipboard(encrypted, "نسخة مشفرة - تم بدء التحميل والمشاركة");
-            await shareOrDownload(encrypted, `Thari_Backup_Secure_${dateStr}.thari`, 'text/plain');
-        }
-    } catch (e) {
-        showToast("فشل النسخ الاحتياطي", 'error');
-    } finally {
-        setIsExporting(false);
-        setBackupPassword('');
-    }
-  };
-  const handleExportBackup = () => setShowBackupModal(true);
-  
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-      const content = event.target?.result as string;
-      if (file.name.endsWith('.thari')) {
-          setPendingRestoreContent(content);
-          setShowRestoreModal(true);
-      } else {
-          try {
-              const parsed = JSON.parse(content);
-              onRestore(parsed);
-              showToast("تمت الاستعادة بنجاح");
-          } catch (err) {
-              showToast("ملف غير صالح", 'error');
-          }
-      }
-    };
-    reader.readAsText(file);
-    if (fileInputRef.current) fileInputRef.current.value = '';
-  };
-
-  const executeRestore = async () => {
-      if (!pendingRestoreContent) return;
-      try {
-          const decrypted = await decryptData(pendingRestoreContent, restorePassword);
-          const parsed = JSON.parse(decrypted);
-          onRestore(parsed);
-          setShowRestoreModal(false);
-          setPendingRestoreContent(null);
-          setRestorePassword('');
-          showToast("تمت الاستعادة بنجاح");
-      } catch (e) {
-          showToast("كلمة المرور غير صحيحة أو الملف تالف", 'error');
-      }
-  };
-
-  const handleExportCSV = (reportType: 'summary' | 'detailed' = 'detailed', currencyFilter: string | null = null) => {
-    try {
-        const transactions: Transaction[] = appState?.transactions || [];
-        const csvContent = buildExecutiveCSVContent({
-            transactions,
-            categories: safeCategories,
-            wallets: safeWallets,
-            userName: userName || localUserName || 'مستخدم ثري',
-            currency: currency || { code: 'SAR', symbol: 'ر.س', name: 'ريال سعودي', icon: '' },
-            exchangeRates: exchangeRates || {},
-            type: reportType,
-            filterCurrency: currencyFilter
-        });
-        
-        const fileName = `Thari_Executive_Report_${reportType}_${new Date().toISOString().split('T')[0]}.csv`;
-        exportAndShareExecutiveCSV(csvContent, fileName);
-        showToast("تم تصدير التقرير المالي المؤسسي بنجاح");
-    } catch (e) {
-        showToast("حدث خطأ أثناء تصدير ملف Excel", 'error');
-    }
-  };
-  const handleExportJSON = () => {
-      const dataStr = JSON.stringify(appState, null, 2);
-      copyToClipboard(dataStr, "بيانات JSON - تم بدء التحميل والمشاركة");
-      shareOrDownload(dataStr, `Thari_Data_Raw_${new Date().toISOString().split('T')[0]}.json`, 'application/json');
+  const handleSaveSecurity = (shouldLock = false) => {
+    onUpdateSettings({
+      pin: isSecurityEnabled ? localPin : null,
+      isLocked: shouldLock,
+      autoLockTime: localAutoLockTime,
+      isBiometricEnabled: isBiometricEnabled,
+      requireBiometricOnOpen: localRequireBiometricOnOpen
+    });
+    showToast('تم تحديث إعدادات الأمان وقفل التطبيق بنجاح');
   };
 
   const handleRunBiometricTest = async () => {
     setBioTestStatus('testing');
-    setBioTestFeedback('جاري التحقق عبر مستشعر الجهاز أو WebAuthn...');
     try {
-      const result = await authenticateBiometrics('اختبار فحص بصمة الجهاز لتطبيق ثري');
-      if (result.success) {
+      const res = await authenticateBiometrics();
+      if (res.success) {
         setBioTestStatus('success');
-        setBioTestFeedback('نجح التحقق الحيوي! مستشعر جهازك متوافق ومفعل 100%.');
-        showToast('تم التحقق من البصمة بنجاح!');
-        if (typeof window !== 'undefined' && window.navigator.vibrate) {
-          window.navigator.vibrate([20, 40, 20]);
-        }
+        setBioTestFeedback('تم التحقق بنجاح! المستشعر والبيومترية تعمل بكفاءة تامة.');
       } else {
         setBioTestStatus('failed');
-        setBioTestFeedback(result.error || 'تعذر مطابقة البصمة أو تم إلغاء الاختبار');
-        showToast(result.error || 'تعذر مطابقة البصمة', 'error');
+        setBioTestFeedback(res.error || 'فشل التحقق الحيوي.');
       }
-    } catch (e) {
+    } catch (e: any) {
       setBioTestStatus('failed');
-      setBioTestFeedback('حدث خطأ أثناء الاتصال بمستشعر الجهاز');
-      showToast('خطأ أثناء فحص البصمة', 'error');
+      setBioTestFeedback(e.message || 'خطأ في تشغيل المستشعر.');
     }
   };
 
-  const handleSendEmailBackup = async (password: string | null) => {
-    const targetEmail = localUserEmail.trim();
-    if (!targetEmail) {
-      showToast('يرجى إدخال البريد الإلكتروني الذي ترغب بإرسال النسخة إليه', 'error');
-      setShowEmailBackupModal(true);
-      return;
-    }
-
-    setIsExporting(true);
-    setShowEmailBackupModal(false);
+  const handleTestNotification = async () => {
     try {
-      const dateStr = new Date().toISOString().split('T')[0];
-      const timeStr = new Date().toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' });
-      const totalTx = appState?.transactions?.length || 0;
-      const totalWallets = appState?.wallets?.length || 0;
-      const totalDebts = appState?.debts?.length || 0;
-
-      let backupContent = '';
-      let fileExt = 'json';
-      let isEncrypted = false;
-
-      if (password) {
-        backupContent = await encryptData(JSON.stringify(appState), password);
-        fileExt = 'thari';
-        isEncrypted = true;
-      } else {
-        backupContent = JSON.stringify(appState, null, 2);
+      if ('Notification' in window) {
+        const perm = await Notification.requestPermission();
+        if (perm === 'granted') {
+          new Notification('تطبيق ثري - تنبيه تجريبي', {
+            body: 'تم تفعيل التنبيهات المباشرة بنجاح!',
+            icon: '/icon.png'
+          });
+          showToast('تم إرسال إشعار تجريبي بنجاح!');
+          return;
+        }
       }
-
-      const fileName = `Thari_Backup_${dateStr}.${fileExt}`;
-
-      // Save file locally / share
-      await shareOrDownload(backupContent, fileName, isEncrypted ? 'text/plain' : 'application/json');
-
-      // Update last backup date in app state
-      onUpdateSettings({ 
-        userEmail: targetEmail, 
-        lastBackupDate: new Date().toISOString() 
-      });
-
-      // Prepare professional mailto link
-      const emailSubject = encodeURIComponent(`نسخة احتياطية مالية - تطبيق ثري (${dateStr})`);
-      const emailBodyText = `مرحباً ${localUserName || 'مستخدم ثري'}،
-
-مرفق في هذا البريد ملخص نسختك الاحتياطية من تطبيق "ثري" لإدارة الأموال:
-- تاريخ النسخة: ${dateStr} ${timeStr}
-- البريد المسجل: ${targetEmail}
-- نوع النسخة: ${isEncrypted ? 'مشفرة وآمنة برقم سري (ملف .thari)' : 'نسخة JSON عادية'}
-- إجمالي العمليات: ${totalTx}
-- عدد المحافظ: ${totalWallets}
-- عدد الديون والالتزامات: ${totalDebts}
-
-تعليمات الاستعادة:
-1. قم بحفظ الملف المرفق أو نص النسخة الاحتياطية على جهازك.
-2. افتح تطبيق "ثري" واذهب إلى الإعدادات > استعادة البيانات.
-3. اختر الملف المرفق وأدخل كلمة المرور في حال كانت النسخة مشفرة.
-
-تطبيق ثري - إدارة مالية ذكية ومؤسسية آمنة أوفلاين`;
-
-      const emailBody = encodeURIComponent(emailBodyText);
-      const mailtoUrl = `mailto:${targetEmail}?subject=${emailSubject}&body=${emailBody}`;
-
-      // Open email client
-      if (typeof window !== 'undefined') {
-        const mailLink = document.createElement('a');
-        mailLink.href = mailtoUrl;
-        mailLink.target = '_blank';
-        document.body.appendChild(mailLink);
-        mailLink.click();
-        setTimeout(() => document.body.removeChild(mailLink), 300);
-      }
-
-      showToast(`تم إعداد النسخة والبريد لـ: ${targetEmail}`);
+      showToast('تم تفعيل التنبيهات بنجاح!');
     } catch (e) {
-      showToast('حدث خطأ أثناء إنشاء النسخة الاحتياطية البريدية', 'error');
+      showToast('تم تفعيل التنبيهات بنجاح!');
+    }
+  };
+
+  const handleExportBackup = () => {
+    setShowBackupModal(true);
+  };
+
+  const executeExport = async (password: string | null) => {
+    try {
+      setIsExporting(true);
+      const dataToExport = {
+        version: '1.2.0',
+        timestamp: Date.now(),
+        state: appState
+      };
+      const jsonStr = JSON.stringify(dataToExport);
+      const finalPayload = password ? await encryptData(jsonStr, password) : jsonStr;
+      
+      const blob = new Blob([finalPayload], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `thari_backup_${new Date().toISOString().slice(0, 10)}.thari`;
+      a.click();
+      URL.revokeObjectURL(url);
+      setShowBackupModal(false);
+      setBackupPassword('');
+      showToast('تم تصدير النسخة الاحتياطية بنجاح');
+    } catch (e) {
+      showToast('فشل تصدير النسخة الاحتياطية', 'error');
     } finally {
       setIsExporting(false);
-      setEmailBackupPassword('');
     }
   };
 
-  const handleSaveProfile = () => {
-    const finalPin = isSecurityEnabled ? (localPin.length === 4 ? localPin : pin) : null;
-    onUpdateSettings({ 
-      userName: localUserName, 
-      userEmail: localUserEmail,
-      pin: finalPin, 
-      isBiometricEnabled, 
-      requireBiometricOnOpen: localRequireBiometricOnOpen,
-      apiKey: localApiKey,
-      autoLockTime: localAutoLockTime,
-      autoBackupFrequency: localAutoBackupFreq,
-      language: localLanguage
-    });
-    showToast("تم حفظ الملف الشخصي وإعدادات اللغة بنجاح");
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const content = event.target?.result as string;
+      if (!content) return;
+      if (content.includes('version') && content.includes('state')) {
+        try {
+          const parsed = JSON.parse(content);
+          onRestore(parsed.state);
+          showToast('تمت استعادة النسخة الاحتياطية بنجاح');
+        } catch (err) {
+          showToast('ملف التصدير غير صالح', 'error');
+        }
+      } else {
+        setPendingRestoreContent(content);
+        setShowRestoreModal(true);
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
   };
 
-  const handleSaveSecurity = (lockNow = false) => {
-    if (isSecurityEnabled && localPin.length !== 4) {
-      showToast("يرجى إدخال رمز PIN سري مكون من 4 أرقام", 'error');
+  const executeRestore = async (password: string) => {
+    if (!pendingRestoreContent) return;
+    try {
+      const decrypted = await decryptData(pendingRestoreContent, password);
+      if (!decrypted) {
+        showToast('كلمة المرور غير صحيحة أو الملف تالف', 'error');
+        return;
+      }
+      const parsed = JSON.parse(decrypted);
+      onRestore(parsed.state || parsed);
+      setShowRestoreModal(false);
+      setRestorePassword('');
+      setPendingRestoreContent(null);
+      showToast('تمت استعادة البيانات المشفرة بنجاح');
+    } catch (e) {
+      showToast('فشل فك تشفير النسخة الاحتياطية', 'error');
+    }
+  };
+
+  const handleExportCSV = (type: 'summary' | 'detailed', currencyFilter: string | null) => {
+    try {
+      const csv = buildExecutiveCSVContent({
+        transactions: appState.transactions || [],
+        categories: appState.categories || categories || [],
+        wallets: appState.wallets || wallets || [],
+        userName: appState.userName || userName || 'مستخدم ثري',
+        currency: currency || appState.currency,
+        exchangeRates: appState.exchangeRates || exchangeRates || {},
+        type,
+        filterCurrency: currencyFilter
+      });
+      const blob = new Blob(["\ufeff" + csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `thari_financial_report_${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      showToast('تم تصدير تقرير Excel (CSV) بنجاح');
+    } catch (e) {
+      showToast('فشل تصدير التقرير', 'error');
+    }
+  };
+
+  const saveWallet = () => {
+    if (!walletData.name.trim()) {
+      showToast('يرجى إدخال اسم المحفظة', 'error');
       return;
     }
-    const finalPin = isSecurityEnabled ? localPin : null;
-    onUpdateSettings({ 
-      pin: finalPin, 
-      isBiometricEnabled: isBiometricEnabled,
-      requireBiometricOnOpen: localRequireBiometricOnOpen,
-      autoLockTime: localAutoLockTime,
-      isLocked: lockNow && !!finalPin 
-    });
-    showToast(lockNow ? "تم قفل التطبيق، أدخل الرمز أو البصمة لفتحه" : "تم حفظ وتفعيل إعدادات الأمان والحماية والتوافق");
-  };
-
-  const openWalletEdit = (w: Wallet) => {
-    setEditingWallet(w);
-    setWalletData({ name: w.name, currencyCode: w.currencyCode, color: w.color });
-    setShowWalletForm(true);
-  };
-  const saveWallet = () => {
-    if (!walletData.name) return showToast("يرجى إدخل اسم المحفظة", "error");
-    if (editingWallet) onUpdateWallet(editingWallet.id, walletData);
-    else onAddWallet(walletData);
+    if (editingWallet) {
+      onUpdateWallet(editingWallet.id, walletData);
+      showToast('تم تحديث المحفظة بنجاح');
+    } else {
+      onAddWallet({ ...walletData, openingBalance: 0, currentBalance: 0 });
+      showToast('تم إضافة المحفظة بنجاح');
+    }
     setShowWalletForm(false);
     setEditingWallet(null);
-    showToast("تم حفظ المحفظة");
   };
 
-  const openCategoryEdit = (c: Category) => {
-    setEditingCategory(c);
-    setCategoryData({ name: c.name, icon: c.icon, color: c.color, type: c.type });
-    setShowCategoryForm(true);
-  };
   const saveCategory = () => {
-    if (!categoryData.name) return showToast("يرجى إدخال اسم التصنيف", "error");
-    if (editingCategory) onUpdateCategory(editingCategory.id, categoryData);
-    else onAddCategory(categoryData);
+    if (!categoryData.name.trim()) {
+      showToast('يرجى إدخال اسم التصنيف', 'error');
+      return;
+    }
+    if (editingCategory) {
+      onUpdateCategory(editingCategory.id, categoryData);
+      showToast('تم تحديث التصنيف بنجاح');
+    } else {
+      onAddCategory(categoryData);
+      showToast('تم إضافة التصنيف بنجاح');
+    }
     setShowCategoryForm(false);
     setEditingCategory(null);
-    showToast("تم حفظ التصنيف");
   };
 
-  // Rate Editing Logic
-  const handleRateEditClick = (code: string) => {
-      const currentRate = exchangeRates?.[code] || DEFAULT_EXCHANGE_RATES[code] || 0;
-      // Convert internal rate (1 Unit = X SAR) to user friendly (1 SAR = X Units)
-      // Internal: YER = 0.00714 SAR. User sees: 1 SAR = 140 YER.
-      const userRate = currentRate > 0 ? (1 / currentRate) : 0;
-      
-      setRateInputValue(userRate.toFixed(2));
-      setEditingRateCode(code);
-  };
-
-  const saveRate = () => {
-      if (!editingRateCode || !rateInputValue) return;
-      const userVal = parseFloat(rateInputValue);
-      if (userVal <= 0) return showToast("القيمة يجب أن تكون أكبر من 0", "error");
-      
-      // Convert back to internal: Internal = 1 / UserVal
-      const internalVal = 1 / userVal;
-      
-      const newRates = { ...(exchangeRates || DEFAULT_EXCHANGE_RATES), [editingRateCode]: internalVal };
-      onUpdateSettings({ exchangeRates: newRates });
-      setEditingRateCode(null);
-      showToast("تم تحديث سعر الصرف");
-  };
-
-  if (activeSection === 'currencies') {
-    return (
-      <div className="space-y-6 pb-24 animate-fade">
-        <div className="flex items-center gap-4 mb-4">
-           <button onClick={() => setActiveSection('main')} className="p-3 bg-slate-900 rounded-2xl border border-slate-800 text-slate-400 active:scale-90 transition-all"><ChevronRight size={20} /></button>
-           <h3 className="font-black text-white text-lg">إدارة العملات وأسعار الصرف</h3>
-        </div>
-
-        <div className="bg-amber-500/10 p-5 rounded-[2rem] border border-amber-500/20 text-amber-500 text-xs font-bold leading-relaxed flex gap-3">
-             <AlertCircle className="shrink-0" size={20} />
-             <p>أسعار الصرف تحسب مقابل الريال السعودي (SAR). قم بتحديث السعر يدوياً إذا كان سعر السوق مختلفاً (مثلاً: 1 ريال سعودي = كم ريال يمني؟).</p>
-        </div>
-
-        <div className="space-y-4">
-           {safeCurrencies.map(c => {
-             const isSAR = c.code === 'SAR';
-             const currentRate = exchangeRates?.[c.code] || DEFAULT_EXCHANGE_RATES[c.code] || 0;
-             const displayRate = currentRate > 0 ? (1 / currentRate).toLocaleString(undefined, {maximumFractionDigits: 2}) : '0';
-
-             return (
-             <div key={c.code} className="bg-slate-900 p-5 rounded-[2rem] flex flex-col gap-4 border border-slate-800">
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                        <span className="bg-slate-800 text-amber-500 font-black w-12 h-12 flex items-center justify-center rounded-2xl border border-white/5">{c.symbol}</span>
-                        <div className="flex flex-col">
-                            <span className="font-bold text-white text-base">{c.name}</span>
-                            <span className="text-[10px] text-slate-500 font-black uppercase tracking-widest">{c.code}</span>
-                        </div>
-                    </div>
-                    {!isSAR && (
-                        <button 
-                            onClick={() => triggerConfirm(`هل أنت متأكد من حذف عملة ${c.name}؟`, () => onRemoveCurrency(c.code), "حذف العملة", "danger")} 
-                            className="p-3 bg-slate-800 text-rose-500 rounded-xl hover:bg-rose-500/10 border border-slate-700 active:scale-95"
-                        >
-                            <Trash2 size={18} />
-                        </button>
-                    )}
-                </div>
-                
-                {!isSAR && (
-                    <div className="bg-slate-950 p-3 rounded-2xl border border-slate-800 flex items-center justify-between">
-                        <span className="text-[10px] font-black text-slate-500">1 ريال سعودي = </span>
-                        {editingRateCode === c.code ? (
-                            <div className="flex items-center gap-2">
-                                <input 
-                                    type="number" 
-                                    value={rateInputValue} 
-                                    onChange={e => setRateInputValue(e.target.value)}
-                                    className="w-24 bg-slate-800 text-white font-bold p-2 rounded-lg text-center outline-none border border-amber-500"
-                                    autoFocus
-                                />
-                                <button onClick={saveRate} className="bg-amber-500 text-slate-950 p-2 rounded-lg"><Check size={16} /></button>
-                                <button onClick={() => setEditingRateCode(null)} className="bg-slate-800 text-slate-400 p-2 rounded-lg"><X size={16} /></button>
-                            </div>
-                        ) : (
-                            <button onClick={() => handleRateEditClick(c.code)} className="flex items-center gap-2 text-white font-black hover:text-amber-500 transition-colors">
-                                <span className="text-lg">{displayRate}</span>
-                                <span className="text-[10px] text-slate-600">{c.code}</span>
-                                <Edit2 size={14} className="text-slate-600" />
-                            </button>
-                        )}
-                    </div>
-                )}
-             </div>
-           )})}
-           <button onClick={() => setShowAddCurrencyForm(true)} className="w-full py-5 bg-amber-500/10 text-amber-500 font-black rounded-2xl border border-amber-500/20 flex items-center justify-center gap-2 active:scale-95">
-              <Plus size={20} /> إضافة عملة جديدة
-           </button>
-
-           {/* Cross-Currency Notification Preference */}
-           <div className="bg-slate-900 p-4 rounded-2xl border border-slate-800 flex items-center justify-between">
-              <div className="text-right space-y-0.5">
-                <span className="text-xs font-black text-white block">إشعار وفروقات العملات عند تسجيل العمليات</span>
-                <span className="text-[10px] text-slate-400 block">
-                  {crossAlertPreference
-                    ? 'التنبيه التلقائي معطل حالياً (إخفاء دائم)'
-                    : 'التنبيه التلقائي مفعل (يظهر عند اختلاف عملة المعاملة عن المحفظة)'}
-                </span>
-              </div>
-              <button
-                onClick={() => {
-                  if (crossAlertPreference) {
-                    try {
-                      localStorage.removeItem('thari_hide_cross_currency_alert');
-                    } catch {}
-                    setCrossAlertPreference(false);
-                    showToast('تم إعادة تفعيل تنبيه العملات المتعددة');
-                  } else {
-                    try {
-                      localStorage.setItem('thari_hide_cross_currency_alert', 'true');
-                    } catch {}
-                    setCrossAlertPreference(true);
-                    showToast('تم تعطيل التنبيه التلقائي (إخفاء دائم)');
-                  }
-                }}
-                className={`px-3 py-1.5 rounded-xl text-xs font-black border transition-all ${
-                  crossAlertPreference
-                    ? 'bg-slate-800 text-amber-400 border-amber-500/30'
-                    : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
-                }`}
-              >
-                {crossAlertPreference ? 'إعادة التفعيل' : 'مفعّل'}
-              </button>
-           </div>
-        </div>
-        
-        {/* Modals ... */}
-        {showAddCurrencyForm && (
-            <Modal title="إضافة عملة" onClose={() => setShowAddCurrencyForm(false)}>
-                <div className="space-y-6">
-                    <InputField label="اسم العملة" value={newCurrency.name} onChange={(v: string) => setNewCurrency({...newCurrency, name: v})} placeholder="ريال سعودي" />
-                    <div className="grid grid-cols-2 gap-4">
-                        <InputField label="الرمز (USD)" value={newCurrency.code} onChange={(v: string) => setNewCurrency({...newCurrency, code: v.toUpperCase()})} placeholder="USD" maxLength={10} />
-                        <InputField label="الشعار ($)" value={newCurrency.symbol} onChange={(v: string) => setNewCurrency({...newCurrency, symbol: v})} placeholder="$" />
-                    </div>
-                    <ActionButton label="حفظ العملة" onClick={() => { onAddCurrency(newCurrency); setShowAddCurrencyForm(false); showToast("تم إضافة العملة"); }} />
-                </div>
-            </Modal>
-        )}
-        <ToastNotification toast={toast} />
-        <ConfirmDialog confirmData={confirmData} onCancel={() => setConfirmData(null)} />
-      </div>
-    );
-  }
-
-  if (activeSection === 'wallets') {
-    return (
-      <div className="space-y-6 pb-24 animate-fade">
-        <div className="flex items-center gap-4 mb-4">
-           <button onClick={() => setActiveSection('main')} className="p-3 bg-slate-900 rounded-2xl border border-slate-800 text-slate-400 active:scale-90 transition-all"><ChevronRight size={20} /></button>
-           <h3 className="font-black text-white text-lg">إدارة المحافظ</h3>
-        </div>
-        <div className="space-y-4">
-           {safeWallets.map(w => (
-             <div key={w.id} className="bg-slate-900 p-5 rounded-[2rem] flex items-center justify-between border border-slate-800">
-                <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-slate-950 shadow-lg" style={{ backgroundColor: w.color }}>
-                        <WalletIcon size={24} />
-                    </div>
-                    <div className="flex flex-col">
-                        <span className="font-bold text-white text-base">{w.name}</span>
-                        <span className="text-[10px] text-slate-500 font-black uppercase tracking-widest">{w.currencyCode}</span>
-                    </div>
-                </div>
-                <div className="flex gap-2">
-                    <button onClick={() => openWalletEdit(w)} className="p-3 bg-slate-800 text-slate-400 rounded-xl hover:text-white border border-slate-700 active:scale-95"><Edit2 size={18} /></button>
-                    <button onClick={() => triggerConfirm(`حذف محفظة ${w.name}؟`, () => onRemoveWallet(w.id), "حذف المحفظة", "danger")} className="p-3 bg-slate-800 text-rose-500 rounded-xl hover:bg-rose-500/10 border border-slate-700 active:scale-95"><Trash2 size={18} /></button>
-                </div>
-             </div>
-           ))}
-           <button onClick={() => { setEditingWallet(null); setWalletData({ name: '', currencyCode: currency.code, color: COLORS[0] }); setShowWalletForm(true); }} className="w-full py-5 bg-amber-500/10 text-amber-500 font-black rounded-2xl border border-amber-500/20 flex items-center justify-center gap-2 active:scale-95">
-              <Plus size={20} /> إضافة محفظة جديدة
-           </button>
-        </div>
-        
-        {showWalletForm && (
-            <Modal title={editingWallet ? "تعديل محفظة مالية" : "إضافة محفظة مالية"} onClose={() => setShowWalletForm(false)}>
-                <div className="space-y-5">
-                    <InputField label="اسم المحفظة" value={walletData.name} onChange={(v: string) => setWalletData({...walletData, name: v})} placeholder="كاش، بنك، محفظة يمنية، حساب استثماري..." />
-                    <div className="space-y-2">
-                        <div className="flex items-center justify-between px-1">
-                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">العملة الأساسية للمحفظة</label>
-                          <span className="text-[9.5px] font-bold text-amber-400">تدعم العملات المتعددة</span>
-                        </div>
-                        <select value={walletData.currencyCode} onChange={e => setWalletData({...walletData, currencyCode: e.target.value})} className="w-full p-4 rounded-2xl bg-slate-950 border border-slate-800 text-white font-bold outline-none cursor-pointer hover:border-slate-700">
-                            {safeCurrencies.map(c => <option key={c.code} value={c.code}>{c.name} ({c.code} - {c.symbol})</option>)}
-                        </select>
-                        <div className="p-3 bg-slate-950/70 rounded-xl border border-white/5 text-[10.5px] text-slate-400 leading-relaxed font-medium space-y-1">
-                          <div className="flex items-center gap-1.5 text-amber-300 font-black">
-                            <Sparkles size={13} />
-                            <span>مرونة العملات المزدوجة والمباشرة:</span>
-                          </div>
-                          <p>
-                            يمكنك إجراء أي معاملة (مصروف/وارد) بأي عملة تريدها دون الحاجة للتبديل بين المحافظ، وسيتم تحويل وخصم المعادل تلقائياً من رصيد المحفظة بهذه العملة الأساسية.
-                          </p>
-                        </div>
-                    </div>
-                    <ColorPicker selected={walletData.color} onSelect={c => setWalletData({...walletData, color: c})} />
-                    <ActionButton label="حفظ المحفظة" onClick={saveWallet} />
-                </div>
-            </Modal>
-        )}
-        <ToastNotification toast={toast} />
-        <ConfirmDialog confirmData={confirmData} onCancel={() => setConfirmData(null)} />
-      </div>
-    );
-  }
-
-  if (activeSection === 'categories') {
-    return (
-      <div className="space-y-6 pb-24 animate-fade">
-        <div className="flex items-center gap-4 mb-4">
-           <button onClick={() => setActiveSection('main')} className="p-3 bg-slate-900 rounded-2xl border border-slate-800 text-slate-400 active:scale-90 transition-all"><ChevronRight size={20} /></button>
-           <h3 className="font-black text-white text-lg">إدارة التصنيفات</h3>
-        </div>
-        <div className="space-y-4">
-           {safeCategories.map(c => (
-             <div key={c.id} className="bg-slate-900 p-4 rounded-[2rem] flex items-center justify-between border border-slate-800">
-                <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-white shadow-lg" style={{ backgroundColor: c.color }}>
-                        {getIcon(c.icon, 20)}
-                    </div>
-                    <div className="flex flex-col">
-                        <span className="font-bold text-white text-base">{c.name}</span>
-                        <span className={`text-[10px] font-black uppercase tracking-widest ${c.type === 'income' ? 'text-emerald-500' : 'text-rose-500'}`}>{c.type === 'income' ? 'دخل' : 'صرف'}</span>
-                    </div>
-                </div>
-                <button onClick={() => openCategoryEdit(c)} className="p-3 bg-slate-800 text-slate-400 rounded-xl hover:text-white border border-slate-700 active:scale-95"><Edit2 size={18} /></button>
-             </div>
-           ))}
-           <button onClick={() => { setEditingCategory(null); setCategoryData({ name: '', icon: ICONS[0], color: COLORS[0], type: 'expense' }); setShowCategoryForm(true); }} className="w-full py-5 bg-amber-500/10 text-amber-500 font-black rounded-2xl border border-amber-500/20 flex items-center justify-center gap-2 active:scale-95">
-              <Plus size={20} /> إضافة تصنيف جديد
-           </button>
-        </div>
-
-        {showCategoryForm && (
-            <Modal title={editingCategory ? "تعديل تصنيف" : "إضافة تصنيف"} onClose={() => setShowCategoryForm(false)}>
-                <div className="space-y-6">
-                    <div className="flex bg-slate-950 p-1 rounded-2xl border border-slate-800">
-                        <button onClick={() => setCategoryData({...categoryData, type: 'expense'})} className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase transition-all ${categoryData.type === 'expense' ? 'bg-rose-500 text-white' : 'text-slate-600'}`}>صرف</button>
-                        <button onClick={() => setCategoryData({...categoryData, type: 'income'})} className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase transition-all ${categoryData.type === 'income' ? 'bg-emerald-500 text-white' : 'text-slate-600'}`}>دخل</button>
-                    </div>
-                    <InputField label="اسم التصنيف" value={categoryData.name} onChange={(v: string) => setCategoryData({...categoryData, name: v})} placeholder="طعام، مواصلات..." />
-                    <div className="space-y-3">
-                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2">الأيقونة</label>
-                        <div className="grid grid-cols-5 gap-3 max-h-40 overflow-y-auto no-scrollbar p-1">
-                            {ICONS.map(icon => (
-                                <button key={icon} onClick={() => setCategoryData({...categoryData, icon})} className={`w-12 h-12 rounded-xl flex items-center justify-center border transition-all ${categoryData.icon === icon ? 'border-amber-500 bg-amber-500/10 text-amber-500' : 'border-slate-800 text-slate-500'}`}>
-                                    {getIcon(icon, 20)}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-                    <ColorPicker selected={categoryData.color} onSelect={c => setCategoryData({...categoryData, color: c})} />
-                    <div className="flex gap-3">
-                        {editingCategory && (
-                            <button onClick={() => triggerConfirm(`حذف تصنيف ${editingCategory.name}؟`, () => { onRemoveCategory(editingCategory.id); setShowCategoryForm(false); }, "حذف التصنيف", "danger")} className="p-4 bg-rose-500/10 text-rose-500 border border-rose-500/20 rounded-2xl active:scale-95"><Trash2 size={24} /></button>
-                        )}
-                        <button onClick={saveCategory} className="flex-1 py-5 bg-amber-500 text-slate-950 font-black rounded-2xl shadow-xl active:scale-95">حفظ التصنيف</button>
-                    </div>
-                </div>
-            </Modal>
-        )}
-        <ToastNotification toast={toast} />
-        <ConfirmDialog confirmData={confirmData} onCancel={() => setConfirmData(null)} />
-      </div>
-    );
-  }
+  const t = getTranslation(appState?.language || 'ar');
 
   const AccordionItem = ({ id, title, icon: Icon, children }: { id: string, title: string, icon: any, children: React.ReactNode }) => {
     const isOpen = openAccordion === id;
     return (
-        <div className="bg-slate-900 rounded-[2rem] border border-slate-800 overflow-hidden transition-all duration-300">
+        <div className="bg-[#11161C] rounded-[2rem] border border-white/10 overflow-hidden transition-all duration-300 shadow-xl">
             <button 
                 onClick={() => setOpenAccordion(isOpen ? null : id)}
-                className="w-full p-5 flex justify-between items-center text-white hover:bg-slate-800/50 transition-colors text-right"
+                className="w-full p-5 flex justify-between items-center text-[#F4F1EA] hover:bg-white/[0.02] transition-colors text-start"
                 type="button"
             >
                 <div className="flex items-center gap-3">
-                    <Icon size={20} className="text-amber-500" />
-                    <span className="font-black text-sm">{title}</span>
+                    <div className="w-10 h-10 rounded-xl bg-[#D9B978]/10 text-[#D9B978] flex items-center justify-center shrink-0">
+                        <Icon size={20} />
+                    </div>
+                    <span className="font-black text-sm md:text-base">{title}</span>
                 </div>
-                <ChevronDown size={18} className={`text-slate-500 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`} />
+                <ChevronDown size={18} className={`text-slate-400 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`} />
             </button>
             {isOpen && (
-                <div className="p-6 border-t border-slate-800 bg-slate-950/20 space-y-5 animate-slide-down shrink-0 text-right">
+                <div className="p-6 border-t border-white/5 bg-[#0A0D10]/50 space-y-5 animate-slide-down text-start">
                     {children}
                 </div>
             )}
@@ -911,27 +479,192 @@ const Settings: React.FC<SettingsProps> = ({
     );
   };
 
-  const t = getTranslation(appState?.language || 'ar');
+  if (activeSection === 'wallets') {
+    return (
+      <div className="space-y-6 pb-24 animate-fade text-start">
+        <div className="flex justify-between items-center bg-[#11161C] p-5 rounded-[2.5rem] border border-white/10 shadow-xl">
+          <div className="flex items-center gap-3">
+            <button onClick={() => setActiveSection('main')} className="p-2.5 bg-[#0A0D10] hover:bg-white/5 rounded-2xl text-slate-400 hover:text-white transition-all"><ChevronLeft size={20} /></button>
+            <h3 className="font-black text-[#F4F1EA] text-lg">{t.walletsManagement}</h3>
+          </div>
+          <button onClick={() => { setEditingWallet(null); setWalletData({ name: '', currencyCode: currency?.code || 'SAR', color: COLORS[0], type: 'cash' }); setShowWalletForm(true); }} className="bg-[#D9B978] text-[#0A0D10] px-5 py-2.5 rounded-2xl font-black text-xs active:scale-95 transition-all shadow-lg shadow-[#D9B978]/10 flex items-center gap-1.5">
+             <Plus size={16} /> {t.addWallet}
+          </button>
+        </div>
 
-  // (Return Main View unchanged, just ensuring it renders correctly)
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+           {safeWallets.map(wallet => (
+              <div key={wallet.id} className="bg-[#11161C] p-5 rounded-[2rem] border border-white/10 flex justify-between items-center shadow-lg">
+                 <div className="flex items-center gap-3.5">
+                    <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-[#0A0D10] font-black" style={{ backgroundColor: wallet.color || '#D9B978' }}>
+                       <WalletIcon size={24} />
+                    </div>
+                    <div>
+                       <h4 className="text-[#F4F1EA] font-black text-sm">{wallet.name}</h4>
+                       <p className="text-xs text-slate-400 font-bold">{(wallet.currentBalance ?? wallet.openingBalance ?? 0).toLocaleString()} {wallet.currencyCode}</p>
+                    </div>
+                 </div>
+                 <button onClick={() => { setEditingWallet(wallet); setWalletData({ name: wallet.name, currencyCode: wallet.currencyCode, color: wallet.color || COLORS[0], type: wallet.type || 'cash' }); setShowWalletForm(true); }} className="p-2.5 bg-[#0A0D10] text-slate-400 hover:text-white rounded-xl border border-white/5">
+                    <Edit2 size={16} />
+                 </button>
+              </div>
+           ))}
+        </div>
+
+        {showWalletForm && (
+            <Modal title={editingWallet ? t.editWallet : t.addWallet} onClose={() => setShowWalletForm(false)}>
+                <div className="space-y-6">
+                    <InputField label={t.walletNameOrAccount} value={walletData.name} onChange={(v: string) => setWalletData({...walletData, name: v})} placeholder={t.walletPlaceholder} />
+                    <div className="space-y-2">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">{t.currency}</label>
+                        <select 
+                          value={walletData.currencyCode} 
+                          onChange={e => setWalletData({...walletData, currencyCode: e.target.value})}
+                          className="w-full p-4 rounded-2xl bg-[#0A0D10] border border-white/10 text-[#F4F1EA] font-bold outline-none"
+                        >
+                           {safeCurrencies.map(c => (
+                              <option key={c.code} value={c.code} className="bg-[#11161C] text-white">{c.name} ({c.code})</option>
+                           ))}
+                        </select>
+                    </div>
+                    <ColorPicker selected={walletData.color} onSelect={c => setWalletData({...walletData, color: c})} t={t} />
+                    <div className="flex gap-3">
+                        {editingWallet && (
+                            <button onClick={() => triggerConfirm(`${t.deleteWallet} ${editingWallet.name}؟`, () => { onRemoveWallet(editingWallet.id); setShowWalletForm(false); }, t.deleteWallet, "danger")} className="p-4 bg-rose-500/10 text-rose-500 border border-rose-500/20 rounded-2xl active:scale-95"><Trash2 size={24} /></button>
+                        )}
+                        <ActionButton label={t.saveWallet} onClick={saveWallet} />
+                    </div>
+                </div>
+            </Modal>
+        )}
+      </div>
+    );
+  }
+
+  if (activeSection === 'categories') {
+    return (
+      <div className="space-y-6 pb-24 animate-fade text-start">
+        <div className="flex justify-between items-center bg-[#11161C] p-5 rounded-[2.5rem] border border-white/10 shadow-xl">
+          <div className="flex items-center gap-3">
+            <button onClick={() => setActiveSection('main')} className="p-2.5 bg-[#0A0D10] hover:bg-white/5 rounded-2xl text-slate-400 hover:text-white transition-all"><ChevronLeft size={20} /></button>
+            <h3 className="font-black text-[#F4F1EA] text-lg">{t.categoriesManagement}</h3>
+          </div>
+          <button onClick={() => { setEditingCategory(null); setCategoryData({ name: '', icon: ICONS[0], color: COLORS[0], type: 'expense' }); setShowCategoryForm(true); }} className="bg-[#D9B978] text-[#0A0D10] px-5 py-2.5 rounded-2xl font-black text-xs active:scale-95 transition-all shadow-lg shadow-[#D9B978]/10 flex items-center gap-1.5">
+             <Plus size={16} /> {t.addCategory}
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+           {safeCategories.map(cat => (
+              <div key={cat.id} className="bg-[#11161C] p-4 rounded-[2rem] border border-white/10 flex justify-between items-center shadow-lg">
+                 <div className="flex items-center gap-3">
+                    <div className="w-11 h-11 rounded-2xl flex items-center justify-center text-white" style={{ backgroundColor: cat.color || '#D9B978' }}>
+                       {getIcon(cat.icon, 20)}
+                    </div>
+                    <div>
+                       <h4 className="text-[#F4F1EA] font-black text-sm">{cat.name}</h4>
+                       <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${cat.type === 'income' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'}`}>
+                          {cat.type === 'income' ? t.income : t.expenses}
+                       </span>
+                    </div>
+                 </div>
+                 <button onClick={() => { setEditingCategory(cat); setCategoryData({ name: cat.name, icon: cat.icon || ICONS[0], color: cat.color || COLORS[0], type: cat.type || 'expense' }); setShowCategoryForm(true); }} className="p-2.5 bg-[#0A0D10] text-slate-400 hover:text-white rounded-xl border border-white/5">
+                    <Edit2 size={16} />
+                 </button>
+              </div>
+           ))}
+        </div>
+
+        {showCategoryForm && (
+            <Modal title={editingCategory ? t.editCategory : t.addCategory} onClose={() => setShowCategoryForm(false)}>
+                <div className="space-y-6">
+                    <div className="flex bg-[#0A0D10] p-1 rounded-2xl border border-white/10">
+                        <button type="button" onClick={() => setCategoryData({...categoryData, type: 'expense'})} className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase transition-all ${categoryData.type === 'expense' ? 'bg-rose-500 text-white' : 'text-slate-400'}`}>{t.expenses}</button>
+                        <button type="button" onClick={() => setCategoryData({...categoryData, type: 'income'})} className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase transition-all ${categoryData.type === 'income' ? 'bg-emerald-500 text-white' : 'text-slate-400'}`}>{t.income}</button>
+                    </div>
+                    <InputField label={t.categoryName} value={categoryData.name} onChange={(v: string) => setCategoryData({...categoryData, name: v})} placeholder={t.categoryPlaceholder} />
+                    <div className="space-y-3">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">{t.icon}</label>
+                        <div className="grid grid-cols-5 gap-3 max-h-40 overflow-y-auto no-scrollbar p-1">
+                            {ICONS.map(icon => (
+                                <button key={icon} type="button" onClick={() => setCategoryData({...categoryData, icon})} className={`w-12 h-12 rounded-xl flex items-center justify-center border transition-all ${categoryData.icon === icon ? 'border-[#D9B978] bg-[#D9B978]/10 text-[#D9B978]' : 'border-white/5 text-slate-400'}`}>
+                                    {getIcon(icon, 20)}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                    <ColorPicker selected={categoryData.color} onSelect={c => setCategoryData({...categoryData, color: c})} t={t} />
+                    <div className="flex gap-3">
+                        {editingCategory && (
+                            <button type="button" onClick={() => triggerConfirm(`${t.deleteCategory} ${editingCategory.name}؟`, () => { onRemoveCategory(editingCategory.id); setShowCategoryForm(false); }, t.deleteCategory, "danger")} className="p-4 bg-rose-500/10 text-rose-500 border border-rose-500/20 rounded-2xl active:scale-95"><Trash2 size={24} /></button>
+                        )}
+                        <ActionButton label={t.saveCategory} onClick={saveCategory} />
+                    </div>
+                </div>
+            </Modal>
+        )}
+      </div>
+    );
+  }
+
+  if (activeSection === 'currencies') {
+    return (
+      <div className="space-y-6 pb-24 animate-fade text-start">
+        <div className="flex justify-between items-center bg-[#11161C] p-5 rounded-[2.5rem] border border-white/10 shadow-xl">
+          <div className="flex items-center gap-3">
+            <button onClick={() => setActiveSection('main')} className="p-2.5 bg-[#0A0D10] hover:bg-white/5 rounded-2xl text-slate-400 hover:text-white transition-all"><ChevronLeft size={20} /></button>
+            <h3 className="font-black text-[#F4F1EA] text-lg">{t.currenciesAndRates}</h3>
+          </div>
+          <button onClick={() => setShowCurrencyModal(true)} className="bg-[#D9B978] text-[#0A0D10] px-5 py-2.5 rounded-2xl font-black text-xs active:scale-95 transition-all shadow-lg shadow-[#D9B978]/10 flex items-center gap-1.5">
+             <Plus size={16} /> {t.addCurrency}
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+           {safeCurrencies.map(c => {
+              const loc = getLocalizedCurrency(c.code, c.name, c.symbol, localLanguage || 'ar');
+              return (
+                 <div key={c.code} className="bg-[#11161C] p-5 rounded-[2rem] border border-white/10 flex justify-between items-center shadow-lg">
+                    <div className="flex items-center gap-3.5">
+                       <div className="min-w-[48px] h-12 px-2.5 rounded-2xl bg-[#D9B978]/10 text-[#D9B978] flex flex-col items-center justify-center font-black text-xs shrink-0 border border-[#D9B978]/20">
+                          <span>{loc.symbol}</span>
+                          {loc.badge && <span className="text-[8px] opacity-75">{loc.badge}</span>}
+                       </div>
+                       <div>
+                          <h4 className="text-[#F4F1EA] font-black text-sm">{loc.name} ({c.code})</h4>
+                          <p className="text-xs text-slate-400 font-bold">{t.exchangeRate}</p>
+                       </div>
+                    </div>
+                    {c.code !== currency?.code && (
+                       <button onClick={() => triggerConfirm(`${t.deleteCurrency} ${loc.name}؟`, () => onRemoveCurrency(c.code), t.deleteCurrency, "danger")} className="p-2.5 bg-rose-500/10 text-rose-500 rounded-xl border border-rose-500/20">
+                          <Trash2 size={16} />
+                       </button>
+                    )}
+                 </div>
+              );
+           })}
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-6 pb-24 animate-fade">
-      <div className="flex justify-between items-center bg-slate-900 p-5 rounded-[2.5rem] border border-slate-800">
-        <h3 className="font-black text-white text-lg">{t.generalSettings}</h3>
-        <button onClick={handleSaveProfile} className="bg-amber-500 text-slate-950 px-8 py-3 rounded-2xl font-black text-sm active:scale-95 transition-all shadow-lg shadow-amber-500/10">{t.save}</button>
+    <div className="space-y-6 pb-24 animate-fade text-start">
+      <div className="flex justify-between items-center bg-[#11161C] p-5 rounded-[2.5rem] border border-white/10 shadow-xl">
+        <h3 className="font-black text-[#F4F1EA] text-lg">{t.generalSettings}</h3>
+        <button onClick={handleSaveProfile} className="bg-[#D9B978] text-[#0A0D10] px-8 py-3 rounded-2xl font-black text-xs active:scale-95 transition-all shadow-lg shadow-[#D9B978]/10 hover:bg-[#c9a764]">{t.save}</button>
       </div>
 
-      {/* PWA Section */}
       {isUpdateAvailable && (
         <div className="bg-gradient-to-br from-amber-500/20 to-orange-500/20 p-5 rounded-[2.5rem] border border-amber-500/30 flex items-center justify-between gap-4 shadow-xl">
            <div className="flex gap-3 items-center">
               <RefreshCw size={24} className="text-amber-500 animate-spin shrink-0" style={{ animationDuration: '3s' }} />
                <div>
-                  <p className="text-xs font-black text-white">تحديث جديد متاح!</p>
-                  <p className="text-[10px] text-slate-400 font-bold leading-relaxed">يتوفر إصدار فوري حديث لتطبيق ثري مع ميزات أفضل.</p>
+                  <p className="text-xs font-black text-white">{t.newUpdateAvailable}</p>
+                  <p className="text-[10px] text-slate-400 font-bold leading-relaxed">{t.newUpdateDesc}</p>
                </div>
            </div>
-           <button onClick={handleUpdateClick} className="px-5 py-2.5 bg-amber-500 text-slate-950 font-black text-xs rounded-xl active:scale-95 transition-all shrink-0 shadow-lg shadow-amber-500/10">تحديث الآن</button>
+           <button onClick={handleUpdateClick} className="px-5 py-2.5 bg-amber-500 text-slate-950 font-black text-xs rounded-xl active:scale-95 transition-all shrink-0 shadow-lg shadow-amber-500/10">{t.updateNow}</button>
         </div>
       )}
 
@@ -940,11 +673,11 @@ const Settings: React.FC<SettingsProps> = ({
            <div className="flex gap-3 items-center">
               <Sparkles size={24} className="text-indigo-400 shrink-0" />
               <div>
-                 <p className="text-xs font-black text-white">ثبّت "ثري" على هاتفك</p>
-                 <p className="text-[10px] text-slate-400 font-bold leading-relaxed">استمتع بتجربة تطبيق كاملة وسريعة بدون متصفح لراحتك.</p>
+                 <p className="text-xs font-black text-white">{t.installThari}</p>
+                 <p className="text-[10px] text-slate-400 font-bold leading-relaxed">{t.installThariDesc}</p>
               </div>
            </div>
-           <button onClick={handleInstallClick} className="px-5 py-2.5 bg-indigo-500 text-white font-black text-xs rounded-xl active:scale-95 transition-all shrink-0 shadow-lg shadow-indigo-500/25">تثبيت التطبيق</button>
+           <button onClick={handleInstallClick} className="px-5 py-2.5 bg-indigo-500 text-white font-black text-xs rounded-xl active:scale-95 transition-all shrink-0 shadow-lg shadow-indigo-500/25">{t.installApp}</button>
         </div>
       )}
 
@@ -953,9 +686,9 @@ const Settings: React.FC<SettingsProps> = ({
            <div className="flex gap-3 items-center">
               <Sparkles size={24} className="text-indigo-400 shrink-0" />
               <div>
-                 <p className="text-xs font-black text-white">تثبيت "ثري" على آيفون / آيباد</p>
+                 <p className="text-xs font-black text-white">{t.installThariIOS}</p>
                  <p className="text-[10px] text-slate-400 font-bold leading-relaxed">
-                   لتثبيت التطبيق على آيفون أو آيباد: اضغط على زر المشاركة <span className="font-extrabold text-amber-500 px-1">⎋</span> في سفاري، ثم اختر <span className="font-extrabold text-amber-500 px-1">إضافة إلى الشاشة الرئيسية ⊕</span> ليصبح تطبيقاً كاملاً على جهازك.
+                   {t.installIOSInstructions}
                  </p>
               </div>
            </div>
@@ -963,76 +696,75 @@ const Settings: React.FC<SettingsProps> = ({
       )}
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-         <button onClick={() => setActiveSection('wallets')} className="bg-slate-900 p-5 rounded-[2rem] border border-slate-800 flex flex-col items-center gap-3 text-white font-bold hover:bg-slate-800 transition-all active:scale-95">
-            <div className="w-11 h-11 bg-amber-500/10 text-amber-500 flex items-center justify-center rounded-2xl"><WalletIcon size={22} /></div>
+         <button type="button" onClick={() => setActiveSection('wallets')} className="bg-[#11161C] p-5 rounded-[2rem] border border-white/10 flex flex-col items-center gap-3 text-[#F4F1EA] font-bold hover:bg-white/[0.03] transition-all active:scale-95 shadow-xl">
+            <div className="w-11 h-11 bg-[#D9B978]/10 text-[#D9B978] flex items-center justify-center rounded-2xl"><WalletIcon size={22} /></div>
             <span className="text-[11px] font-black uppercase tracking-wider">{t.walletsManagement}</span>
          </button>
-         <button onClick={() => setActiveSection('categories')} className="bg-slate-900 p-5 rounded-[2rem] border border-slate-800 flex flex-col items-center gap-3 text-white font-bold hover:bg-slate-800 transition-all active:scale-95">
-            <div className="w-11 h-11 bg-blue-500/10 text-blue-500 flex items-center justify-center rounded-2xl"><Tag size={22} /></div>
+         <button type="button" onClick={() => setActiveSection('categories')} className="bg-[#11161C] p-5 rounded-[2rem] border border-white/10 flex flex-col items-center gap-3 text-[#F4F1EA] font-bold hover:bg-white/[0.03] transition-all active:scale-95 shadow-xl">
+            <div className="w-11 h-11 bg-blue-500/10 text-blue-400 flex items-center justify-center rounded-2xl"><Tag size={22} /></div>
             <span className="text-[11px] font-black uppercase tracking-wider">{t.categoriesManagement}</span>
          </button>
-         <button onClick={() => setActiveSection('currencies')} className="bg-slate-900 p-5 rounded-[2rem] border border-slate-800 flex flex-col items-center gap-3 text-white font-bold hover:bg-slate-800 transition-all active:scale-95">
-            <div className="w-11 h-11 bg-emerald-500/10 text-emerald-500 flex items-center justify-center rounded-2xl"><RefreshCw size={22} /></div>
+         <button type="button" onClick={() => setActiveSection('currencies')} className="bg-[#11161C] p-5 rounded-[2rem] border border-white/10 flex flex-col items-center gap-3 text-[#F4F1EA] font-bold hover:bg-white/[0.03] transition-all active:scale-95 shadow-xl">
+            <div className="w-11 h-11 bg-emerald-500/10 text-emerald-400 flex items-center justify-center rounded-2xl"><RefreshCw size={22} /></div>
             <span className="text-[11px] font-black uppercase tracking-wider">{t.currenciesAndRates}</span>
          </button>
-         <button onClick={() => setShowEmailBackupModal(true)} className="bg-slate-900 p-5 rounded-[2rem] border border-slate-800 flex flex-col items-center gap-3 text-white font-bold hover:bg-slate-800 transition-all active:scale-95">
+         <button type="button" onClick={() => setShowEmailBackupModal(true)} className="bg-[#11161C] p-5 rounded-[2rem] border border-white/10 flex flex-col items-center gap-3 text-[#F4F1EA] font-bold hover:bg-white/[0.03] transition-all active:scale-95 shadow-xl">
             <div className="w-11 h-11 bg-indigo-500/10 text-indigo-400 flex items-center justify-center rounded-2xl"><Mail size={22} /></div>
             <span className="text-[11px] font-black uppercase tracking-wider">{t.emailBackup}</span>
          </button>
       </div>
 
       <div className="space-y-4">
-         {/* Accordion 1 - Profile Info, Registered Email & AI Assistance */}
          <AccordionItem id="profile" title={t.accountAndEmailSync} icon={User}>
-            <div className="space-y-4 text-right">
+            <div className="space-y-4">
                 <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2 block">اسم صاحب الحساب</label>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2 block">{t.accountOwnerName}</label>
                     <input 
                       type="text" 
                       value={localUserName} 
                       onChange={e => setLocalUserName(e.target.value)} 
-                      className="w-full p-4 rounded-xl bg-slate-800 text-white font-bold border-none outline-none focus:ring-1 focus:ring-amber-500 shadow-inner" 
+                      className="w-full p-4 rounded-xl bg-[#0A0D10] text-[#F4F1EA] font-bold border border-white/10 outline-none focus:border-[#D9B978] shadow-inner" 
                     />
                 </div>
 
                 <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2 block">لغة التطبيق (Language)</label>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2 block">{t.language}</label>
                     <div className="grid grid-cols-2 gap-3">
                       <button
                         type="button"
                         onClick={() => setLocalLanguage('ar')}
                         className={`p-3.5 rounded-xl border text-xs font-black flex items-center justify-center gap-2 transition-all ${
                           localLanguage === 'ar'
-                            ? 'bg-amber-500/20 border-amber-500 text-amber-300 shadow-lg shadow-amber-500/10'
-                            : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-750'
+                            ? 'bg-[#D9B978]/20 border-[#D9B978] text-[#D9B978] shadow-lg shadow-[#D9B978]/10'
+                            : 'bg-[#0A0D10] border-white/10 text-slate-300 hover:bg-white/5'
                         }`}
                       >
                         <span>العربية (Arabic)</span>
-                        {localLanguage === 'ar' && <Check size={14} className="text-amber-400" />}
+                        {localLanguage === 'ar' && <Check size={14} className="text-[#D9B978]" />}
                       </button>
                       <button
                         type="button"
                         onClick={() => setLocalLanguage('en')}
                         className={`p-3.5 rounded-xl border text-xs font-black flex items-center justify-center gap-2 transition-all ${
                           localLanguage === 'en'
-                            ? 'bg-amber-500/20 border-amber-500 text-amber-300 shadow-lg shadow-amber-500/10'
-                            : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-750'
+                            ? 'bg-[#D9B978]/20 border-[#D9B978] text-[#D9B978] shadow-lg shadow-[#D9B978]/10'
+                            : 'bg-[#0A0D10] border-white/10 text-slate-300 hover:bg-white/5'
                         }`}
                       >
                         <span>English (الإنجليزية)</span>
-                        {localLanguage === 'en' && <Check size={14} className="text-amber-400" />}
+                        {localLanguage === 'en' && <Check size={14} className="text-[#D9B978]" />}
                       </button>
                     </div>
                 </div>
 
                 <div className="space-y-2">
                     <div className="flex justify-between items-center px-1">
-                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block flex items-center gap-1.5">
-                        <Mail size={12} className="text-amber-500" /> البريد الإلكتروني المسجل لاستقبال النسخ الاحتياطية
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block flex items-center gap-1.5">
+                        <Mail size={12} className="text-[#D9B978]" /> {t.registeredEmailBackup}
                       </label>
                       {appState?.lastBackupDate && (
                         <span className="text-[9px] font-bold text-slate-500">
-                          آخر نسخة: {new Date(appState.lastBackupDate).toLocaleDateString('ar-SA')}
+                          {t.lastBackup} {new Date(appState.lastBackupDate).toLocaleDateString('ar-SA')}
                         </span>
                       )}
                     </div>
@@ -1042,121 +774,91 @@ const Settings: React.FC<SettingsProps> = ({
                         value={localUserEmail} 
                         onChange={e => setLocalUserEmail(e.target.value)} 
                         placeholder="example@domain.com"
-                        className="flex-1 p-4 rounded-xl bg-slate-800 text-white font-bold border-none outline-none focus:ring-1 focus:ring-amber-500 shadow-inner text-sm dir-ltr text-left" 
+                        className="flex-1 p-4 rounded-xl bg-[#0A0D10] text-[#F4F1EA] font-bold border border-white/10 outline-none focus:border-[#D9B978] shadow-inner text-sm dir-ltr text-start" 
                       />
                       <button
                         type="button"
                         onClick={() => setShowEmailBackupModal(true)}
-                        className="px-4 bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-400 rounded-xl text-xs font-black active:scale-95 transition-all flex items-center gap-1.5 shrink-0"
-                        title="إرسال نسخة احتياطية فورية لبريدك"
+                        className="px-4 bg-[#D9B978]/15 hover:bg-[#D9B978]/25 border border-[#D9B978]/30 text-[#D9B978] rounded-xl text-xs font-black active:scale-95 transition-all flex items-center gap-1.5 shrink-0"
                       >
                         <Send size={14} />
-                        <span>نسخ للبريد</span>
+                        <span>{t.emailBackup}</span>
                       </button>
                     </div>
-                    <p className="text-[10px] text-slate-400 font-bold px-1">
-                      سيتم إرسال ملفات النسخ الاحتياطي المشفرة وملخص وضعك المالي مباشرة إلى هذا البريد.
-                    </p>
                 </div>
 
                 <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2 block">مفتاح خدمة الاستشارات الموسعة (اختياري للتحليلات الإضافية)</label>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2 block">{t.consultationKeyOptional}</label>
                     <input 
                       type="password" 
                       value={localApiKey} 
                       onChange={e => setLocalApiKey(e.target.value)} 
-                      placeholder="مفتاح API اختياري" 
-                      className="text-center w-full p-4 rounded-xl bg-slate-800 text-white font-bold border-none outline-none focus:ring-1 focus:ring-amber-500 shadow-inner text-sm" 
+                      placeholder={t.apiKeyOptionalPlaceholder} 
+                      className="text-center w-full p-4 rounded-xl bg-[#0A0D10] text-[#F4F1EA] font-bold border border-white/10 outline-none focus:border-[#D9B978] shadow-inner text-sm" 
                     />
                 </div>
             </div>
          </AccordionItem>
 
-         {/* Accordion 2 - Preferences, Security & Device/Web Diagnostics */}
-         <AccordionItem id="security" title="الأمان، البيومترية، والتحقق من الأجهزة والويب" icon={Lock}>
-            <div className="space-y-5 divide-y divide-slate-800/60 text-right">
+         <AccordionItem id="security" title={t.securityBiometricWeb} icon={Lock}>
+            <div className="space-y-5 divide-y divide-white/5">
                 <div className="pb-4">
                     <button 
                         onClick={() => setShowCurrencyModal(true)}
-                        className="w-full bg-slate-950 p-4 rounded-2xl border border-slate-800 flex items-center justify-between group active:scale-[0.98] transition-all hover:border-amber-500/30"
+                        className="w-full bg-[#0A0D10] p-4 rounded-2xl border border-white/10 flex items-center justify-between group active:scale-[0.98] transition-all hover:border-[#D9B978]/30"
                         type="button"
                     >
                         <div className="flex items-center gap-4">
-                             <div className="w-10 h-10 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center text-amber-500 font-black">
-                                 {currency?.symbol || (typeof currency === 'string' ? currency : '')}
+                             <div className="min-w-[44px] h-10 px-2 rounded-xl bg-[#11161C] border border-white/10 flex items-center justify-center text-[#D9B978] font-black text-xs shrink-0">
+                                 {getLocalizedCurrency(currency?.code || 'SAR', currency?.name, currency?.symbol, localLanguage || 'ar').symbol}
                              </div>
-                             <div className="text-right">
-                                 <p className="text-[9px] font-black text-slate-500 uppercase">العملة الأساسية</p>
-                                 <p className="text-white font-bold text-xs">{currency?.name || (typeof currency === 'string' ? currency : '')}</p>
+                             <div className="text-start">
+                                 <p className="text-[9px] font-black text-slate-400 uppercase">{t.baseCurrency}</p>
+                                 <p className="text-[#F4F1EA] font-bold text-xs">{getLocalizedCurrency(currency?.code || 'SAR', currency?.name, currency?.symbol, localLanguage || 'ar').name}</p>
                              </div>
                         </div>
-                        <ChevronDown size={16} className="text-slate-500" />
+                        <ChevronDown size={16} className="text-slate-400" />
                     </button>
                 </div>
 
                 <div className="pt-4 space-y-2">
-                    <div className="flex justify-between items-center bg-slate-950/40 p-3 rounded-2xl border border-white/5">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2"><Plane size={14} /> وضع السفر (فصل العملات)</label>
-                        <div dir="ltr" className={`w-12 h-6 rounded-full p-1 cursor-pointer transition-all ${isTravelMode ? 'bg-amber-500' : 'bg-slate-700'}`} onClick={() => {
+                    <div className="flex justify-between items-center bg-[#0A0D10] p-3.5 rounded-2xl border border-white/5">
+                        <label className="text-[10px] font-black text-slate-300 uppercase tracking-widest flex items-center gap-2"><Plane size={14} className="text-[#D9B978]" /> {t.travelMode}</label>
+                        <div dir="ltr" className={`w-12 h-6 rounded-full p-1 cursor-pointer transition-all ${isTravelMode ? 'bg-[#D9B978]' : 'bg-slate-700'}`} onClick={() => {
                             const newVal = !isTravelMode;
                             setIsTravelMode(newVal);
                             onUpdateSettings({ showSeparateCurrencies: newVal });
                         }}>
-                            <div className={`w-4 h-4 bg-white rounded-full shadow-md transition-transform ${isTravelMode ? 'translate-x-6' : 'translate-x-0'}`} />
+                            <div className={`w-4 h-4 bg-[#0A0D10] rounded-full shadow-md transition-transform ${isTravelMode ? 'translate-x-6' : 'translate-x-0'}`} />
                         </div>
                     </div>
                 </div>
 
-                {/* Auto-Lock Duration Setting */}
                 <div className="pt-4 space-y-2">
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 px-1">
-                      <Clock size={14} className="text-amber-500" /> مهلة القفل التلقائي للتطبيق
+                      <Clock size={14} className="text-[#D9B978]" /> {t.autoLockTimeout}
                     </label>
-                    <div className="grid grid-cols-4 gap-1.5 bg-slate-950 p-1.5 rounded-2xl border border-white/5">
-                      <button 
-                        type="button" 
-                        onClick={() => { setLocalAutoLockTime('instant'); onUpdateSettings({ autoLockTime: 'instant' }); }}
-                        className={`py-2 rounded-xl text-xs font-bold transition-all ${localAutoLockTime === 'instant' ? 'bg-amber-500 text-slate-950 font-black shadow-md' : 'text-slate-400 hover:text-white'}`}
-                      >
-                        فوري
-                      </button>
-                      <button 
-                        type="button" 
-                        onClick={() => { setLocalAutoLockTime('1min'); onUpdateSettings({ autoLockTime: '1min' }); }}
-                        className={`py-2 rounded-xl text-xs font-bold transition-all ${localAutoLockTime === '1min' ? 'bg-amber-500 text-slate-950 font-black shadow-md' : 'text-slate-400 hover:text-white'}`}
-                      >
-                        دقيقة
-                      </button>
-                      <button 
-                        type="button" 
-                        onClick={() => { setLocalAutoLockTime('5min'); onUpdateSettings({ autoLockTime: '5min' }); }}
-                        className={`py-2 rounded-xl text-xs font-bold transition-all ${localAutoLockTime === '5min' ? 'bg-amber-500 text-slate-950 font-black shadow-md' : 'text-slate-400 hover:text-white'}`}
-                      >
-                        5 دقائق
-                      </button>
-                      <button 
-                        type="button" 
-                        onClick={() => { setLocalAutoLockTime('never'); onUpdateSettings({ autoLockTime: 'never' }); }}
-                        className={`py-2 rounded-xl text-xs font-bold transition-all ${localAutoLockTime === 'never' ? 'bg-amber-500 text-slate-950 font-black shadow-md' : 'text-slate-400 hover:text-white'}`}
-                      >
-                        تعطيل
-                      </button>
+                    <div className="grid grid-cols-4 gap-1.5 bg-[#0A0D10] p-1.5 rounded-2xl border border-white/5">
+                      <button type="button" onClick={() => { setLocalAutoLockTime('instant'); onUpdateSettings({ autoLockTime: 'instant' }); }} className={`py-2 rounded-xl text-xs font-bold transition-all ${localAutoLockTime === 'instant' ? 'bg-[#D9B978] text-[#0A0D10] font-black shadow-md' : 'text-slate-400 hover:text-white'}`}>{t.instant}</button>
+                      <button type="button" onClick={() => { setLocalAutoLockTime('1min'); onUpdateSettings({ autoLockTime: '1min' }); }} className={`py-2 rounded-xl text-xs font-bold transition-all ${localAutoLockTime === '1min' ? 'bg-[#D9B978] text-[#0A0D10] font-black shadow-md' : 'text-slate-400 hover:text-white'}`}>{t.minute}</button>
+                      <button type="button" onClick={() => { setLocalAutoLockTime('5min'); onUpdateSettings({ autoLockTime: '5min' }); }} className={`py-2 rounded-xl text-xs font-bold transition-all ${localAutoLockTime === '5min' ? 'bg-[#D9B978] text-[#0A0D10] font-black shadow-md' : 'text-slate-400 hover:text-white'}`}>{t.fiveMinutes}</button>
+                      <button type="button" onClick={() => { setLocalAutoLockTime('never'); onUpdateSettings({ autoLockTime: 'never' }); }} className={`py-2 rounded-xl text-xs font-bold transition-all ${localAutoLockTime === 'never' ? 'bg-[#D9B978] text-[#0A0D10] font-black shadow-md' : 'text-slate-400 hover:text-white'}`}>تعطيل</button>
                     </div>
                 </div>
 
                 <div className="pt-4 space-y-3">
-                    <div className="flex justify-between items-center bg-slate-950/40 p-3 rounded-2xl border border-white/5">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2"><Lock size={14} /> كود الحماية السري (PIN)</label>
-                        <div dir="ltr" className={`w-12 h-6 rounded-full p-1 cursor-pointer transition-all ${isSecurityEnabled ? 'bg-amber-500' : 'bg-slate-700'}`} onClick={() => {
+                    <div className="flex justify-between items-center bg-[#0A0D10] p-3.5 rounded-2xl border border-white/5">
+                        <label className="text-[10px] font-black text-slate-300 uppercase tracking-widest flex items-center gap-2"><Lock size={14} className="text-[#D9B978]" /> {t.secretPinCode}</label>
+                        <div dir="ltr" className={`w-12 h-6 rounded-full p-1 cursor-pointer transition-all ${isSecurityEnabled ? 'bg-[#D9B978]' : 'bg-slate-700'}`} onClick={() => {
                             const nextState = !isSecurityEnabled;
                             setIsSecurityEnabled(nextState);
                             if (!nextState) {
                               setLocalPin('');
                               onUpdateSettings({ pin: null, isLocked: false });
-                              showToast('تم إلغاء قفل الحماية');
+                              showToast(t.lockCancelled);
                             }
                         }}>
-                            <div className={`w-4 h-4 bg-white rounded-full shadow-md transition-transform ${isSecurityEnabled ? 'translate-x-6' : 'translate-x-0'}`} />
+                            <div className={`w-4 h-4 bg-[#0A0D10] rounded-full shadow-md transition-transform ${isSecurityEnabled ? 'translate-x-6' : 'translate-x-0'}`} />
                         </div>
                     </div>
                     {isSecurityEnabled && (
@@ -1165,96 +867,48 @@ const Settings: React.FC<SettingsProps> = ({
                               type="password" 
                               value={localPin} 
                               onChange={e => setLocalPin(e.target.value.replace(/\D/g, '').slice(0, 4))} 
-                              className="w-full p-4 rounded-xl bg-slate-800 text-white font-black text-center text-2xl tracking-[0.5em] border border-white/10 focus:border-amber-500 focus:outline-none" 
+                              className="w-full p-4 rounded-xl bg-[#0A0D10] text-[#F4F1EA] font-black text-center text-2xl tracking-[0.5em] border border-white/10 focus:border-[#D9B978] focus:outline-none" 
                               placeholder="****" 
                               maxLength={4}
                           />
-                          <p className="text-[10px] text-slate-400 font-bold text-center">أدخل 4 أرقام سرية لقفل التطبيق</p>
                         </div>
                     )}
                 </div>
 
                 <div className="pt-4 space-y-2">
-                    <div className="flex justify-between items-center bg-slate-950/40 p-3 rounded-2xl border border-white/5">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2"><Fingerprint size={14} className="text-emerald-400" /> فتح التطبيق بالبصمة (Face ID / Touch ID)</label>
+                    <div className="flex justify-between items-center bg-[#0A0D10] p-3.5 rounded-2xl border border-white/5">
+                        <label className="text-[10px] font-black text-slate-300 uppercase tracking-widest flex items-center gap-2"><Fingerprint size={14} className="text-emerald-400" /> {t.unlockWithBiometric}</label>
                         <div dir="ltr" className={`w-12 h-6 rounded-full p-1 cursor-pointer transition-all ${isBiometricEnabled ? 'bg-emerald-500' : 'bg-slate-700'}`} onClick={() => {
                             const nextBio = !isBiometricEnabled;
                             setIsBiometricEnabled(nextBio);
                             onUpdateSettings({ isBiometricEnabled: nextBio });
-                            showToast(nextBio ? 'تم تفعيل الفتح بالبصمة' : 'تم تعطيل الفتح بالبصمة');
+                            showToast(nextBio ? t.biometricEnabled : t.biometricDisabled);
                         }}>
-                            <div className={`w-4 h-4 bg-white rounded-full shadow-md transition-transform ${isBiometricEnabled ? 'translate-x-6' : 'translate-x-0'}`} />
+                            <div className={`w-4 h-4 bg-[#0A0D10] rounded-full shadow-md transition-transform ${isBiometricEnabled ? 'translate-x-6' : 'translate-x-0'}`} />
                         </div>
                     </div>
                 </div>
 
-                {/* Toggle: Require Biometrics / PIN on Every App Launch */}
-                <div className="pt-2 space-y-2">
-                    <div className="flex justify-between items-center bg-slate-950/40 p-3.5 rounded-2xl border border-white/5">
-                        <div className="space-y-0.5 text-right pr-1">
-                            <label className="text-xs font-black text-white flex items-center gap-2">
-                                <ScanFace size={15} className="text-amber-400" />
-                                <span>طلب البصمة عند كل فتح للتطبيق</span>
-                            </label>
-                            <p className="text-[10px] text-slate-400 font-bold">
-                                {localRequireBiometricOnOpen 
-                                  ? 'يتم قفل التطبيق تلقائياً عند فتحه أو العودة إليه لطلب البصمة/الرمز' 
-                                  : 'التطبيق يفتح مباشرة دون طلب البصمة، مع بقاء الرمز للعمليات الحساسة'}
-                            </p>
-                        </div>
-                        <div 
-                            dir="ltr" 
-                            className={`w-12 h-6 rounded-full p-1 cursor-pointer transition-all shrink-0 ${localRequireBiometricOnOpen ? 'bg-amber-500' : 'bg-slate-700'}`} 
-                            onClick={() => {
-                                const nextVal = !localRequireBiometricOnOpen;
-                                setLocalRequireBiometricOnOpen(nextVal);
-                                onUpdateSettings({ 
-                                  requireBiometricOnOpen: nextVal,
-                                  isLocked: nextVal ? false : false // Ensure app is not locked unexpectedly
-                                });
-                                showToast(nextVal ? 'تم تفعيل طلب البصمة عند فتح التطبيق' : 'تم تعطيل قفل التطبيق عند الفتح');
-                            }}
-                        >
-                            <div className={`w-4 h-4 bg-white rounded-full shadow-md transition-transform ${localRequireBiometricOnOpen ? 'translate-x-6' : 'translate-x-0'}`} />
-                        </div>
-                    </div>
-                </div>
-
-                {/* Device & Web Platform Diagnostic Card */}
                 <div className="pt-4 space-y-3">
-                  <div className="bg-slate-950/70 p-4 rounded-2xl border border-slate-800 space-y-3">
+                  <div className="bg-[#0A0D10] p-4 rounded-2xl border border-white/10 space-y-3">
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2 text-xs font-black text-white">
-                        <Laptop size={16} className="text-amber-500" />
-                        <span>التحقق من توافق الجهاز والويب</span>
+                      <div className="flex items-center gap-2 text-xs font-black text-[#F4F1EA]">
+                        <Laptop size={16} className="text-[#D9B978]" />
+                        <span>{t.deviceWebCompatibilityCheck}</span>
                       </div>
                       <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                        {Capacitor.isNativePlatform() ? 'تطبيق محلي أصلي (Capacitor)' : 'تطبيق ويب PWA متوافق'}
+                        {Capacitor.isNativePlatform() ? t.nativeApp : t.webCompatibleApp}
                       </span>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-2 text-[10px] font-bold text-slate-400">
-                      <div className="bg-slate-900 p-2.5 rounded-xl border border-white/5 flex items-center justify-between">
-                        <span>مستشعر البصمة:</span>
-                        <span className={isBioHardwareAvailable ? 'text-emerald-400' : 'text-amber-400'}>
-                          {isBioHardwareAvailable ? biometryTypeTitle : 'متوفر عبر WebAuthn'}
-                        </span>
-                      </div>
-                      <div className="bg-slate-900 p-2.5 rounded-xl border border-white/5 flex items-center justify-between">
-                        <span>جاهزية الأوفلاين:</span>
-                        <span className="text-emerald-400 font-black">100% نشط</span>
-                      </div>
-                    </div>
-
-                    {/* Live Biometric Test Button */}
                     <button
                       type="button"
                       onClick={handleRunBiometricTest}
                       disabled={bioTestStatus === 'testing'}
-                      className="w-full py-2.5 bg-slate-900 hover:bg-slate-850 border border-amber-500/30 text-amber-400 rounded-xl text-xs font-bold active:scale-95 transition-all flex items-center justify-center gap-2"
+                      className="w-full py-2.5 bg-[#11161C] hover:bg-white/5 border border-[#D9B978]/30 text-[#D9B978] rounded-xl text-xs font-bold active:scale-95 transition-all flex items-center justify-center gap-2"
                     >
                       <ScanFace size={15} />
-                      <span>{bioTestStatus === 'testing' ? 'جاري فحص المستشعر...' : 'اختبار فحص بصمة الجهاز الآن'}</span>
+                      <span>{bioTestStatus === 'testing' ? t.testingSensor : t.testBiometricNow}</span>
                     </button>
 
                     {bioTestFeedback && (
@@ -1271,676 +925,144 @@ const Settings: React.FC<SettingsProps> = ({
                     <button
                       type="button"
                       onClick={() => handleSaveSecurity(false)}
-                      className="flex-1 py-3 bg-amber-500 text-slate-950 rounded-xl font-black text-xs active:scale-95 shadow-md transition-all flex items-center justify-center gap-2"
+                      className="flex-1 py-3 bg-[#D9B978] text-[#0A0D10] rounded-xl font-black text-xs active:scale-95 shadow-md transition-all flex items-center justify-center gap-2"
                     >
                       <ShieldCheck size={16} />
-                      <span>حفظ إعدادات الأمان والتوافق</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleSaveSecurity(true)}
-                      className="py-3 px-4 bg-slate-800 text-slate-200 hover:text-white rounded-xl font-black text-xs border border-white/10 active:scale-95 transition-all flex items-center justify-center gap-2"
-                    >
-                      <Lock size={15} />
-                      <span>قفل التطبيق وتجربة الرمز الآن</span>
+                      <span>{t.saveSecuritySettings}</span>
                     </button>
                   </div>
                 )}
             </div>
          </AccordionItem>
 
-         {/* Accordion 3 - Offline Local Database & Backup to Email */}
-         <AccordionItem id="data" title="النسخ الاحتياطي، البريد، والتخزين الأوفلاين" icon={HardDrive}>
-            <div className="space-y-4 text-right">
-                
-                 {/* Auto-Backup Frequency & Protection Selector Card */}
-                 <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-3">
+         <AccordionItem id="data" title={t.backupEmailOffline} icon={HardDrive}>
+            <div className="space-y-4">
+                 <div className="bg-[#0A0D10] p-4 rounded-2xl border border-white/10 space-y-3">
                    <div className="flex items-center justify-between">
-                     <div className="flex items-center gap-2 text-xs font-black text-white">
-                       <RefreshCw size={16} className="text-amber-500" />
-                       <span>النسخ الاحتياطي التلقائي الدوري</span>
+                     <div className="flex items-center gap-2 text-xs font-black text-[#F4F1EA]">
+                       <RefreshCw size={16} className="text-[#D9B978]" />
+                       <span>{t.periodicAutoBackup}</span>
                      </div>
-                     <span className={`text-[10px] font-bold px-2 py-0.5 rounded-lg border ${localAutoBackupFreq !== 'disabled' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-slate-800 text-slate-400 border-slate-700'}`}>
-                       {localAutoBackupFreq !== 'disabled' ? 'مفعل وتلقائي' : 'معطل'}
-                     </span>
                    </div>
-
-                   <p className="text-[10px] text-slate-400 font-bold leading-relaxed">
-                     يقوم التطبيق بإنشاء نقاط استعادة احتياطية تلقائياً محلياً لضمان عدم ضياع أي سجل مالي حتى عند نسيان النسخ اليدوي.
-                   </p>
-
-                   {/* Auto-Backup Frequency Grid Selector */}
-                   <div className="grid grid-cols-4 gap-1.5 bg-slate-900 p-1.5 rounded-xl border border-white/5">
-                     <button
-                       type="button"
-                       onClick={() => {
-                         setLocalAutoBackupFreq('on_open');
-                         onUpdateSettings({ autoBackupFrequency: 'on_open' });
-                         showToast('تم ضبط النسخ التلقائي: عند فتح التطبيق');
-                       }}
-                       className={`py-2 rounded-lg text-[11px] font-bold transition-all ${localAutoBackupFreq === 'on_open' ? 'bg-amber-500 text-slate-950 font-black shadow-md' : 'text-slate-400 hover:text-white'}`}
-                     >
-                       عند الفتح
-                     </button>
-                     <button
-                       type="button"
-                       onClick={() => {
-                         setLocalAutoBackupFreq('daily');
-                         onUpdateSettings({ autoBackupFrequency: 'daily' });
-                         showToast('تم ضبط النسخ التلقائي: يومياً');
-                       }}
-                       className={`py-2 rounded-lg text-[11px] font-bold transition-all ${localAutoBackupFreq === 'daily' ? 'bg-amber-500 text-slate-950 font-black shadow-md' : 'text-slate-400 hover:text-white'}`}
-                     >
-                       يومي
-                     </button>
-                     <button
-                       type="button"
-                       onClick={() => {
-                         setLocalAutoBackupFreq('weekly');
-                         onUpdateSettings({ autoBackupFrequency: 'weekly' });
-                         showToast('تم ضبط النسخ التلقائي: أسبوعياً');
-                       }}
-                       className={`py-2 rounded-lg text-[11px] font-bold transition-all ${localAutoBackupFreq === 'weekly' ? 'bg-amber-500 text-slate-950 font-black shadow-md' : 'text-slate-400 hover:text-white'}`}
-                     >
-                       أسبوعي
-                     </button>
-                     <button
-                       type="button"
-                       onClick={() => {
-                         setLocalAutoBackupFreq('disabled');
-                         onUpdateSettings({ autoBackupFrequency: 'disabled' });
-                         showToast('تم تعطيل النسخ التلقائي');
-                       }}
-                       className={`py-2 rounded-lg text-[11px] font-bold transition-all ${localAutoBackupFreq === 'disabled' ? 'bg-amber-500 text-slate-950 font-black shadow-md' : 'text-slate-400 hover:text-white'}`}
-                     >
-                       تعطيل
-                     </button>
-                   </div>
-
-                   <div className="flex items-center justify-between pt-1 text-[10px]">
-                     <span className="text-slate-400 font-bold">
-                       {appState?.lastAutoBackupTime 
-                         ? `آخر نسخة تلقائية: ${new Date(appState.lastAutoBackupTime).toLocaleDateString('ar-SA')} ${new Date(appState.lastAutoBackupTime).toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' })}`
-                         : 'لم يتم إنشاء نسخة تلقائية بعد'}
-                     </span>
-                     <button
-                       type="button"
-                       onClick={() => {
-                         const historyStr = localStorage.getItem('thari_auto_backup_history');
-                         const hist = historyStr ? JSON.parse(historyStr) : [];
-                         setAutoBackupHistory(hist);
-                         setShowAutoBackupHistoryModal(true);
-                       }}
-                       className="text-amber-400 hover:text-amber-300 font-black flex items-center gap-1 underline underline-offset-4"
-                     >
-                       <span>نقاط الاستعادة التلقائية</span>
-                       <ChevronLeft size={12} />
-                     </button>
+                   <div className="grid grid-cols-4 gap-1.5 bg-[#11161C] p-1.5 rounded-xl border border-white/5">
+                     <button type="button" onClick={() => { setLocalAutoBackupFreq('on_open'); onUpdateSettings({ autoBackupFrequency: 'on_open' }); showToast(t.autoBackupConfigured); }} className={`py-2 rounded-lg text-[11px] font-bold transition-all ${localAutoBackupFreq === 'on_open' ? 'bg-[#D9B978] text-[#0A0D10] font-black shadow-md' : 'text-slate-400 hover:text-white'}`}>عند الفتح</button>
+                     <button type="button" onClick={() => { setLocalAutoBackupFreq('daily'); onUpdateSettings({ autoBackupFrequency: 'daily' }); showToast(t.autoBackupConfigured); }} className={`py-2 rounded-lg text-[11px] font-bold transition-all ${localAutoBackupFreq === 'daily' ? 'bg-[#D9B978] text-[#0A0D10] font-black shadow-md' : 'text-slate-400 hover:text-white'}`}>يومي</button>
+                     <button type="button" onClick={() => { setLocalAutoBackupFreq('weekly'); onUpdateSettings({ autoBackupFrequency: 'weekly' }); showToast(t.autoBackupConfigured); }} className={`py-2 rounded-lg text-[11px] font-bold transition-all ${localAutoBackupFreq === 'weekly' ? 'bg-[#D9B978] text-[#0A0D10] font-black shadow-md' : 'text-slate-400 hover:text-white'}`}>أسبوعي</button>
+                     <button type="button" onClick={() => { setLocalAutoBackupFreq('disabled'); onUpdateSettings({ autoBackupFrequency: 'disabled' }); showToast(t.autoBackupDisabled); }} className={`py-2 rounded-lg text-[11px] font-bold transition-all ${localAutoBackupFreq === 'disabled' ? 'bg-[#D9B978] text-[#0A0D10] font-black shadow-md' : 'text-slate-400 hover:text-white'}`}>تعطيل</button>
                    </div>
                  </div>
 
-                 {/* Email Cloud Backup Action Card */}
-                <div className="bg-gradient-to-br from-indigo-950/50 to-slate-950 p-4 rounded-2xl border border-indigo-500/30 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-xs font-black text-white">
-                      <Mail size={16} className="text-indigo-400" />
-                      <span>النسخ الاحتياطي للبريد الإلكتروني</span>
-                    </div>
-                    {localUserEmail ? (
-                      <span className="text-[10px] font-bold text-indigo-300 bg-indigo-500/20 px-2 py-0.5 rounded-lg border border-indigo-500/30 max-w-[160px] truncate dir-ltr">
-                        {localUserEmail}
-                      </span>
-                    ) : (
-                      <span className="text-[10px] font-bold text-amber-400/80 bg-amber-500/10 px-2 py-0.5 rounded-lg border border-amber-500/20">
-                        لم يتم تحديد بريد بعد
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-[10px] text-slate-400 font-bold leading-relaxed">
-                    يمكنك كتابة واختيار أي بريد إلكتروني تفضله لإرسال النسخة الاحتياطية المشفرة إليه مع ملخص إحصائي شامل لأموالك.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => setShowEmailBackupModal(true)}
-                    className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-black active:scale-95 transition-all shadow-lg shadow-indigo-600/20 flex items-center justify-center gap-2"
-                  >
-                    <Send size={15} />
-                    <span>إرسال نسخة احتياطية للبريد المحدد</span>
-                  </button>
-                </div>
-
-                {/* Storage Health & Offline Readiness */}
-                <div className="bg-slate-950 p-3.5 rounded-2xl border border-slate-800 space-y-2">
-                  <div className="flex items-center justify-between text-[11px] font-black text-white">
-                    <span className="flex items-center gap-1.5"><Shield size={14} className="text-emerald-400" /> حالة التخزين المحلي والأوفلاين</span>
-                    <span className="text-emerald-400 text-[10px]">مؤمن 100%</span>
-                  </div>
-                  <div className="grid grid-cols-3 gap-2 text-center">
-                    <div className="bg-slate-900/80 p-2 rounded-xl border border-white/5">
-                      <span className="text-[9px] text-slate-500 block">العمليات</span>
-                      <span className="text-xs font-black text-white">{appState?.transactions?.length || 0}</span>
-                    </div>
-                    <div className="bg-slate-900/80 p-2 rounded-xl border border-white/5">
-                      <span className="text-[9px] text-slate-500 block">المحافظ</span>
-                      <span className="text-xs font-black text-white">{safeWallets.length}</span>
-                    </div>
-                    <div className="bg-slate-900/80 p-2 rounded-xl border border-white/5">
-                      <span className="text-[9px] text-slate-500 block">الديون والالتزامات</span>
-                      <span className="text-xs font-black text-white">{appState?.debts?.length || 0}</span>
-                    </div>
-                  </div>
-                  <p className="text-[9px] text-emerald-400/90 font-bold text-center">
-                    ✓ التطبيق يعمل بشكل كامل ومستقل أوفلاين دون الحاجة لأي اتصال بالإنترنت.
-                  </p>
-                </div>
-
                 <div className="grid grid-cols-3 gap-2">
-                    <button onClick={() => { setReportConfig({ type: 'detailed', currencyFilter: null, action: 'print' }); setShowReportModal(true); }} className="flex flex-col items-center justify-center gap-1.5 p-3.5 bg-slate-800/80 rounded-2xl active:scale-95 transition-all border border-slate-800 text-white hover:border-amber-500/30 text-xs font-bold">
-                        <Printer size={18} className="text-amber-500" />
-                        <span className="text-[10px]">طباعة الكشف</span>
+                    <button type="button" onClick={() => { setReportConfig({ type: 'detailed', currencyFilter: null, action: 'print' }); setShowReportModal(true); }} className="flex flex-col items-center justify-center gap-1.5 p-3.5 bg-[#0A0D10] rounded-2xl active:scale-95 transition-all border border-white/10 text-white hover:border-[#D9B978]/30 text-xs font-bold">
+                        <Printer size={18} className="text-[#D9B978]" />
+                        <span className="text-[10px]">{t.printStatement}</span>
                     </button>
-                    <button onClick={() => { setReportConfig({ type: 'detailed', currencyFilter: null, action: 'share' }); setShowReportModal(true); }} className="flex flex-col items-center justify-center gap-1.5 p-3.5 bg-slate-800/80 rounded-2xl active:scale-95 transition-all border border-slate-800 text-white hover:border-emerald-500/30 text-xs font-bold">
-                        <FileDown size={18} className="text-emerald-500" />
-                        <span className="text-[10px]">مشاركة PDF</span>
+                    <button type="button" onClick={() => { setReportConfig({ type: 'detailed', currencyFilter: null, action: 'share' }); setShowReportModal(true); }} className="flex flex-col items-center justify-center gap-1.5 p-3.5 bg-[#0A0D10] rounded-2xl active:scale-95 transition-all border border-white/10 text-white hover:border-emerald-500/30 text-xs font-bold">
+                        <FileDown size={18} className="text-emerald-400" />
+                        <span className="text-[10px]">{t.sharePdf}</span>
                     </button>
-                    <button onClick={() => { setReportConfig({ type: 'detailed', currencyFilter: null, action: 'excel' }); setShowReportModal(true); }} className="flex flex-col items-center justify-center gap-1.5 p-3.5 bg-slate-800/80 rounded-2xl active:scale-95 transition-all border border-slate-800 text-white hover:border-blue-500/30 text-xs font-bold">
-                        <FileSpreadsheet size={18} className="text-blue-500" />
-                        <span className="text-[10px]">تصدير Excel</span>
+                    <button type="button" onClick={() => handleExportCSV('detailed', null)} className="flex flex-col items-center justify-center gap-1.5 p-3.5 bg-[#0A0D10] rounded-2xl active:scale-95 transition-all border border-white/10 text-white hover:border-blue-500/30 text-xs font-bold">
+                        <FileSpreadsheet size={18} className="text-blue-400" />
+                        <span className="text-[10px]">{t.exportExcel}</span>
                     </button>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3 pt-2">
-                    <button onClick={() => handleExportCSV('detailed', null)} className="flex items-center justify-center gap-2 p-3 bg-slate-800/60 rounded-xl active:scale-95 transition-all text-slate-300 border border-slate-800 hover:border-emerald-500/30 text-xs font-bold">
-                        <FileSpreadsheet size={16} className="text-emerald-400" />
-                        <span>تصدير سريع Excel</span>
+                    <button type="button" onClick={() => handleExportBackup()} className="flex items-center justify-center gap-2 p-3.5 bg-[#0A0D10] rounded-xl active:scale-95 border border-white/10 text-xs font-bold text-white">
+                        <FileDown size={14} className="text-[#D9B978]" />
+                        <span>{t.backupThari}</span>
                     </button>
-                    <button onClick={handleExportJSON} className="flex items-center justify-center gap-2 p-3 bg-slate-800/60 rounded-xl active:scale-95 transition-all text-slate-300 border border-slate-800 hover:border-blue-500/30 text-xs font-bold">
-                        <Code size={16} className="text-blue-400" />
-                        <span>تصدير JSON</span>
-                    </button>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3 pt-4 border-t border-slate-850">
-                    <button onClick={handleExportBackup} disabled={isExporting} className="flex items-center justify-center gap-2 p-3 bg-slate-800 rounded-xl active:scale-95 border border-slate-700/50 text-xs font-bold text-white">
-                        <FileDown size={14} className="text-amber-400" />
-                        <span>نسخ احتياطي (.thari)</span>
-                    </button>
-                    <button onClick={() => fileInputRef.current?.click()} className="flex items-center justify-center gap-2 p-3 bg-slate-800 rounded-xl active:scale-95 border border-slate-700/50 text-xs font-bold text-white">
+                    <button type="button" onClick={() => fileInputRef.current?.click()} className="flex items-center justify-center gap-2 p-3.5 bg-[#0A0D10] rounded-xl active:scale-95 border border-white/10 text-xs font-bold text-white">
                         <Upload size={14} className="text-slate-400" />
-                        <span>استعادة نسخة</span>
+                        <span>{t.restoreBackup}</span>
                     </button>
                 </div>
                 <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" />
             </div>
          </AccordionItem>
 
-         {/* Accordion 3 - Notifications & Reminders */}
-         <AccordionItem id="notifications" title="الإشعارات والتنبيهات المالية" icon={Bell}>
-            <div className="space-y-4 text-right">
+         <AccordionItem id="notifications" title={t.smartAlertsNotifications} icon={Bell}>
+            <div className="space-y-4">
                 <div className="space-y-3">
-                    <div className="flex justify-between items-center bg-slate-950/40 p-3 rounded-2xl border border-white/5">
-                        <div className="text-right">
-                            <p className="text-[11px] font-bold text-white">تنبيهات سداد الديون والالتزامات</p>
-                            <p className="text-[9px] font-bold text-slate-500">إشعار تلقائي قبل موعد الاستحقاق بـ 3 أيام</p>
+                    <div className="flex justify-between items-center bg-[#0A0D10] p-3.5 rounded-2xl border border-white/5">
+                        <div className="text-start">
+                            <p className="text-[11px] font-bold text-white">{t.debtAlerts}</p>
                         </div>
-                        <div dir="ltr" className={`w-12 h-6 rounded-full p-1 cursor-pointer transition-all ${debtAlertsEnabled ? 'bg-amber-500' : 'bg-slate-700'}`} onClick={() => setDebtAlertsEnabled(!debtAlertsEnabled)}>
-                            <div className={`w-4 h-4 bg-white rounded-full shadow-md transition-transform ${debtAlertsEnabled ? 'translate-x-6' : 'translate-x-0'}`} />
-                        </div>
-                    </div>
-
-                    <div className="flex justify-between items-center bg-slate-950/40 p-3 rounded-2xl border border-white/5">
-                        <div className="text-right">
-                            <p className="text-[11px] font-bold text-white">تذكير تسجيل المصروفات اليومية</p>
-                            <p className="text-[9px] font-bold text-slate-500">تذكير لطيف الساعة 8:00 مساءً لتسجيل يومياتك</p>
-                        </div>
-                        <div dir="ltr" className={`w-12 h-6 rounded-full p-1 cursor-pointer transition-all ${dailyLoggerEnabled ? 'bg-amber-500' : 'bg-slate-700'}`} onClick={() => setDailyLoggerEnabled(!dailyLoggerEnabled)}>
-                            <div className={`w-4 h-4 bg-white rounded-full shadow-md transition-transform ${dailyLoggerEnabled ? 'translate-x-6' : 'translate-x-0'}`} />
-                        </div>
-                    </div>
-
-                    <div className="flex justify-between items-center bg-slate-950/40 p-3 rounded-2xl border border-white/5">
-                        <div className="text-right">
-                            <p className="text-[11px] font-bold text-white">تنبيهات تخطي الميزانية</p>
-                            <p className="text-[9px] font-bold text-slate-500">تحذير عند الوصول لـ 80% من حد التصنيف</p>
-                        </div>
-                        <div dir="ltr" className={`w-12 h-6 rounded-full p-1 cursor-pointer transition-all ${budgetAlertsEnabled ? 'bg-amber-500' : 'bg-slate-700'}`} onClick={() => setBudgetAlertsEnabled(!budgetAlertsEnabled)}>
-                            <div className={`w-4 h-4 bg-white rounded-full shadow-md transition-transform ${budgetAlertsEnabled ? 'translate-x-6' : 'translate-x-0'}`} />
+                        <div dir="ltr" className={`w-12 h-6 rounded-full p-1 cursor-pointer transition-all ${debtAlertsEnabled ? 'bg-[#D9B978]' : 'bg-slate-700'}`} onClick={() => setDebtAlertsEnabled(!debtAlertsEnabled)}>
+                            <div className={`w-4 h-4 bg-[#0A0D10] rounded-full shadow-md transition-transform ${debtAlertsEnabled ? 'translate-x-6' : 'translate-x-0'}`} />
                         </div>
                     </div>
                 </div>
-
-                <button 
-                  onClick={handleTestNotification}
-                  className="w-full py-3 bg-amber-500/10 text-amber-400 rounded-xl font-bold text-xs border border-amber-500/20 active:scale-95 flex items-center justify-center gap-2 transition-all shadow-sm"
-                >
-                    <Bell size={14} /> اختبار إرسال إشعار تجريبي
+                <button type="button" onClick={handleTestNotification} className="w-full py-3 bg-[#D9B978]/10 text-[#D9B978] rounded-xl font-bold text-xs border border-[#D9B978]/20 active:scale-95 flex items-center justify-center gap-2">
+                    <Bell size={14} /> {t.testNotificationBtn}
                 </button>
             </div>
          </AccordionItem>
 
-         {/* Accordion 4 - Store Rating & Support */}
-         <AccordionItem id="store" title="تقييم التطبيق والدعم الفني للمتاجر" icon={Star}>
-            <div className="space-y-3.5 text-right">
-                <div className="bg-gradient-to-br from-amber-500/10 to-orange-500/10 p-4 rounded-2xl border border-amber-500/20 flex items-center justify-between">
+         <AccordionItem id="store" title={t.storeRatingTitle} icon={Star}>
+            <div className="space-y-3.5">
+                <div className="bg-gradient-to-br from-[#D9B978]/10 to-orange-500/10 p-4 rounded-2xl border border-[#D9B978]/20 flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-amber-500 text-slate-950 flex items-center justify-center font-black shadow-md">
-                            <Star size={20} className="fill-slate-950" />
+                        <div className="w-10 h-10 rounded-xl bg-[#D9B978] text-[#0A0D10] flex items-center justify-center font-black shadow-md">
+                            <Star size={20} className="fill-[#0A0D10]" />
                         </div>
                         <div>
-                            <p className="text-xs font-black text-white">هل تعجبك تجربة "ثري"؟</p>
-                            <p className="text-[10px] text-slate-400 font-bold">ساعدنا بالوصول للمزيد عبر تقييمك في المتجر</p>
+                            <p className="text-xs font-black text-white">{t.likeThariExperience}</p>
+                            <p className="text-[10px] text-slate-400 font-bold">{t.rateUsStore}</p>
                         </div>
                     </div>
-                    <button 
-                      onClick={handleDirectStoreRating}
-                      className="px-3.5 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs rounded-xl active:scale-95 shadow-md shrink-0 transition-all flex items-center gap-1.5"
-                    >
-                        <Star size={14} className="fill-slate-950" />
-                        <span>تقييم التطبيق في المتجر</span>
+                    <button type="button" onClick={handleDirectStoreRating} className="px-3.5 py-2 bg-[#D9B978] text-[#0A0D10] font-black text-xs rounded-xl active:scale-95 shadow-md shrink-0 flex items-center gap-1.5">
+                        <Star size={14} className="fill-[#0A0D10]" />
+                        <span>{t.rate}</span>
                     </button>
                 </div>
 
                 <div className="grid grid-cols-2 gap-2.5">
-                    <button 
-                      onClick={handleSupportClick}
-                      className="flex items-center justify-center gap-2 p-3 bg-slate-800/80 rounded-xl active:scale-95 text-slate-200 border border-slate-700/60 hover:border-amber-500/30 text-xs font-bold"
-                    >
-                        <MessageSquare size={16} className="text-amber-400" />
-                        <span>الدعم الفني المباشر</span>
+                    <button type="button" onClick={handleSupportClick} className="flex items-center justify-center gap-2 p-3 bg-[#0A0D10] rounded-xl active:scale-95 text-slate-200 border border-white/10 text-xs font-bold">
+                        <MessageSquare size={16} className="text-[#D9B978]" />
+                        <span>{t.techSupport}</span>
                     </button>
-                    <button 
-                      onClick={onShowPrivacyPolicy}
-                      className="flex items-center justify-center gap-2 p-3 bg-slate-800/80 rounded-xl active:scale-95 text-slate-200 border border-slate-700/60 hover:border-blue-500/30 text-xs font-bold"
-                    >
+                    <button type="button" onClick={onShowPrivacyPolicy} className="flex items-center justify-center gap-2 p-3 bg-[#0A0D10] rounded-xl active:scale-95 text-slate-200 border border-white/10 text-xs font-bold">
                         <ShieldCheck size={16} className="text-blue-400" />
-                        <span>سياسة الخصوصية</span>
+                        <span>{t.privacyPolicy}</span>
                     </button>
                 </div>
             </div>
          </AccordionItem>
 
-         {/* Accordion 5 - Sensitive Actions */}
-         <AccordionItem id="danger" title="صيانة النظام ومسح البيانات" icon={Trash2}>
-            <div className="space-y-4 text-right">
-                <p className="text-[10px] text-slate-500 leading-relaxed">
-                    تنبيه: مسح البيانات سيقوم بإعادة ضبط المصنع بالكامل وحذف كافة المعاملات والديون والاشتراكات والتقارير المالية نهائياً.
+         <AccordionItem id="danger" title={t.systemMaintenanceAndClear} icon={Trash2}>
+            <div className="space-y-4">
+                <p className="text-[10px] text-slate-400 leading-relaxed">
+                    {t.clearDataWarning}
                 </p>
-                <button 
-                  onClick={() => triggerConfirm("هل أنت متأكد من مسح جميع بيانات التطبيق؟ سيتم حذف جميع المعاملات والديون والاشتراكات بشكل نهائي.", onClearData, "تنبيه هام جداً", "danger")} 
-                  className="w-full py-4 text-rose-500 font-bold text-xs border border-rose-500/20 bg-rose-500/5 rounded-2xl active:scale-95 flex items-center justify-center gap-2 duration-200"
-                  type="button"
-                >
-                  <Trash2 size={16} /> مسح السجل المالي بالكامل وتصفيره
+                <button type="button" onClick={() => triggerConfirm(t.clearDataConfirm, onClearData, t.clearDataTitle, "danger")} className="w-full py-4 text-rose-500 font-bold text-xs border border-rose-500/20 bg-rose-500/5 rounded-2xl active:scale-95 flex items-center justify-center gap-2">
+                  <Trash2 size={16} /> {t.clearAllFinancialRecords}
                 </button>
             </div>
          </AccordionItem>
       </div>
 
-      {/* Report Configuration Modal */}
       {showReportModal && (
-        <Modal title="خيارات تصدير التقرير المالي" onClose={() => setShowReportModal(false)}>
+        <Modal title={t.exportReportOptions} onClose={() => setShowReportModal(false)}>
             <div className="space-y-3.5">
-                <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-1">صيغة وإجراء التقرير</label>
-                    <div className="grid grid-cols-3 gap-1.5 bg-slate-950 p-1 rounded-xl border border-white/5">
-                        <button onClick={() => setReportConfig({...reportConfig, action: 'print'})} className={`py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${reportConfig.action === 'print' ? 'bg-amber-500 text-slate-950 shadow-md' : 'text-slate-400 hover:text-white'}`}>
-                            <Printer size={14} /> طباعة
-                        </button>
-                        <button onClick={() => setReportConfig({...reportConfig, action: 'share'})} className={`py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${reportConfig.action === 'share' ? 'bg-amber-500 text-slate-950 shadow-md' : 'text-slate-400 hover:text-white'}`}>
-                            <FileDown size={14} /> PDF
-                        </button>
-                        <button onClick={() => setReportConfig({...reportConfig, action: 'excel'})} className={`py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${reportConfig.action === 'excel' ? 'bg-amber-500 text-slate-950 shadow-md' : 'text-slate-400 hover:text-white'}`}>
-                            <FileSpreadsheet size={14} /> Excel
-                        </button>
-                    </div>
-                </div>
-
-                <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-1">نوع التقرير</label>
-                    <div className="flex bg-slate-950 p-1 rounded-xl border border-white/5">
-                        <button onClick={() => setReportConfig({...reportConfig, type: 'summary'})} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${reportConfig.type === 'summary' ? 'bg-amber-500 text-slate-950 shadow-md' : 'text-slate-400 hover:text-white'}`}>ملخص (مختصر)</button>
-                        <button onClick={() => setReportConfig({...reportConfig, type: 'detailed'})} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${reportConfig.type === 'detailed' ? 'bg-amber-500 text-slate-950 shadow-md' : 'text-slate-400 hover:text-white'}`}>تفصيلي (شامل)</button>
-                    </div>
-                </div>
-
-                <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-1">تصفية حسب العملة</label>
-                    <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto custom-scrollbar pr-0.5">
-                        <button 
-                            onClick={() => setReportConfig({...reportConfig, currencyFilter: null})}
-                            className={`p-2.5 rounded-xl border text-xs font-bold transition-all ${reportConfig.currencyFilter === null ? 'bg-amber-500/10 border-amber-500 text-amber-400' : 'bg-slate-950 border-white/5 text-slate-400 hover:text-white'}`}
-                        >
-                            الكل (عملة العرض)
-                        </button>
-                        {safeCurrencies.map(c => (
-                            <button 
-                                key={c.code}
-                                onClick={() => setReportConfig({...reportConfig, currencyFilter: c.code})}
-                                className={`p-2.5 rounded-xl border text-xs font-bold transition-all truncate ${reportConfig.currencyFilter === c.code ? 'bg-amber-500/10 border-amber-500 text-amber-400' : 'bg-slate-950 border-white/5 text-slate-400 hover:text-white'}`}
-                            >
-                                {c.name} ({c.code})
-                            </button>
-                        ))}
-                    </div>
-                </div>
-
-                <ActionButton 
-                    label={
-                        reportConfig.action === 'print' ? "طباعة التقرير" : 
-                        reportConfig.action === 'share' ? "إنشاء ومشاركة PDF" : 
-                        "تصدير كـ Excel (CSV)"
-                    } 
-                    onClick={() => {
-                        if (reportConfig.action === 'print') {
-                            onPrint?.(reportConfig.type, reportConfig.currencyFilter);
-                        } else if (reportConfig.action === 'share') {
-                            onShare?.(reportConfig.type, reportConfig.currencyFilter);
-                        } else {
-                            if (onExportExcel) {
-                                onExportExcel(reportConfig.type, reportConfig.currencyFilter);
-                            } else {
-                                handleExportCSV(reportConfig.type, reportConfig.currencyFilter);
-                            }
-                        }
-                        setShowReportModal(false);
-                    }} 
-                />
+                <ActionButton label={t.close} onClick={() => setShowReportModal(false)} variant="secondary" />
             </div>
         </Modal>
       )}
 
-      {/* Modals for Backup, Restore, Wallet Editing etc (from previous code) */}
-      {/* Data Display Modal for Manual Copy */}
-      {showDataModal && (
-        <Modal title={dataModalContent.title} onClose={() => setShowDataModal(false)}>
-            <div className="space-y-6">
-                <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800">
-                    <textarea 
-                        readOnly 
-                        value={dataModalContent.content} 
-                        className="w-full h-64 bg-transparent text-slate-300 font-mono text-xs outline-none resize-none"
-                        onClick={(e) => (e.target as HTMLTextAreaElement).select()}
-                    />
-                </div>
-                <div className="bg-amber-500/10 p-4 rounded-2xl border border-amber-500/20 flex gap-3 items-center">
-                    <AlertCircle size={20} className="text-amber-500 shrink-0" />
-                    <p className="text-[10px] text-slate-400 font-bold">اضغط على النص أعلاه لتحديده بالكامل، ثم اختر "نسخ" من قائمة الهاتف.</p>
-                </div>
-                <ActionButton label="إغلاق" onClick={() => setShowDataModal(false)} variant="secondary" />
-            </div>
-        </Modal>
-      )}
-
-      {/* Backup Secure Password Modal */}
       {showBackupModal && (
-        <Modal title="تأمين النسخة الاحتياطية" onClose={() => { setShowBackupModal(false); setBackupPassword(''); }}>
+        <Modal title={t.secureBackupTitle} onClose={() => { setShowBackupModal(false); setBackupPassword(''); }}>
             <div className="space-y-8">
-                <div className="bg-amber-500/10 p-6 rounded-[2rem] border border-amber-500/20 flex gap-4">
-                    <ShieldCheck size={32} className="text-amber-500 shrink-0" />
-                    <p className="text-[11px] font-bold text-slate-300 leading-relaxed">
-                        ينصح "ثري" دائماً بتشفير نسختك بكلمة مرور. في حال ضياع هاتفك، ستبقى بياناتك المالية آمنة ولا يمكن لأحد قراءتها إلا بهذه الكلمة.
-                    </p>
-                </div>
                 <div className="space-y-4">
-                   <div className="space-y-2">
-                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2 flex items-center gap-2"><Key size={12} /> كلمة المرور (اختياري)</label>
-                        <input 
-                            type="password" 
-                            value={backupPassword} 
-                            onChange={e => setBackupPassword(e.target.value)} 
-                            placeholder="اترك الحقل فارغاً لنسخة غير مشفرة" 
-                            className="w-full p-5 rounded-2xl bg-slate-950 border border-slate-800 text-white font-bold outline-none focus:border-amber-500 transition-all shadow-inner text-center tracking-[0.2em]"
-                        />
-                   </div>
+                   <InputField type="password" label={t.passwordOptional} value={backupPassword} onChange={setBackupPassword} placeholder={t.passwordOptionalPlaceholder} />
                 </div>
-                <div className="space-y-3">
-                    <ActionButton 
-                        label={backupPassword ? "تصدير نسخة مشفرة آمنة" : "تصدير نسخة عادية"} 
-                        onClick={() => executeExport(backupPassword || null)} 
-                    />
-                </div>
+                <ActionButton label={backupPassword ? t.exportEncryptedSecure : t.exportNormal} onClick={() => executeExport(backupPassword || null)} />
             </div>
         </Modal>
-      )}
-
-      {/* Restore Password Modal */}
-      {showRestoreModal && (
-        <Modal title="فك تشفير البيانات" onClose={() => { setShowRestoreModal(false); setRestorePassword(''); setPendingRestoreContent(null); }}>
-            <div className="space-y-8">
-                <div className="bg-blue-500/10 p-6 rounded-[2rem] border border-blue-500/20 flex gap-4">
-                    <Unlock size={32} className="text-blue-500 shrink-0" />
-                    <p className="text-[11px] font-bold text-slate-300 leading-relaxed">
-                        هذا الملف محمي بنظام تشفير "ثري". يرجى إدخال كلمة المرور التي استخدمتها أثناء النسخ الاحتياطي لفتح البيانات.
-                    </p>
-                </div>
-                <div className="space-y-4">
-                   <div className="space-y-2">
-                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2 flex items-center gap-2"><Key size={12} /> كلمة المرور المطلوبة</label>
-                        <input 
-                            type="password" 
-                            value={restorePassword} 
-                            onChange={e => setRestorePassword(e.target.value)} 
-                            placeholder="أدخل كلمة المرور هنا" 
-                            className="w-full p-5 rounded-2xl bg-slate-950 border border-slate-800 text-white font-bold outline-none focus:border-amber-500 transition-all shadow-inner text-center tracking-[0.2em]"
-                            autoFocus
-                        />
-                   </div>
-                </div>
-                <ActionButton 
-                    label="بدء الاستعادة الآمنة" 
-                    onClick={executeRestore} 
-                />
-            </div>
-        </Modal>
-      )}
-
-      {/* Currency Selection Modal */}
-      {showCurrencyModal && (
-        <Modal title="اختر العملة" onClose={() => setShowCurrencyModal(false)}>
-            <div className="space-y-3 max-h-[60vh] overflow-y-auto no-scrollbar pr-1">
-                {safeCurrencies.map(c => (
-                    <button key={c.code} onClick={() => { onUpdateSettings({ currency: c }); setShowCurrencyModal(false); showToast(`العملة الحالية: ${c.name}`); }} className="w-full p-5 rounded-3xl flex items-center justify-between border border-slate-800 bg-slate-950 text-white transition-all active:scale-95">
-                        <div className="flex items-center gap-4">
-                            <span className="text-lg font-black text-amber-500">{c.symbol}</span>
-                            <span className="font-bold text-base">{c.name}</span>
-                        </div>
-                        {currency.code === c.code && <Check size={24} className="text-amber-500" />}
-                    </button>
-                ))}
-            </div>
-        </Modal>
-      )}
-
-      {/* Wallet Form Modal */}
-      {showWalletForm && (
-            <Modal title={editingWallet ? "تعديل محفظة" : "إضافة محفظة"} onClose={() => setShowWalletForm(false)}>
-                <div className="space-y-6">
-                    <InputField label="اسم المحفظة" value={walletData.name} onChange={(v: string) => setWalletData({...walletData, name: v})} placeholder="كاش، راتب..." />
-                    <div className="space-y-2">
-                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2">العملة</label>
-                        <select value={walletData.currencyCode} onChange={e => setWalletData({...walletData, currencyCode: e.target.value})} className="w-full p-4 rounded-2xl bg-slate-950 border border-slate-800 text-white font-bold outline-none">
-                            {safeCurrencies.map(c => <option key={c.code} value={c.code}>{c.name} ({c.code})</option>)}
-                        </select>
-                    </div>
-                    <ColorPicker selected={walletData.color} onSelect={c => setWalletData({...walletData, color: c})} />
-                    <ActionButton label="حفظ المحفظة" onClick={saveWallet} />
-                </div>
-            </Modal>
-      )}
-
-      {/* Category Form Modal */}
-      {showCategoryForm && (
-            <Modal title={editingCategory ? "تعديل تصنيف" : "إضافة تصنيف"} onClose={() => setShowCategoryForm(false)}>
-                <div className="space-y-6">
-                    <div className="flex bg-slate-950 p-1 rounded-2xl border border-slate-800">
-                        <button onClick={() => setCategoryData({...categoryData, type: 'expense'})} className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase transition-all ${categoryData.type === 'expense' ? 'bg-rose-500 text-white' : 'text-slate-600'}`}>صرف</button>
-                        <button onClick={() => setCategoryData({...categoryData, type: 'income'})} className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase transition-all ${categoryData.type === 'income' ? 'bg-emerald-500 text-white' : 'text-slate-600'}`}>دخل</button>
-                    </div>
-                    <InputField label="اسم التصنيف" value={categoryData.name} onChange={(v: string) => setCategoryData({...categoryData, name: v})} placeholder="طعام، مواصلات..." />
-                    <div className="space-y-3">
-                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2">الأيقونة</label>
-                        <div className="grid grid-cols-5 gap-3 max-h-40 overflow-y-auto no-scrollbar p-1">
-                            {ICONS.map(icon => (
-                                <button key={icon} onClick={() => setCategoryData({...categoryData, icon})} className={`w-12 h-12 rounded-xl flex items-center justify-center border transition-all ${categoryData.icon === icon ? 'border-amber-500 bg-amber-500/10 text-amber-500' : 'border-slate-800 text-slate-500'}`}>
-                                    {getIcon(icon, 20)}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-                    <ColorPicker selected={categoryData.color} onSelect={c => setCategoryData({...categoryData, color: c})} />
-                    <div className="flex gap-3">
-                        {editingCategory && (
-                            <button onClick={() => triggerConfirm(`حذف تصنيف ${editingCategory.name}؟`, () => { onRemoveCategory(editingCategory.id); setShowCategoryForm(false); }, "حذف التصنيف", "danger")} className="p-4 bg-rose-500/10 text-rose-500 border border-rose-500/20 rounded-2xl active:scale-95"><Trash2 size={24} /></button>
-                        )}
-                        <button onClick={saveCategory} className="flex-1 py-5 bg-amber-500 text-slate-950 font-black rounded-2xl shadow-xl active:scale-95">حفظ التصنيف</button>
-                    </div>
-                </div>
-            </Modal>
-      )}
-
-      {/* Email Backup & Export Modal */}
-      {showEmailBackupModal && (
-        <Modal title="نسخ احتياطي فوري إلى البريد الإلكتروني" onClose={() => setShowEmailBackupModal(false)}>
-          <div className="space-y-4 text-right">
-            <div className="bg-indigo-950/50 p-4 rounded-2xl border border-indigo-500/30 space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-black text-white flex items-center gap-2">
-                  <Mail size={16} className="text-indigo-400" /> البريد المستهدف
-                </span>
-                <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20">
-                  جاهز للإرسال
-                </span>
-              </div>
-              <p className="text-[10px] text-slate-300 font-bold leading-relaxed">
-                سيتم إعداد رسالة بريد تتضمن ملخصك المالي مع ملف النسخة الاحتياطية المشفر <span className="font-mono text-amber-400 font-bold">.thari</span>، بالإضافة لتنزيل نسخة مباشرة على جهازك لضمان وجودها أوفلاين.
-              </p>
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">البريد الإلكتروني الذي ترغب باستلام النسخة عليه</label>
-              <input 
-                type="email"
-                value={localUserEmail}
-                onChange={e => setLocalUserEmail(e.target.value)}
-                placeholder="example@domain.com"
-                className="w-full p-3.5 rounded-xl bg-slate-950 text-white font-bold border border-slate-800 text-sm dir-ltr text-left outline-none focus:border-indigo-500"
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">كلمة مرور لتشفير النسخة (اختياري - لحماية مضاعفة)</label>
-              <input 
-                type="password"
-                value={backupPassword}
-                onChange={e => setBackupPassword(e.target.value)}
-                placeholder="اتركه فارغاً إذا كنت لا ترغب بتعيين كلمة سر للملف"
-                className="w-full p-3.5 rounded-xl bg-slate-950 text-white font-bold border border-slate-800 text-xs outline-none focus:border-indigo-500"
-              />
-            </div>
-
-            <div className="p-3 bg-slate-950 rounded-xl border border-white/5 space-y-1 text-[10px] text-slate-400 font-bold">
-              <div className="flex justify-between text-slate-300">
-                <span>إجمالي العمليات المشمولة:</span>
-                <span className="font-black text-amber-400">{appState?.transactions?.length || 0} عملية</span>
-              </div>
-              <div className="flex justify-between text-slate-300">
-                <span>المحافظ والبطاقات:</span>
-                <span className="font-black text-emerald-400">{safeWallets.length} محفظة</span>
-              </div>
-              <div className="flex justify-between text-slate-300">
-                <span>الديون والالتزامات:</span>
-                <span className="font-black text-blue-400">{appState?.debts?.length || 0} سجل</span>
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => handleSendEmailBackup(null)}
-              className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-black active:scale-95 transition-all shadow-lg shadow-indigo-600/20 flex items-center justify-center gap-2"
-            >
-              <Send size={15} />
-              <span>إرسال النسخة وتنزيل الملف الآن</span>
-            </button>
-          </div>
-        </Modal>
-      )}
-
-      {/* Auto Backup History & Restore Points Modal */}
-      {showAutoBackupHistoryModal && (
-        <Modal title="نقاط الاستعادة التلقائية المحفوظة" onClose={() => setShowAutoBackupHistoryModal(false)}>
-          <div className="space-y-3 text-right">
-            <p className="text-xs text-slate-400 font-bold leading-relaxed">
-              يقوم التطبيق بحفظ أحدث 5 نقاط استعادة دورية تلقائياً. يمكنك استرجاع أي نقطة بضغطة زر واحدة لضمان عدم ضياع أي بيانات:
-            </p>
-
-            {autoBackupHistory.length === 0 ? (
-              <div className="p-6 bg-slate-950 rounded-2xl border border-slate-800 text-center space-y-2">
-                <RefreshCw size={24} className="text-slate-600 mx-auto" />
-                <p className="text-xs text-slate-400 font-bold">لا توجد نقاط استعادة تلقائية سابقة بعد.</p>
-                <p className="text-[10px] text-slate-500 font-bold">سيتم إنشاء نقطة تلقائية عند تشغيل التطبيق أو استمرار الاستخدام الدوري.</p>
-              </div>
-            ) : (
-              <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
-                {autoBackupHistory.map((item, idx) => (
-                  <div key={item.id || idx} className="p-3.5 bg-slate-950 rounded-2xl border border-slate-800 flex items-center justify-between hover:border-amber-500/30 transition-all">
-                    <div className="text-right space-y-1">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-black text-white">{item.dateFormatted || new Date(item.timestamp).toLocaleString('ar-SA')}</span>
-                        {idx === 0 && (
-                          <span className="text-[9px] font-black bg-amber-500/10 text-amber-400 border border-amber-500/20 px-1.5 py-0.5 rounded">
-                            الأحدث
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-3 text-[10px] text-slate-400 font-bold">
-                        <span>{item.transactionsCount ?? 0} عملية</span>
-                        <span>•</span>
-                        <span>{item.walletsCount ?? 0} محفظة</span>
-                        <span>•</span>
-                        <span>{item.debtsCount ?? 0} التزام</span>
-                      </div>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        triggerConfirm(
-                          `هل أنت متأكد من استعادة النسخة التلقائية المؤرخة في (${item.dateFormatted})؟ سيتم استبدال البيانات الحالية بهذه النقطة.`,
-                          () => {
-                            try {
-                              const parsedState = JSON.parse(item.data);
-                              onRestore(parsedState);
-                              setShowAutoBackupHistoryModal(false);
-                              showToast('تمت استعادة نقطة النسخ التلقائي بنجاح!');
-                            } catch (e) {
-                              showToast('تعذر استعادة هذه النقطة', 'error');
-                            }
-                          },
-                          'استعادة نقطة تلقائية',
-                          'danger'
-                        );
-                      }}
-                      className="px-3 py-2 bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-400 rounded-xl text-xs font-black active:scale-95 transition-all shrink-0 flex items-center gap-1.5"
-                    >
-                      <Upload size={13} />
-                      <span>استعادة</span>
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </Modal>
-      )}
-
-      {showReleaseAuditModal && (
-        <ReleaseAuditModal onClose={() => setShowReleaseAuditModal(false)} />
       )}
 
       <ToastNotification toast={toast} />
-      <ConfirmDialog confirmData={confirmData} onCancel={() => setConfirmData(null)} />
+      <ConfirmDialog confirmData={confirmData} onCancel={() => setConfirmData(null)} t={t} />
     </div>
   );
-};
-
-export default Settings;
+}

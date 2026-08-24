@@ -9,8 +9,8 @@ import { Category, Currency } from './types';
 
 export const DEFAULT_CURRENCIES: Currency[] = [
   { code: 'SAR', symbol: 'ر.س', name: 'ريال سعودي' },
-  { code: 'YER_SANAA', symbol: 'ر.ي (صنعاء)', name: 'ريال يمني - صنعاء' },
-  { code: 'YER_ADEN', symbol: 'ر.ي (عدن)', name: 'ريال يمني - عدن' },
+  { code: 'YER_SANAA', symbol: 'ر.ي', name: 'ريال يمني - صنعاء' },
+  { code: 'YER_ADEN', symbol: 'ر.ي', name: 'ريال يمني - عدن' },
   { code: 'USD', symbol: '$', name: 'دولار أمريكي' },
   { code: 'EUR', symbol: '€', name: 'يورو' },
   { code: 'AED', symbol: 'د.إ', name: 'درهم إماراتي' },

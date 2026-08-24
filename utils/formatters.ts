@@ -5,6 +5,7 @@
 
 import { DEFAULT_CURRENCIES } from '../constants';
 import { roundToCurrency } from './mathPrecision';
+import { getLocalizedCurrency, LanguageKey } from './translations';
 
 export interface FormatCurrencyOptions {
   showSymbol?: boolean;
@@ -12,6 +13,7 @@ export interface FormatCurrencyOptions {
   decimalPlaces?: number;
   useGrouping?: boolean;
   locale?: string;
+  language?: LanguageKey;
 }
 
 /**
@@ -19,8 +21,8 @@ export interface FormatCurrencyOptions {
  */
 export const CURRENCY_SYMBOLS: Record<string, string> = {
   SAR: 'ر.س',
-  YER_SANAA: 'ر.ي (صنعاء)',
-  YER_ADEN: 'ر.ي (عدن)',
+  YER_SANAA: 'ر.ي',
+  YER_ADEN: 'ر.ي',
   YER: 'ر.ي',
   USD: '$',
   EUR: '€',
@@ -33,13 +35,34 @@ export const CURRENCY_SYMBOLS: Record<string, string> = {
   GBP: '£',
   EGP: 'ج.م',
   INR: '₹',
+  TRY: '₺',
+  MYR: 'ر.م',
+  IDR: 'ر.إ',
+  CAD: 'C$',
+  AUD: 'A$',
+  CHF: 'CHF',
+  CNY: '¥',
+  JPY: '¥',
+  SYP: 'ل.س',
+  LBP: 'ل.ل',
+  IQD: 'د.ع',
+  MAD: 'د.م',
+  DZD: 'د.ج',
+  TND: 'د.ت',
+  LYD: 'د.ل',
+  SDG: 'ج.س',
+  PKR: '₨',
+  BDT: '৳',
+  PHP: '₱',
 };
 
 /**
- * Get currency symbol by currency code
+ * Get currency symbol by currency code and optional language
  */
-export function getCurrencySymbol(code: string): string {
-  if (!code) return 'ر.س';
+export function getCurrencySymbol(code: string, lang: LanguageKey = 'ar'): string {
+  if (!code) return lang === 'ar' ? 'ر.س' : 'SAR';
+  const loc = getLocalizedCurrency(code, undefined, undefined, lang);
+  if (loc && loc.symbol) return loc.symbol;
   if (CURRENCY_SYMBOLS[code]) return CURRENCY_SYMBOLS[code];
   const found = DEFAULT_CURRENCIES.find(c => c.code === code);
   return found ? found.symbol : code;

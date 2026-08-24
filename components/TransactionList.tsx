@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { Transaction, Category, TransactionType, Wallet, Currency } from '../types';
 import { getIcon, DEFAULT_CURRENCIES, convertCurrency } from '../constants';
+import { getLocalizedCurrency, LanguageKey } from '../utils/translations';
 
 interface TransactionListProps {
   transactions: Transaction[];
@@ -31,6 +32,7 @@ interface TransactionListProps {
   currencies?: Currency[];
   exchangeRates?: Record<string, number>;
   showFilters?: boolean;
+  language?: LanguageKey;
 }
 
 const TransactionList: React.FC<TransactionListProps> = ({
@@ -43,7 +45,8 @@ const TransactionList: React.FC<TransactionListProps> = ({
   currentCurrencyCode = 'SAR',
   currencies = DEFAULT_CURRENCIES,
   exchangeRates = {},
-  showFilters = false
+  showFilters = false,
+  language = 'ar'
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState<'all' | TransactionType>('all');
@@ -257,11 +260,14 @@ const TransactionList: React.FC<TransactionListProps> = ({
               const txCurrencyObj =
                 currencies.find(c => c.code === txCurrencyCode) ||
                 DEFAULT_CURRENCIES.find(c => c.code === txCurrencyCode);
-              const txSymbol = txCurrencyObj?.symbol || txCurrencyCode;
-              const txCurrencyName = txCurrencyObj?.name || txCurrencyCode;
+              const txLoc = getLocalizedCurrency(txCurrencyCode, txCurrencyObj?.name, txCurrencyObj?.symbol, language);
+              const txSymbol = txLoc.symbol;
+              const txCurrencyName = txLoc.name;
 
               // Converted amount calculation for Base Currency
               const isDiffCurrency = txCurrencyCode !== currentCurrencyCode;
+              const baseLoc = getLocalizedCurrency(currentCurrencyCode, undefined, currencySymbol, language);
+              const resolvedBaseSymbol = baseLoc.symbol;
               const convertedAmount =
                 isDiffCurrency && !isTransfer
                   ? convertCurrency(tx.amount, txCurrencyCode, currentCurrencyCode, exchangeRates)
@@ -270,6 +276,8 @@ const TransactionList: React.FC<TransactionListProps> = ({
               // Cross-Currency deduction relative to the specific Wallet's Primary Currency
               const isDiffFromWallet = Boolean(wallet && txCurrencyCode !== wallet.currencyCode && !isTransfer);
               const walletCurrencyCode = wallet?.currencyCode || currentCurrencyCode;
+              const walletLoc = getLocalizedCurrency(walletCurrencyCode, undefined, undefined, language);
+              const walletSymbol = walletLoc.symbol;
               const amountInWallet = isDiffFromWallet
                 ? (tx.convertedAmountInWalletCurrency || convertCurrency(tx.amount, txCurrencyCode, walletCurrencyCode, exchangeRates))
                 : null;
@@ -392,10 +400,10 @@ const TransactionList: React.FC<TransactionListProps> = ({
 
                       {isDiffFromWallet && amountInWallet !== null && (
                         <span className="text-[9px] font-bold text-amber-400/90 dir-ltr text-right flex items-center gap-1 mt-0.5">
-                          <span>المخصوم: {amountInWallet.toLocaleString('en-US', { maximumFractionDigits: 1 })} {walletCurrencyCode}</span>
+                          <span>المخصوم: {amountInWallet.toLocaleString('en-US', { maximumFractionDigits: 1 })} {walletSymbol}</span>
                           {exchangeRateToWallet && (
                             <span className="text-slate-500 font-normal">
-                              (1 {txCurrencyCode} = {exchangeRateToWallet.toLocaleString('en-US', { maximumFractionDigits: 2 })})
+                              (1 {txSymbol} = {exchangeRateToWallet.toLocaleString('en-US', { maximumFractionDigits: 2 })} {walletSymbol})
                             </span>
                           )}
                         </span>
@@ -403,7 +411,7 @@ const TransactionList: React.FC<TransactionListProps> = ({
 
                       {isDiffCurrency && convertedAmount !== null && (
                         <span className="text-[9px] font-bold text-slate-400 dir-ltr">
-                          المعادل: ≈ {Math.round(convertedAmount).toLocaleString()} {currencySymbol}
+                          المعادل: ≈ {Math.round(convertedAmount).toLocaleString()} {resolvedBaseSymbol}
                         </span>
                       )}
 

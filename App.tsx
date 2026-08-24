@@ -1,18 +1,17 @@
 
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Plus, LayoutDashboard, History, Settings as SettingsIcon, Briefcase, HandCoins, Repeat, Coins, ArrowRight, Sparkles, Scale, Wallet as WalletIcon, Check, Plane, FileText, Download, ArrowUpRight, ArrowDownLeft, Calendar, ArrowLeftRight, Trash2, Wifi, WifiOff, Edit3, ChevronDown } from 'lucide-react';
-import { AppState, Transaction, Category, Debt, DebtPayment, Account, RecurringRule, AuditLog } from './types';
+import { Plus, LayoutDashboard, History, Settings as SettingsIcon, Briefcase, HandCoins, Repeat, Coins, Sparkles, Scale, Wallet as WalletIcon, Check, Wifi, WifiOff, ChevronDown } from 'lucide-react';
+import { AppState, Transaction, Category, Debt, DebtPayment, Account, RecurringRule } from './types';
 import { INITIAL_CATEGORIES, DEFAULT_CURRENCIES, DEFAULT_EXCHANGE_RATES, convertCurrency } from './constants';
-import { generateAndShareCSV, buildExecutiveCSVContent, exportAndShareExecutiveCSV } from './utils/exportHelper';
+import { buildExecutiveCSVContent, exportAndShareExecutiveCSV } from './utils/exportHelper';
 import { saveSecureState, loadSecureState } from './utils/secureStorage';
-import { calculateConsolidatedPosition, calculateWalletBalances } from './services/balanceEngine';
+import { calculateConsolidatedPosition } from './services/balanceEngine';
 import { processDueRecurringRules } from './services/recurringService';
-import { getTranslation } from './utils/translations';
+import { getTranslation, getLocalizedCurrency } from './utils/translations';
 import { Capacitor } from '@capacitor/core';
 import { App as CapApp } from '@capacitor/app';
-import { Filesystem, Directory } from '@capacitor/filesystem';
-import { Share } from '@capacitor/share';
+import { Filesystem } from '@capacitor/filesystem';
 import BalanceCard from './components/BalanceCard';
 import ElegantDashboard from './components/ElegantDashboard';
 import TransactionForm from './components/TransactionForm';
@@ -185,7 +184,34 @@ const App: React.FC = () => {
     document.documentElement.lang = lang;
   }, [state.language]);
 
-  const t = getTranslation(state.language || 'ar');
+  const activeLanguage = state.language || 'ar';
+  const t = getTranslation(activeLanguage);
+
+  const localizedCurrency = useMemo(() => {
+    const loc = getLocalizedCurrency(
+      state.currency?.code || 'SAR',
+      state.currency?.name,
+      state.currency?.symbol,
+      activeLanguage
+    );
+    return {
+      ...state.currency,
+      name: loc.name,
+      symbol: loc.symbol,
+    };
+  }, [state.currency, activeLanguage]);
+
+  const localizedCurrencies = useMemo(() => {
+    return (state.currencies || DEFAULT_CURRENCIES).map(c => {
+      const loc = getLocalizedCurrency(c.code, c.name, c.symbol, activeLanguage);
+      return {
+        ...c,
+        name: loc.name,
+        symbol: loc.symbol,
+      };
+    });
+  }, [state.currencies, activeLanguage]);
+
   const [isOnline, setIsOnline] = useState<boolean>(typeof navigator !== 'undefined' ? navigator.onLine : true);
   const [showNetworkToast, setShowNetworkToast] = useState(false);
 
@@ -867,21 +893,26 @@ const App: React.FC = () => {
               </button>
 
               {/* Currency Badge / Interactive Quick Selector */}
-              <button
-                type="button"
-                onClick={() => setShowCurrencySelector(true)}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#141B24] hover:bg-[#1C2633] border border-[#D9B978]/40 hover:border-[#D9B978] text-white transition-all text-xs shadow-sm active:scale-95 group ring-1 ring-[#D9B978]/20"
-                title={`العملة الأساسية الحالية: ${state.currency.name} (${state.currency.code}) - انقر للاختيار`}
-              >
-                <div className="w-5 h-5 rounded-lg bg-[#D9B978] text-slate-950 font-black text-[11px] flex items-center justify-center shadow-xs">
-                  {state.currency.symbol}
-                </div>
-                <div className="flex items-baseline gap-1">
-                  <span className="font-bold text-white tracking-wide">{state.currency.code}</span>
-                  <span className="text-[10px] text-slate-400 font-normal hidden md:inline">({state.currency.name})</span>
-                </div>
-                <ChevronDown size={14} className="text-[#D9B978] group-hover:translate-y-0.5 transition-transform" />
-              </button>
+              {(() => {
+                const currentCurrLoc = getLocalizedCurrency(state.currency?.code || 'SAR', state.currency?.name, state.currency?.symbol, state.language || 'ar');
+                return (
+                  <button
+                    type="button"
+                    onClick={() => setShowCurrencySelector(true)}
+                    className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#141B24] hover:bg-[#1C2633] border border-[#D9B978]/40 hover:border-[#D9B978] text-white transition-all text-xs shadow-sm active:scale-95 group ring-1 ring-[#D9B978]/20"
+                    title={`العملة الأساسية: ${currentCurrLoc.name} (${state.currency.code})`}
+                  >
+                    <div className="w-5 h-5 rounded-lg bg-[#D9B978] text-slate-950 font-black text-[11px] flex items-center justify-center shadow-xs">
+                      {currentCurrLoc.symbol}
+                    </div>
+                    <div className="flex items-baseline gap-1">
+                      <span className="font-bold text-white tracking-wide">{state.currency.code}</span>
+                      <span className="text-[10px] text-slate-400 font-normal hidden md:inline">({currentCurrLoc.name})</span>
+                    </div>
+                    <ChevronDown size={14} className="text-[#D9B978] group-hover:translate-y-0.5 transition-transform" />
+                  </button>
+                );
+              })()}
 
               {/* Tools Hub Button */}
               <button
@@ -933,8 +964,8 @@ const App: React.FC = () => {
                     monthlyIncome={monthlyMetrics.monthlyIncome}
                     monthlyExpense={monthlyMetrics.monthlyExpense}
                     monthlyNet={monthlyMetrics.monthlyNet}
-                    currency={state.currency}
-                    currencies={state.currencies}
+                    currency={localizedCurrency}
+                    currencies={localizedCurrencies}
                     wallets={state.wallets}
                     transactions={state.transactions}
                     categories={state.categories}
@@ -952,30 +983,30 @@ const App: React.FC = () => {
                     onOpenAllTransactions={() => setActiveTab('transactions')}
                     onEditTransaction={handleEditTransaction}
                     onDeleteTransaction={handleDeleteTransaction}
-                    language={state.language || 'ar'}
+                    language={activeLanguage}
                   />
                 )}
                 
-                {activeTab === 'goals' && <GoalTracker goals={state.goals} wallets={state.wallets} transactions={state.transactions} onAddGoal={(g) => setState(p => ({ ...p, goals: [...p.goals, { ...g, id: 'g-'+Date.now() }] }))} onUpdateGoalAmount={(id, amt) => setState(p => ({ ...p, goals: p.goals.map(g => g.id === id ? { ...g, currentAmount: g.currentAmount + amt } : g) }))} currencySymbol={state.currency.symbol} apiKey={state.apiKey} />}
-                {activeTab === 'budgets' && <BudgetManager budgets={state.budgets} categories={state.categories} transactions={filteredTransactions} onSetBudget={(catId, amount) => setState(p => ({ ...p, budgets: [...p.budgets.filter(b => b.categoryId !== catId), { categoryId: catId, amount }] }))} currencySymbol={state.currency.symbol} />}
-                {activeTab === 'chat' && <AIChat history={state.chatHistory} transactions={filteredTransactions} categories={state.categories} currency={state.currency.symbol} onSendMessage={(msg) => setState(p => ({ ...p, chatHistory: [...p.chatHistory, msg].slice(-30) }))} apiKey={state.apiKey} />}
-                {activeTab === 'debts' && <DebtManager debts={state.debts} wallets={state.wallets} onAddDebt={handleAddDebt} onUpdateDebt={handleUpdateDebt} onSettleDebt={handleSettleDebt} onPayDebt={handlePayDebt} onDeleteDebt={(id) => setState(p => ({ ...p, debts: p.debts.filter(d => d.id !== id) }))} currencySymbol={state.currency.symbol} currencyCode={state.currency.code} />}
-                {activeTab === 'subscriptions' && <SubscriptionManager subscriptions={state.subscriptions} categories={state.categories} onAdd={(sub) => setState(p => ({ ...p, subscriptions: [{...sub, id: 's-'+Date.now()}, ...p.subscriptions] }))} onRemove={(id) => setState(p => ({ ...p, subscriptions: p.subscriptions.filter(s => s.id !== id) }))} currencySymbol={state.currency.symbol} />}
+                {activeTab === 'goals' && <GoalTracker goals={state.goals} wallets={state.wallets} transactions={state.transactions} onAddGoal={(g) => setState(p => ({ ...p, goals: [...p.goals, { ...g, id: 'g-'+Date.now() }] }))} onUpdateGoalAmount={(id, amt) => setState(p => ({ ...p, goals: p.goals.map(g => g.id === id ? { ...g, currentAmount: g.currentAmount + amt } : g) }))} currencySymbol={localizedCurrency.symbol} apiKey={state.apiKey} />}
+                {activeTab === 'budgets' && <BudgetManager budgets={state.budgets} categories={state.categories} transactions={filteredTransactions} onSetBudget={(catId, amount) => setState(p => ({ ...p, budgets: [...p.budgets.filter(b => b.categoryId !== catId), { categoryId: catId, amount }] }))} currencySymbol={localizedCurrency.symbol} currencyCode={state.currency.code} language={activeLanguage} />}
+                {activeTab === 'chat' && <AIChat history={state.chatHistory} transactions={filteredTransactions} categories={state.categories} currency={localizedCurrency.symbol} onSendMessage={(msg) => setState(p => ({ ...p, chatHistory: [...p.chatHistory, msg].slice(-30) }))} apiKey={state.apiKey} />}
+                {activeTab === 'debts' && <DebtManager debts={state.debts} wallets={state.wallets} onAddDebt={handleAddDebt} onUpdateDebt={handleUpdateDebt} onSettleDebt={handleSettleDebt} onPayDebt={handlePayDebt} onDeleteDebt={(id) => setState(p => ({ ...p, debts: p.debts.filter(d => d.id !== id) }))} currencySymbol={localizedCurrency.symbol} currencyCode={state.currency.code} language={activeLanguage} />}
+                {activeTab === 'subscriptions' && <SubscriptionManager subscriptions={state.subscriptions} categories={state.categories} onAdd={(sub) => setState(p => ({ ...p, subscriptions: [{...sub, id: 's-'+Date.now()}, ...p.subscriptions] }))} onRemove={(id) => setState(p => ({ ...p, subscriptions: p.subscriptions.filter(s => s.id !== id) }))} currencySymbol={localizedCurrency.symbol} currencyCode={state.currency.code} language={activeLanguage} />}
                 {activeTab === 'zakat' && (
                   <ZakatCalculator 
                     totalBalance={totals.netWorthInBase} 
-                    currencySymbol={state.currency.symbol} 
+                    currencySymbol={localizedCurrency.symbol} 
                     debts={state.debts}
                     wallets={state.wallets}
                     transactions={state.transactions}
-                    currencies={state.currencies}
-                    currentCurrency={state.currency}
+                    currencies={localizedCurrencies}
+                    currentCurrency={localizedCurrency}
                     exchangeRates={state.exchangeRates}
                     zakatProfiles={state.zakatProfiles}
                     zakatPayments={state.zakatPayments}
                     onSaveProfiles={(profiles) => setState(p => ({ ...p, zakatProfiles: profiles }))}
                     onSavePayments={(payments) => setState(p => ({ ...p, zakatPayments: payments }))}
-                    language={state.language || 'ar'}
+                    language={activeLanguage}
                   />
                 )}
                 
@@ -985,14 +1016,14 @@ const App: React.FC = () => {
                             transactions={state.transactions} 
                             categories={state.categories} 
                             wallets={state.wallets}
-                            currencySymbol={state.currency.symbol} 
+                            currencySymbol={localizedCurrency.symbol} 
                             onPrint={handlePrint} 
                             currentCurrencyCode={state.currency.code} 
                             exchangeRates={state.exchangeRates} 
                             initialWalletId={selectedWalletId} 
                             onFilterChange={handleSelectWallet} 
                             userName={state.userName}
-                            currencies={state.currencies}
+                            currencies={localizedCurrencies}
                         />
                         
                         <TransactionList 
@@ -1001,11 +1032,12 @@ const App: React.FC = () => {
                             wallets={state.wallets} 
                             onDelete={handleDeleteTransaction} 
                             onEdit={handleEditTransaction} 
-                            currencySymbol={state.currency.symbol}
+                            currencySymbol={localizedCurrency.symbol}
                             currentCurrencyCode={state.currency.code}
-                            currencies={state.currencies}
+                            currencies={localizedCurrencies}
                             exchangeRates={state.exchangeRates}
                             showFilters 
+                            language={activeLanguage}
                         />
                     </div>
                 )}
@@ -1013,6 +1045,8 @@ const App: React.FC = () => {
                 {activeTab === 'settings' && (
                     <Settings 
                         {...state} 
+                        currency={localizedCurrency}
+                        currencies={localizedCurrencies}
                         appState={state} 
                         onUpdateSettings={(updates) => setState(p => ({...p, ...updates}))} 
                         onAddCurrency={(c) => setState(p => ({...p, currencies: [...p.currencies, c]}))} 
@@ -1163,6 +1197,8 @@ const App: React.FC = () => {
                 initialData={editingTransaction} 
                 defaultType={formDefaultType} 
                 exchangeRates={state.exchangeRates} 
+                language={state.language || 'ar'}
+                t={t}
               />
           )}
           {showPrivacyPolicy && <PrivacyPolicy onBack={() => setShowPrivacyPolicy(false)} />}
@@ -1176,6 +1212,7 @@ const App: React.FC = () => {
               exchangeRates={state.exchangeRates}
               onOpenSettings={() => setActiveTab('settings')}
               language={state.language || 'ar'}
+              t={t}
             />
           )}
           {showWalletSelector && (
@@ -1187,6 +1224,7 @@ const App: React.FC = () => {
               onSelectWallet={setSelectedWalletId}
               onOpenSettingsWallets={() => setActiveTab('settings')}
               language={state.language || 'ar'}
+              t={t}
             />
           )}
         </AnimatePresence>

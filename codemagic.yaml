@@ -317,3 +317,66 @@ workflows:
         notify:
           success: false
           failure: true
+
+  # ----------------------------------------------------------------------------
+  # 4. مسار بناء آبل iOS غير الموقع (للتجربة يدوياً مجاناً عبر Sideloadly)
+  # ----------------------------------------------------------------------------
+  ios-unsigned-workflow:
+    name: iOS Unsigned Build (Sideloading)
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+    environment:
+      node: 20
+      xcode: latest
+      cocoapods: default
+    scripts:
+      - name: Install Node dependencies
+        script: |
+          set -e
+          npm ci --prefer-offline || npm install
+
+      - name: Build Web production distribution (Vite)
+        script: |
+          set -e
+          npm run build
+
+      - name: Capacitor iOS platform preparation and CocoaPods sync
+        script: |
+          set -e
+          if [ ! -f "ios/App/Podfile" ]; then
+            npx cap add ios
+          fi
+          npx cap sync ios
+          
+          # تطبيق ملف Info.plist المعتمد إن وجد
+          if [ -f "release/ios/Info.plist" ]; then
+            cp -f release/ios/Info.plist ios/App/App/Info.plist
+          fi
+
+      - name: Build unsigned iOS app (Bypass Code Signing)
+        script: |
+          set -e
+          cd ios/App
+          # بناء التطبيق مع إجبار النظام على تجاهل فحص التوقيع والشهادات
+          xcodebuild build \
+            -workspace App.xcworkspace \
+            -scheme App \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath $CM_BUILD_DIR/build \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Package to Unsigned IPA
+        script: |
+          set -e
+          # الدخول لمجلد مخرجات البناء، إنشاء مجلد Payload، وضغطه ليصبح ipa
+          cd $CM_BUILD_DIR/build/Build/Products/Release-iphoneos
+          mkdir -p Payload
+          mv App.app Payload/
+          zip -r ../../../../thari_unsigned_app.ipa Payload
+          
+    artifacts:
+      - thari_unsigned_app.ipa
+

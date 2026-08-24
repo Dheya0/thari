@@ -6,12 +6,10 @@ import {
   Layers, 
   ShieldCheck, 
   Calendar, 
-  ChevronLeft, 
   Plus, 
   RotateCcw, 
   Check, 
   Trash2, 
-  Edit3, 
   Sparkles, 
   Clock,
   Wallet as WalletIcon,
@@ -24,15 +22,13 @@ import {
   Landmark,
   BadgeAlert,
   Info,
-  SlidersHorizontal,
-  ArrowRight,
-  ExternalLink
+  SlidersHorizontal
 } from 'lucide-react';
 import { Wallet, Transaction, Debt, Currency, ZakatProfile, ZakatPaymentRecord } from '../types';
 import { convertCurrency, DEFAULT_EXCHANGE_RATES } from '../constants';
 import { getTranslation } from '../utils/translations';
 import { formatFinancialNumber } from './ElegantDashboard';
-import { StatsGrid, StatItem } from './StatsGrid';
+import { StatsGrid } from './StatsGrid';
 import { AssetItemRow } from './AssetItemRow';
 import { ZakatAssetConfigModal, ZakatModalCategory } from './ZakatAssetConfigModal';
 
@@ -52,19 +48,16 @@ interface ZakatCalculatorProps {
   language?: 'ar' | 'en';
 }
 
-// Default benchmark price for 24k Gold per gram in SAR (approx 320 SAR/g)
 const BASE_GOLD_PRICE_SAR = 320;
 const BASE_SILVER_PRICE_SAR = 4.2;
 
-// Unified Category Navigation Tabs
 export type UnifiedZakatCategory = 
-  | 'cash_liquidity'       // السيولة والنقد
-  | 'metals_gold'          // المعادن والذهب
-  | 'stocks_invest'        // الأسهم والاستثمار
-  | 'realestate_assets'    // العقارات والأصول
-  | 'debts_liabilities';   // الالتزامات والديون
+  | 'cash_liquidity'
+  | 'metals_gold'
+  | 'stocks_invest'
+  | 'realestate_assets'
+  | 'debts_liabilities';
 
-// Unified Karat & Silver Pricing Model
 export interface KaratRates {
   price24k: number;
   price21k: number;
@@ -75,7 +68,6 @@ export interface KaratRates {
   customSilver: number | null;
 }
 
-// Central Calculation Function
 export function calculateAssetZakat(
   profile: ZakatProfile,
   scopedCashInBase: number,
@@ -83,7 +75,6 @@ export function calculateAssetZakat(
   debtsOnMeIncluded: number,
   rates: KaratRates
 ) {
-  // 1. Metals (Gold & Silver)
   const g24 = Number(profile.gold24Grams) || 0;
   const g21 = Number(profile.gold21Grams) || 0;
   const g18 = Number(profile.gold18Grams) || 0;
@@ -96,7 +87,6 @@ export function calculateAssetZakat(
   const totalSilverVal = silver * rates.priceSilver;
   const totalMetalsVal = totalGoldVal + totalSilverVal;
 
-  // 2. Commercial, Stocks, Real Estate
   const tradeInv = Number(profile.tradeInventoryValue) || 0;
   const tradingStocks = Number(profile.tradingStocksValue) || 0;
   const reTrade = Number(profile.realEstateTradeValue) || 0;
@@ -105,25 +95,22 @@ export function calculateAssetZakat(
 
   let longTermBase = 0;
   if (profile.investmentStocksMethod === 'liquid_ratio') {
-    longTermBase = (Number(profile.longTermStocksValue) || 0) * 0.10; // 10% Liquid assets ratio
+    longTermBase = (Number(profile.longTermStocksValue) || 0) * 0.10;
   } else {
     longTermBase = Number(profile.longTermDividendsValue) || 0;
   }
 
   const totalCommercial = tradeInv + tradingStocks + longTermBase + reTrade + fundsVal + rentIncome;
 
-  // 3. Gross, Deductions & Net Pool
   const grossAssets = scopedCashInBase + debtsToMeIncluded + totalMetalsVal + totalCommercial;
   const customDeductions = Number(profile.customDeductions) || 0;
   const totalDeductions = debtsOnMeIncluded + customDeductions;
   const netBase = Math.max(0, grossAssets - totalDeductions);
 
-  // 4. Nisab Benchmark: 85 grams of 24k Gold
   const nisabThreshold = 85 * rates.price24k;
   const silverNisabThreshold = 595 * rates.priceSilver;
   const hasReachedNisab = netBase >= nisabThreshold && nisabThreshold > 0;
 
-  // 5. Hawl tracking
   const startDate = profile.hawlStartDate ? new Date(profile.hawlStartDate) : new Date();
   const today = new Date();
   const elapsedDays = Math.max(0, Math.floor((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)));
@@ -131,7 +118,6 @@ export function calculateAssetZakat(
   const remainingDays = Math.max(0, totalHawlDays - elapsedDays);
   const isHawlCompleted = elapsedDays >= totalHawlDays;
 
-  // 6. Zakat Rate: 2.5% on Net Base
   const zakatRate = 0.025;
   const estimatedZakat = hasReachedNisab ? netBase * zakatRate : 0;
 
@@ -156,8 +142,6 @@ export function calculateAssetZakat(
   };
 }
 
-// Central Calculation Function
-
 export const ZakatCalculator: React.FC<ZakatCalculatorProps> = ({
   totalBalance = 0,
   currencySymbol = 'ر.س',
@@ -177,7 +161,6 @@ export const ZakatCalculator: React.FC<ZakatCalculatorProps> = ({
   const baseCurrencyCode = currentCurrency.code || 'SAR';
   const displaySymbol = currentCurrency.symbol || currencySymbol || baseCurrencyCode;
 
-  // Initialize Default Profiles if none exist
   const [profiles, setProfiles] = useState<ZakatProfile[]>(() => {
     if (zakatProfiles && zakatProfiles.length > 0) return zakatProfiles;
     
@@ -186,15 +169,13 @@ export const ZakatCalculator: React.FC<ZakatCalculatorProps> = ({
       try {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      } catch (e) {
-        console.error('Failed to parse saved zakat profiles', e);
-      }
+      } catch (e) {}
     }
 
     const defaultProfile: ZakatProfile = {
       id: 'zp-personal-default',
-      name: 'زكاة أموالي الشخصية',
-      description: 'النطاق المالي الشامل للمحافظ والمدخرات والذهب الشخصي',
+      name: language === 'ar' ? 'زكاة أموالي الشخصية' : 'Personal Wealth Zakat',
+      description: language === 'ar' ? 'النطاق المالي الشامل للمحافظ والمدخرات والذهب الشخصي' : 'Comprehensive financial scope for wallets, savings, and gold',
       scopeType: 'all',
       selectedWalletIds: wallets.map(w => w.id),
       includeDebtsToMe: true,
@@ -211,8 +192,8 @@ export const ZakatCalculator: React.FC<ZakatCalculatorProps> = ({
       investmentFundsValue: 0,
       realEstateTradeValue: 0,
       rentalIncomeValue: 0,
-      hawlStartDate: new Date(Date.now() - 336 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // ~11 months ago as default
-      hawlDurationDays: 354, // Hijri lunar year
+      hawlStartDate: new Date(Date.now() - 336 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      hawlDurationDays: 354,
       customDeductions: 0,
       isScopeConfirmed: true,
       createdAt: new Date().toISOString(),
@@ -234,10 +215,8 @@ export const ZakatCalculator: React.FC<ZakatCalculatorProps> = ({
     return [];
   });
 
-  // Unified Top Category Tab
   const [activeCategoryTab, setActiveCategoryTab] = useState<UnifiedZakatCategory>('cash_liquidity');
 
-  // Gold & Silver Prices State (Calculated cleanly using exchange rates)
   const computeDefaultGoldPrice = (code: string): number => {
     try {
       const converted = convertCurrency(BASE_GOLD_PRICE_SAR, 'SAR', code, exchangeRates);
@@ -252,7 +231,6 @@ export const ZakatCalculator: React.FC<ZakatCalculatorProps> = ({
   const [customPrice18k, setCustomPrice18k] = useState<number | null>(null);
   const [customSilverPrice, setCustomSilverPrice] = useState<number | null>(null);
 
-  // Modals state
   const [showConfigModal, setShowConfigModal] = useState<boolean>(false);
   const [configModalCategory, setConfigModalCategory] = useState<ZakatModalCategory>('metals_rates');
   const [showNewProfileModal, setShowNewProfileModal] = useState<boolean>(false);
@@ -265,17 +243,15 @@ export const ZakatCalculator: React.FC<ZakatCalculatorProps> = ({
     setShowConfigModal(true);
   };
 
-  // Form states for adding payment
   const [paymentAmount, setPaymentAmount] = useState('');
   const [paymentRecipient, setPaymentRecipient] = useState('');
   const [paymentWalletId, setPaymentWalletId] = useState('');
   const [paymentNote, setPaymentNote] = useState('');
 
-  // Active Profile object
   const activeProfile = useMemo(() => {
     return profiles.find(p => p.id === activeProfileId) || profiles[0] || {
       id: 'temp',
-      name: 'زكاة أموالي',
+      name: t.zakatTitle,
       scopeType: 'all',
       selectedWalletIds: wallets.map(w => w.id),
       includeDebtsToMe: true,
@@ -297,9 +273,8 @@ export const ZakatCalculator: React.FC<ZakatCalculatorProps> = ({
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     } as ZakatProfile;
-  }, [profiles, activeProfileId, wallets]);
+  }, [profiles, activeProfileId, wallets, t.zakatTitle]);
 
-  // Persist profiles
   const updateProfiles = (newProfiles: ZakatProfile[]) => {
     setProfiles(newProfiles);
     localStorage.setItem('thari_zakat_profiles', JSON.stringify(newProfiles));
@@ -316,12 +291,10 @@ export const ZakatCalculator: React.FC<ZakatCalculatorProps> = ({
     updateProfiles(updated);
   };
 
-  // Sync default gold price if currency changes
   useEffect(() => {
     setGoldPrice24k(computeDefaultGoldPrice(baseCurrencyCode));
   }, [baseCurrencyCode, exchangeRates]);
 
-  // Unified Karat Rates Object
   const karatRates: KaratRates = useMemo(() => {
     const p24 = goldPrice24k;
     const p21 = customPrice21k !== null ? customPrice21k : (goldPrice24k * 21) / 24;
@@ -338,22 +311,21 @@ export const ZakatCalculator: React.FC<ZakatCalculatorProps> = ({
     };
   }, [goldPrice24k, customPrice21k, customPrice18k, customSilverPrice]);
 
-  // Live Wallet balances
   const allWalletBalances = useMemo(() => {
     return wallets.map(wallet => {
       let balance = 0;
-      transactions.forEach(t => {
-        if (t.isDeleted) return;
-        const amt = Number(t.amount) || 0;
-        const conv = Number(t.convertedAmountInWalletCurrency) || amt;
+      transactions.forEach(tx => {
+        if (tx.isDeleted) return;
+        const amt = Number(tx.amount) || 0;
+        const conv = Number(tx.convertedAmountInWalletCurrency) || amt;
 
-        if (t.walletId === wallet.id) {
-          if (t.type === 'income') balance += conv;
-          else if (t.type === 'expense') balance -= conv;
-          else if (t.type === 'transfer') balance -= amt;
-          else if (t.type === 'adjustment') balance = amt;
-        } else if (t.destinationWalletId === wallet.id && t.type === 'transfer') {
-          balance += (t.destinationAmount || amt);
+        if (tx.walletId === wallet.id) {
+          if (tx.type === 'income') balance += conv;
+          else if (tx.type === 'expense') balance -= conv;
+          else if (tx.type === 'transfer') balance -= amt;
+          else if (tx.type === 'adjustment') balance = amt;
+        } else if (tx.destinationWalletId === wallet.id && tx.type === 'transfer') {
+          balance += (tx.destinationAmount || amt);
         }
       });
 
@@ -375,7 +347,6 @@ export const ZakatCalculator: React.FC<ZakatCalculatorProps> = ({
     });
   }, [wallets, transactions, baseCurrencyCode, exchangeRates]);
 
-  // Active Scoped Wallets
   const scopedWallets = useMemo(() => {
     if (activeProfile.scopeType === 'all') {
       return allWalletBalances;
@@ -384,12 +355,10 @@ export const ZakatCalculator: React.FC<ZakatCalculatorProps> = ({
     return allWalletBalances.filter(w => selectedIds.has(w.id));
   }, [activeProfile.scopeType, activeProfile.selectedWalletIds, allWalletBalances]);
 
-  // Total Scoped Liquid Cash
   const scopedCashInBase = useMemo(() => {
     return scopedWallets.reduce((sum, w) => sum + w.balanceInBase, 0);
   }, [scopedWallets]);
 
-  // Debts scoped calculation
   const scopedDebts = useMemo(() => {
     let toMe = 0;
     let onMe = 0;
@@ -422,7 +391,6 @@ export const ZakatCalculator: React.FC<ZakatCalculatorProps> = ({
     };
   }, [debts, activeProfile.includeDebtsToMe, activeProfile.includeDebtsOnMe, baseCurrencyCode, exchangeRates]);
 
-  // Central Zakat Calculation Result
   const zakat = useMemo(() => {
     return calculateAssetZakat(
       activeProfile,
@@ -439,7 +407,7 @@ export const ZakatCalculator: React.FC<ZakatCalculatorProps> = ({
     const newProfile: ZakatProfile = {
       id: newId,
       name: editingProfileName.trim(),
-      description: 'ملف زكاة مخصص',
+      description: language === 'ar' ? 'ملف زكاة مخصص' : 'Custom Zakat profile',
       scopeType: 'selected_wallets',
       selectedWalletIds: wallets.map(w => w.id),
       includeDebtsToMe: false,
@@ -497,7 +465,7 @@ export const ZakatCalculator: React.FC<ZakatCalculatorProps> = ({
       amount: amt,
       currency: baseCurrencyCode,
       date: new Date().toISOString().split('T')[0],
-      recipient: paymentRecipient.trim() || 'مستحق زكاة',
+      recipient: paymentRecipient.trim() || (language === 'ar' ? 'مستحق زكاة' : 'Zakat Beneficiary'),
       walletId: paymentWalletId || undefined,
       note: paymentNote.trim(),
       cycleYear: new Date().getFullYear().toString()
@@ -515,7 +483,6 @@ export const ZakatCalculator: React.FC<ZakatCalculatorProps> = ({
     setShowPaymentModal(false);
   };
 
-  // Category counts/badges
   const categorySummary = useMemo(() => {
     return {
       cashCount: scopedWallets.length,
@@ -527,7 +494,7 @@ export const ZakatCalculator: React.FC<ZakatCalculatorProps> = ({
   }, [scopedWallets, activeProfile, zakat.longTermBase, scopedDebts]);
 
   return (
-    <div id="zakat-calculator-root" className="w-full max-w-5xl mx-auto space-y-5 pb-16 font-sans text-right" dir="rtl">
+    <div id="zakat-calculator-root" className="w-full max-w-5xl mx-auto space-y-5 pb-16 font-sans text-start bg-[#0A0D10] text-[#F4F1EA]" dir={language === 'ar' ? 'rtl' : 'ltr'}>
       
       {/* ─────────────────────────────────────────────────────────────
           1. HEADER & PROFILE SELECTOR
@@ -538,43 +505,42 @@ export const ZakatCalculator: React.FC<ZakatCalculatorProps> = ({
             <div className="flex items-center gap-2 mb-1">
               <Scale size={18} className="text-[#D9B978]" />
               <span className="text-xs font-semibold uppercase tracking-wider text-[#D9B978]">
-                حساب الوعاء والزكاة الشرعية
+                {t.zakatCalculationHeader}
               </span>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white/95">
-              زكــــاتــــي
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#F4F1EA]">
+              {t.zakatMainTitle}
             </h1>
           </div>
 
-          {/* Action buttons */}
           <div className="flex items-center gap-2 flex-wrap">
             <button
               id="btn-gold-price-badge"
               onClick={() => openCategoryConfig('metals_rates')}
-              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#D9B978]/10 hover:bg-[#D9B978]/20 border border-[#D9B978]/30 text-xs font-medium text-[#E5C17B] transition-all active:scale-95 group"
-              title="تعديل أسعار عيارات الذهب والفضة"
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#D9B978]/10 hover:bg-[#D9B978]/20 border border-[#D9B978]/30 text-xs font-medium text-[#D9B978] transition-all active:scale-95 group"
+              title={t.editGoldPrices}
             >
               <Sparkles size={13} className="text-[#D9B978] group-hover:scale-110 transition-transform" />
-              <span>ذهب 24: {formatFinancialNumber(karatRates.price24k, true)} {displaySymbol}</span>
+              <span>{t.gold24}: {formatFinancialNumber(karatRates.price24k, true)} {displaySymbol}</span>
             </button>
 
             <button
               id="btn-new-hawl"
               onClick={() => setShowHawlResetConfirm(true)}
               className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/[0.03] hover:bg-white/[0.07] border border-white/[0.07] text-xs font-medium text-slate-300 hover:text-white transition-all active:scale-95"
-              title="بدء دورة جديدة للحول"
+              title={t.startNewHawlCycle}
             >
               <RotateCcw size={13} />
-              <span>دورة حول</span>
+              <span>{t.hawlCycle}</span>
             </button>
 
             <button
               id="btn-new-profile"
               onClick={() => setShowNewProfileModal(true)}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#D9B978] hover:bg-[#E5C17B] text-slate-950 text-xs font-bold transition-all shadow-sm active:scale-95"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#D9B978] hover:bg-[#E5C17B] text-[#0A0D10] text-xs font-bold transition-all shadow-sm active:scale-95"
             >
               <Plus size={14} strokeWidth={2.5} />
-              <span>ملف جديد</span>
+              <span>{t.newProfile}</span>
             </button>
           </div>
         </div>
@@ -588,8 +554,8 @@ export const ZakatCalculator: React.FC<ZakatCalculatorProps> = ({
                 key={p.id}
                 className={`group shrink-0 flex items-center gap-2 px-4 py-2 rounded-xl border transition-all text-xs font-medium ${
                   isActive 
-                    ? 'bg-white text-slate-950 border-white shadow-md font-bold' 
-                    : 'bg-white/[0.02] border-white/[0.06] text-slate-400 hover:text-white hover:bg-white/[0.05]'
+                    ? 'bg-[#F4F1EA] text-[#0A0D10] border-[#F4F1EA] shadow-md font-bold' 
+                    : 'bg-[#11161C] border-white/[0.06] text-slate-400 hover:text-[#F4F1EA] hover:bg-white/[0.05]'
                 }`}
               >
                 <button
@@ -597,7 +563,7 @@ export const ZakatCalculator: React.FC<ZakatCalculatorProps> = ({
                   onClick={() => setActiveProfileId(p.id)}
                   className="flex items-center gap-1.5"
                 >
-                  <FileCheck size={13} className={isActive ? 'text-slate-950' : 'text-slate-500'} />
+                  <FileCheck size={13} className={isActive ? 'text-[#0A0D10]' : 'text-slate-500'} />
                   <span>{p.name}</span>
                 </button>
 
@@ -605,8 +571,8 @@ export const ZakatCalculator: React.FC<ZakatCalculatorProps> = ({
                   <button
                     type="button"
                     onClick={(e) => { e.stopPropagation(); handleDeleteProfile(p.id); }}
-                    className={`opacity-0 group-hover:opacity-100 transition-opacity p-0.5 rounded hover:bg-black/10 text-slate-500 hover:text-rose-600 ${isActive ? 'text-slate-700' : ''}`}
-                    title="حذف الملف"
+                    className={`opacity-0 group-hover:opacity-100 transition-opacity p-0.5 rounded hover:bg-black/10 text-slate-500 hover:text-rose-400 ${isActive ? 'text-slate-700' : ''}`}
+                    title={t.deleteProfile}
                   >
                     <Trash2 size={11} />
                   </button>
@@ -622,26 +588,26 @@ export const ZakatCalculator: React.FC<ZakatCalculatorProps> = ({
       ───────────────────────────────────────────────────────────── */}
       <motion.section 
         layout
-        className="p-5 sm:p-6 rounded-3xl bg-gradient-to-b from-[#101726] to-[#0A0E18] border border-[#D9B978]/25 space-y-5 shadow-xl"
+        className="p-5 sm:p-6 rounded-3xl bg-[#11161C] border border-[#D9B978]/25 space-y-5 shadow-xl"
       >
         <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-4">
           <div className="space-y-1.5">
             <div className="flex items-center gap-2">
               <span className="text-xs font-semibold text-slate-300">
-                الزكاة الشرعية المستحقة (2.5%)
+                {t.zakatDueAmount}
               </span>
               <div className={`inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-0.5 rounded-full border ${
                 zakat.hasReachedNisab 
-                  ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' 
+                  ? 'text-[#8EB9A7] bg-[#8EB9A7]/10 border-[#8EB9A7]/20' 
                   : 'text-amber-400 bg-amber-500/10 border-amber-500/20'
               }`}>
                 {zakat.hasReachedNisab ? <Check size={12} strokeWidth={2.5} /> : <Clock size={12} />}
-                <span>{zakat.hasReachedNisab ? 'بلغ النصاب الشرعي' : 'دون النصاب الشرعي'}</span>
+                <span>{zakat.hasReachedNisab ? t.reachedNisab : t.belowNisab}</span>
               </div>
             </div>
 
             <div className="flex items-baseline gap-2" dir="ltr">
-              <span className="text-4xl sm:text-5xl font-light tracking-tight text-white font-numeric">
+              <span className="text-4xl sm:text-5xl font-light tracking-tight text-[#F4F1EA] font-numeric">
                 {formatFinancialNumber(zakat.estimatedZakat)}
               </span>
               <span className="text-base sm:text-lg font-bold text-[#D9B978]">
@@ -655,10 +621,10 @@ export const ZakatCalculator: React.FC<ZakatCalculatorProps> = ({
               id="btn-document-payment"
               type="button"
               onClick={() => setShowPaymentModal(true)}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold transition-all shadow-md active:scale-95"
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#8EB9A7] hover:bg-[#7da896] text-[#0A0D10] text-xs font-bold transition-all shadow-md active:scale-95"
             >
               <HandCoins size={15} />
-              <span>توثيق إخراج زكاة</span>
+              <span>{t.documentZakatPayment}</span>
             </button>
           </div>
         </div>
@@ -666,51 +632,39 @@ export const ZakatCalculator: React.FC<ZakatCalculatorProps> = ({
         {/* Standardized StatsGrid (Quiet Luxury Tokens) */}
         <div className="pt-4 border-t border-white/[0.06]">
           <StatsGrid
-            columns={4}
+            columns={3}
             theme="dark"
             items={[
               {
-                id: 'scope-summary',
-                label: 'نطاق الحساب',
-                value: activeProfile.name,
-                subValue: `${scopedWallets.length} محافظ مشمولة`,
-                accentColor: 'champagne',
-                icon: Layers,
-                badge: {
-                  text: `${scopedWallets.length} محافظ`,
-                  variant: 'champagne'
-                }
-              },
-              {
                 id: 'net-zakatable-pool',
-                label: 'الوعاء الزكوي الصافي',
+                label: t.netZakatPool,
                 value: formatFinancialNumber(zakat.netBase, true),
                 currency: displaySymbol,
-                subValue: 'بعد خصم الالتزامات المستحقة',
+                subValue: t.afterDeduction,
                 accentColor: 'ocean',
                 icon: Scale
               },
               {
                 id: 'nisab-benchmark',
-                label: 'حد النصاب (85g عيار 24)',
+                label: t.nisabThreshold,
                 value: formatFinancialNumber(zakat.nisabThreshold, true),
                 currency: displaySymbol,
                 accentColor: zakat.hasReachedNisab ? 'sage' : 'amber',
                 icon: ShieldCheck,
                 badge: {
-                  text: zakat.hasReachedNisab ? 'تجاوز النصاب' : 'دون النصاب',
+                  text: zakat.hasReachedNisab ? t.reachedNisab : t.belowNisab,
                   variant: zakat.hasReachedNisab ? 'sage' : 'amber'
                 }
               },
               {
                 id: 'hawl-tracker',
-                label: 'حالة الحول (القمري)',
-                value: zakat.isHawlCompleted ? 'اكتمل الحول' : `متبقي ${zakat.remainingDays} يوم`,
-                subValue: `بدأ في ${activeProfile.hawlStartDate}`,
+                label: t.hawlStatus,
+                value: zakat.isHawlCompleted ? t.reachedNisab : `${t.daysRemaining} ${zakat.remainingDays} ${t.days}`,
+                subValue: `${t.daysRemaining} ${activeProfile.hawlStartDate}`,
                 accentColor: zakat.isHawlCompleted ? 'sage' : 'neutral',
                 icon: Calendar,
                 badge: {
-                  text: zakat.isHawlCompleted ? 'مستحقة فوراً' : `${zakat.remainingDays} يوم`,
+                  text: zakat.isHawlCompleted ? t.reachedNisab : `${zakat.remainingDays} ${t.days}`,
                   variant: zakat.isHawlCompleted ? 'sage' : 'neutral'
                 }
               }
@@ -725,7 +679,7 @@ export const ZakatCalculator: React.FC<ZakatCalculatorProps> = ({
       <section className="space-y-3">
         <div 
           id="unified-zakat-nav"
-          className="p-1 rounded-2xl bg-[#0B0F19] border border-white/[0.08] flex items-center gap-1 overflow-x-auto no-scrollbar"
+          className="p-1 rounded-2xl bg-[#11161C] border border-white/[0.08] flex items-center gap-1 overflow-x-auto no-scrollbar"
         >
           {/* TAB 1: Cash & Liquidity */}
           <button
@@ -734,12 +688,12 @@ export const ZakatCalculator: React.FC<ZakatCalculatorProps> = ({
             onClick={() => setActiveCategoryTab('cash_liquidity')}
             className={`flex-1 min-w-[120px] py-2.5 px-3 rounded-xl text-xs sm:text-sm font-medium transition-all text-center flex items-center justify-center gap-2 shrink-0 ${
               activeCategoryTab === 'cash_liquidity'
-                ? 'bg-[#182032] text-[#F3D382] border border-[#D9B978]/35 shadow-sm font-bold'
+                ? 'bg-[#182032] text-[#D9B978] border border-[#D9B978]/35 shadow-sm font-bold'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.03]'
             }`}
           >
-            <Coins size={15} className={activeCategoryTab === 'cash_liquidity' ? 'text-[#F3D382]' : 'text-slate-500'} />
-            <span className="whitespace-nowrap">السيولة والنقد</span>
+            <Coins size={15} className={activeCategoryTab === 'cash_liquidity' ? 'text-[#D9B978]' : 'text-slate-500'} />
+            <span className="whitespace-nowrap">{t.liquidityAndCash}</span>
           </button>
 
           {/* TAB 2: Metals & Gold */}
@@ -749,12 +703,12 @@ export const ZakatCalculator: React.FC<ZakatCalculatorProps> = ({
             onClick={() => setActiveCategoryTab('metals_gold')}
             className={`flex-1 min-w-[120px] py-2.5 px-3 rounded-xl text-xs sm:text-sm font-medium transition-all text-center flex items-center justify-center gap-2 shrink-0 ${
               activeCategoryTab === 'metals_gold'
-                ? 'bg-[#182032] text-[#F3D382] border border-[#D9B978]/35 shadow-sm font-bold'
+                ? 'bg-[#182032] text-[#D9B978] border border-[#D9B978]/35 shadow-sm font-bold'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.03]'
             }`}
           >
-            <Sparkles size={15} className={activeCategoryTab === 'metals_gold' ? 'text-[#F3D382]' : 'text-slate-500'} />
-            <span className="whitespace-nowrap">المعادن والذهب</span>
+            <Sparkles size={15} className={activeCategoryTab === 'metals_gold' ? 'text-[#D9B978]' : 'text-slate-500'} />
+            <span className="whitespace-nowrap">{t.metalsAndGold}</span>
             {categorySummary.metalsGrams > 0 && (
               <span className="w-1.5 h-1.5 rounded-full bg-[#D9B978]" />
             )}
@@ -767,12 +721,12 @@ export const ZakatCalculator: React.FC<ZakatCalculatorProps> = ({
             onClick={() => setActiveCategoryTab('stocks_invest')}
             className={`flex-1 min-w-[120px] py-2.5 px-3 rounded-xl text-xs sm:text-sm font-medium transition-all text-center flex items-center justify-center gap-2 shrink-0 ${
               activeCategoryTab === 'stocks_invest'
-                ? 'bg-[#182032] text-[#F3D382] border border-[#D9B978]/35 shadow-sm font-bold'
+                ? 'bg-[#182032] text-[#D9B978] border border-[#D9B978]/35 shadow-sm font-bold'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.03]'
             }`}
           >
-            <TrendingUp size={15} className={activeCategoryTab === 'stocks_invest' ? 'text-[#F3D382]' : 'text-slate-500'} />
-            <span className="whitespace-nowrap">الأسهم والاستثمار</span>
+            <TrendingUp size={15} className={activeCategoryTab === 'stocks_invest' ? 'text-[#D9B978]' : 'text-slate-500'} />
+            <span className="whitespace-nowrap">{t.stocksAndInvestments}</span>
           </button>
 
           {/* TAB 4: Real Estate & Assets */}
@@ -782,12 +736,12 @@ export const ZakatCalculator: React.FC<ZakatCalculatorProps> = ({
             onClick={() => setActiveCategoryTab('realestate_assets')}
             className={`flex-1 min-w-[120px] py-2.5 px-3 rounded-xl text-xs sm:text-sm font-medium transition-all text-center flex items-center justify-center gap-2 shrink-0 ${
               activeCategoryTab === 'realestate_assets'
-                ? 'bg-[#182032] text-[#F3D382] border border-[#D9B978]/35 shadow-sm font-bold'
+                ? 'bg-[#182032] text-[#D9B978] border border-[#D9B978]/35 shadow-sm font-bold'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.03]'
             }`}
           >
-            <Building size={15} className={activeCategoryTab === 'realestate_assets' ? 'text-[#F3D382]' : 'text-slate-500'} />
-            <span className="whitespace-nowrap">العقارات والأصول</span>
+            <Building size={15} className={activeCategoryTab === 'realestate_assets' ? 'text-[#D9B978]' : 'text-slate-500'} />
+            <span className="whitespace-nowrap">{t.realEstateAndAssets}</span>
           </button>
 
           {/* TAB 5: Debts & Liabilities */}
@@ -797,12 +751,12 @@ export const ZakatCalculator: React.FC<ZakatCalculatorProps> = ({
             onClick={() => setActiveCategoryTab('debts_liabilities')}
             className={`flex-1 min-w-[120px] py-2.5 px-3 rounded-xl text-xs sm:text-sm font-medium transition-all text-center flex items-center justify-center gap-2 shrink-0 ${
               activeCategoryTab === 'debts_liabilities'
-                ? 'bg-[#182032] text-[#F3D382] border border-[#D9B978]/35 shadow-sm font-bold'
+                ? 'bg-[#182032] text-[#D9B978] border border-[#D9B978]/35 shadow-sm font-bold'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.03]'
             }`}
           >
-            <HandCoins size={15} className={activeCategoryTab === 'debts_liabilities' ? 'text-[#F3D382]' : 'text-slate-500'} />
-            <span className="whitespace-nowrap">الالتزامات والديون</span>
+            <HandCoins size={15} className={activeCategoryTab === 'debts_liabilities' ? 'text-[#D9B978]' : 'text-slate-500'} />
+            <span className="whitespace-nowrap">{t.liabilitiesAndDebts}</span>
           </button>
         </div>
 
@@ -819,12 +773,11 @@ export const ZakatCalculator: React.FC<ZakatCalculatorProps> = ({
             exit={{ opacity: 0, y: -6 }}
             className="space-y-3"
           >
-            {/* Liquid Cash Quick Config Bar */}
-            <div className="p-3 rounded-2xl bg-white/[0.02] border border-white/[0.06] flex items-center justify-between gap-3 text-xs">
+            <div className="p-3 rounded-2xl bg-[#11161C] border border-white/[0.06] flex items-center justify-between gap-3 text-xs">
               <div className="flex items-center gap-2 text-slate-300">
                 <Coins size={14} className="text-[#D9B978]" />
-                <span>إدارة وتخصيص السيولة المشمولة في الزكاة:</span>
-                <span className="text-[#E5C17B] font-numeric font-semibold">
+                <span>{t.manageZakatLiquidity}</span>
+                <span className="text-[#D9B978] font-numeric font-semibold">
                   {formatFinancialNumber(scopedCashInBase, true)} {displaySymbol}
                 </span>
               </div>
@@ -834,104 +787,24 @@ export const ZakatCalculator: React.FC<ZakatCalculatorProps> = ({
                 className="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 text-[11px] font-semibold transition-all shrink-0 flex items-center gap-1"
               >
                 <SlidersHorizontal size={12} />
-                <span>تخصيص السيولة والمحافظ</span>
+                <span>{t.allocateLiquidity}</span>
               </button>
             </div>
 
-            {/* Total Liquid Cash Row */}
             <AssetItemRow
               id="cash-liquidity-total"
               icon={<Coins size={18} />}
               iconBg="bg-teal-500/10 border-teal-500/20"
               iconColor="text-teal-400"
-              title="إجمالي السيولة النقدية"
+              title={t.totalCashLiquidity}
               codeBadge="CASH"
               badgeColor="bg-teal-500/10 text-teal-400 border-teal-500/20"
-              description="أرصدة الحسابات البنكية والنقد الحر المشمولة في نطاق الزكاة"
+              description={t.cashLiquidityDesc}
               valueDisplay={formatFinancialNumber(scopedCashInBase)}
               currencyCode={displaySymbol}
             />
 
-            {/* Wallets Inclusion Selector Row */}
-            <AssetItemRow
-              id="wallets-scope-selector"
-              icon={<WalletIcon size={18} />}
-              iconBg="bg-indigo-500/10 border-indigo-500/20"
-              iconColor="text-indigo-400"
-              title="تخصيص المحافظ المشمولة"
-              codeBadge="WALLETS"
-              badgeColor="bg-indigo-500/10 text-indigo-400 border-indigo-500/20"
-              description="اختر المحافظ المحددة لإدراج أرصدتها في هذا الملف"
-              valueDisplay={formatFinancialNumber(scopedCashInBase)}
-              currencyCode={displaySymbol}
-              actionElement={
-                <div className="flex items-center gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => updateActiveProfile({ scopeType: 'all', selectedWalletIds: wallets.map(w => w.id) })}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
-                      activeProfile.scopeType === 'all'
-                        ? 'bg-[#D9B978] text-slate-950 border-[#D9B978] shadow-xs'
-                        : 'bg-white/5 border-white/10 text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    تضمين الكل
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => updateActiveProfile({ scopeType: 'selected_wallets' })}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
-                      activeProfile.scopeType === 'selected_wallets'
-                        ? 'bg-[#D9B978] text-slate-950 border-[#D9B978] shadow-xs'
-                        : 'bg-white/5 border-white/10 text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    تخصيص يدوي
-                  </button>
-                </div>
-              }
-            >
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 pt-1">
-                {allWalletBalances.map(w => {
-                  const isChecked = activeProfile.scopeType === 'all' || activeProfile.selectedWalletIds?.includes(w.id);
-                  return (
-                    <button
-                      key={w.id}
-                      type="button"
-                      onClick={() => {
-                        const current = new Set(activeProfile.selectedWalletIds || []);
-                        if (current.has(w.id)) {
-                          if (current.size > 1) current.delete(w.id);
-                        } else {
-                          current.add(w.id);
-                        }
-                        updateActiveProfile({
-                          scopeType: 'selected_wallets',
-                          selectedWalletIds: Array.from(current)
-                        });
-                      }}
-                      className={`flex items-center justify-between p-2.5 rounded-xl border text-right transition-all ${
-                        isChecked 
-                          ? 'bg-amber-500/10 border-amber-500/30 text-white' 
-                          : 'bg-white/[0.02] border-white/[0.04] text-slate-400 opacity-60 hover:opacity-90'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2 truncate">
-                        <div className={`w-4 h-4 rounded flex items-center justify-center border shrink-0 ${
-                          isChecked ? 'bg-[#D9B978] border-[#D9B978] text-slate-950' : 'border-slate-600'
-                        }`}>
-                          {isChecked && <Check size={11} strokeWidth={3} />}
-                        </div>
-                        <span className="text-xs font-medium truncate">{w.name}</span>
-                      </div>
-                      <span className="text-xs font-numeric font-bold text-[#E5C17B] shrink-0" dir="ltr">
-                        {formatFinancialNumber(w.nativeBalance, true)} {w.currencyCode}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            </AssetItemRow>
+
           </motion.div>
         )}
 
@@ -944,16 +817,15 @@ export const ZakatCalculator: React.FC<ZakatCalculatorProps> = ({
             exit={{ opacity: 0, y: -6 }}
             className="space-y-3"
           >
-            {/* Live Karats Quick Bar */}
-            <div className="p-3 rounded-2xl bg-white/[0.02] border border-white/[0.06] flex items-center justify-between gap-3 text-xs">
+            <div className="p-3 rounded-2xl bg-[#11161C] border border-white/[0.06] flex items-center justify-between gap-3 text-xs">
               <div className="flex items-center gap-2 text-slate-300">
                 <Sparkles size={14} className="text-[#D9B978]" />
-                <span>الأسعار المعتمدة للجرام:</span>
-                <span className="text-[#E5C17B] font-numeric font-semibold">24k: {formatFinancialNumber(karatRates.price24k, true)}</span>
+                <span>{t.approvedGramPrices}</span>
+                <span className="text-[#D9B978] font-numeric font-semibold">24k: {formatFinancialNumber(karatRates.price24k, true)}</span>
                 <span className="text-slate-500">|</span>
-                <span className="text-[#E5C17B] font-numeric font-semibold">21k: {formatFinancialNumber(karatRates.price21k, true)}</span>
+                <span className="text-[#D9B978] font-numeric font-semibold">21k: {formatFinancialNumber(karatRates.price21k, true)}</span>
                 <span className="text-slate-500">|</span>
-                <span className="text-[#E5C17B] font-numeric font-semibold">18k: {formatFinancialNumber(karatRates.price18k, true)} {displaySymbol}</span>
+                <span className="text-[#D9B978] font-numeric font-semibold">18k: {formatFinancialNumber(karatRates.price18k, true)} {displaySymbol}</span>
               </div>
               <button
                 type="button"
@@ -961,25 +833,24 @@ export const ZakatCalculator: React.FC<ZakatCalculatorProps> = ({
                 className="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 text-[11px] font-semibold transition-all shrink-0 flex items-center gap-1"
               >
                 <SlidersHorizontal size={12} />
-                <span>تعديل الأسعار والعيارات</span>
+                <span>{t.editPricesAndKarats}</span>
               </button>
             </div>
 
-            {/* Gold 24k Row */}
             <AssetItemRow
               id="gold-24k"
               icon={<Sparkles size={18} />}
               iconBg="bg-amber-500/10 border-amber-500/20"
               iconColor="text-amber-400"
-              title="ذهب عيار 24 (سبائك ونقي)"
+              title={t.gold24KPure}
               codeBadge="Au 24"
               badgeColor="bg-amber-500/15 text-amber-400 border-amber-500/30"
-              description={`سعر الجرام المعتمد: ${formatFinancialNumber(karatRates.price24k, true)} ${displaySymbol}`}
+              description={`${t.approvedGramPrices} ${formatFinancialNumber(karatRates.price24k, true)} ${displaySymbol}`}
               valueDisplay={formatFinancialNumber(zakat.val24)}
               currencyCode={displaySymbol}
             >
               <div className="flex items-center gap-3 pt-1">
-                <label className="text-xs text-slate-400 shrink-0">الوزن المملوك:</label>
+                <label className="text-xs text-slate-400 shrink-0">{t.ownedWeight}</label>
                 <div className="relative flex-1 max-w-xs">
                   <input
                     type="number"
@@ -988,30 +859,29 @@ export const ZakatCalculator: React.FC<ZakatCalculatorProps> = ({
                     placeholder="0.00"
                     value={activeProfile.gold24Grams || ''}
                     onChange={(e) => updateActiveProfile({ gold24Grams: parseFloat(e.target.value) || 0 })}
-                    className="w-full bg-black/40 border border-white/10 focus:border-amber-400 rounded-xl pl-12 pr-3 py-2 text-sm text-white font-numeric outline-none text-left"
+                    className="w-full bg-black/40 border border-white/10 focus:border-amber-400 rounded-xl ps-3 pe-16 py-2 text-sm text-[#F4F1EA] font-numeric outline-none text-start"
                   />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 pointer-events-none">
-                    جرام
+                  <span className="absolute end-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 pointer-events-none">
+                    {t.grams}
                   </span>
                 </div>
               </div>
             </AssetItemRow>
 
-            {/* Gold 21k Row */}
             <AssetItemRow
               id="gold-21k"
               icon={<Sparkles size={18} />}
               iconBg="bg-amber-500/10 border-amber-500/20"
               iconColor="text-amber-400"
-              title="ذهب عيار 21 (مدخرات واستثمار)"
+              title={t.gold21KInvest}
               codeBadge="Au 21"
               badgeColor="bg-amber-500/15 text-amber-400 border-amber-500/30"
-              description={`سعر الجرام المعتمد: ${formatFinancialNumber(karatRates.price21k, true)} ${displaySymbol}`}
+              description={`${t.approvedGramPrices} ${formatFinancialNumber(karatRates.price21k, true)} ${displaySymbol}`}
               valueDisplay={formatFinancialNumber(zakat.val21)}
               currencyCode={displaySymbol}
             >
               <div className="flex items-center gap-3 pt-1">
-                <label className="text-xs text-slate-400 shrink-0">الوزن المملوك:</label>
+                <label className="text-xs text-slate-400 shrink-0">{t.ownedWeight}</label>
                 <div className="relative flex-1 max-w-xs">
                   <input
                     type="number"
@@ -1020,30 +890,29 @@ export const ZakatCalculator: React.FC<ZakatCalculatorProps> = ({
                     placeholder="0.00"
                     value={activeProfile.gold21Grams || ''}
                     onChange={(e) => updateActiveProfile({ gold21Grams: parseFloat(e.target.value) || 0 })}
-                    className="w-full bg-black/40 border border-white/10 focus:border-amber-400 rounded-xl pl-12 pr-3 py-2 text-sm text-white font-numeric outline-none text-left"
+                    className="w-full bg-black/40 border border-white/10 focus:border-amber-400 rounded-xl ps-3 pe-16 py-2 text-sm text-[#F4F1EA] font-numeric outline-none text-start"
                   />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 pointer-events-none">
-                    جرام
+                  <span className="absolute end-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 pointer-events-none">
+                    {t.grams}
                   </span>
                 </div>
               </div>
             </AssetItemRow>
 
-            {/* Gold 18k Row */}
             <AssetItemRow
               id="gold-18k"
               icon={<Sparkles size={18} />}
               iconBg="bg-amber-500/10 border-amber-500/20"
               iconColor="text-amber-400"
-              title="ذهب عيار 18 (مدخرات)"
+              title={t.gold18KOrnaments}
               codeBadge="Au 18"
               badgeColor="bg-amber-500/15 text-amber-400 border-amber-500/30"
-              description={`سعر الجرام المعتمد: ${formatFinancialNumber(karatRates.price18k, true)} ${displaySymbol}`}
+              description={`${t.approvedGramPrices} ${formatFinancialNumber(karatRates.price18k, true)} ${displaySymbol}`}
               valueDisplay={formatFinancialNumber(zakat.val18)}
               currencyCode={displaySymbol}
             >
               <div className="flex items-center gap-3 pt-1">
-                <label className="text-xs text-slate-400 shrink-0">الوزن المملوك:</label>
+                <label className="text-xs text-slate-400 shrink-0">{t.ownedWeight}</label>
                 <div className="relative flex-1 max-w-xs">
                   <input
                     type="number"
@@ -1052,30 +921,29 @@ export const ZakatCalculator: React.FC<ZakatCalculatorProps> = ({
                     placeholder="0.00"
                     value={activeProfile.gold18Grams || ''}
                     onChange={(e) => updateActiveProfile({ gold18Grams: parseFloat(e.target.value) || 0 })}
-                    className="w-full bg-black/40 border border-white/10 focus:border-amber-400 rounded-xl pl-12 pr-3 py-2 text-sm text-white font-numeric outline-none text-left"
+                    className="w-full bg-black/40 border border-white/10 focus:border-amber-400 rounded-xl ps-3 pe-16 py-2 text-sm text-[#F4F1EA] font-numeric outline-none text-start"
                   />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 pointer-events-none">
-                    جرام
+                  <span className="absolute end-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 pointer-events-none">
+                    {t.grams}
                   </span>
                 </div>
               </div>
             </AssetItemRow>
 
-            {/* Silver Row */}
             <AssetItemRow
               id="silver-bullion"
               icon={<Gem size={18} />}
               iconBg="bg-slate-500/10 border-slate-400/20"
               iconColor="text-slate-300"
-              title="الفضة والسبائك الفضية"
+              title={t.pureSilverGrams}
               codeBadge="Ag"
               badgeColor="bg-slate-500/15 text-slate-300 border-slate-400/30"
-              description={`سعر الجرام المعتمد: ${formatFinancialNumber(karatRates.priceSilver, true)} ${displaySymbol}`}
+              description={`${t.approvedGramPrices} ${formatFinancialNumber(karatRates.priceSilver, true)} ${displaySymbol}`}
               valueDisplay={formatFinancialNumber(zakat.totalSilverVal)}
               currencyCode={displaySymbol}
             >
               <div className="flex items-center gap-3 pt-1">
-                <label className="text-xs text-slate-400 shrink-0">الوزن المملوك (جرام فضة):</label>
+                <label className="text-xs text-slate-400 shrink-0">{t.ownedWeightSilverGrams}</label>
                 <div className="relative flex-1 max-w-xs">
                   <input
                     type="number"
@@ -1084,10 +952,10 @@ export const ZakatCalculator: React.FC<ZakatCalculatorProps> = ({
                     placeholder="0.00"
                     value={activeProfile.silverGrams || ''}
                     onChange={(e) => updateActiveProfile({ silverGrams: parseFloat(e.target.value) || 0 })}
-                    className="w-full bg-black/40 border border-white/10 focus:border-slate-300 rounded-xl pl-16 pr-3 py-2 text-sm text-white font-numeric outline-none text-left"
+                    className="w-full bg-black/40 border border-white/10 focus:border-slate-300 rounded-xl ps-3 pe-16 py-2 text-sm text-[#F4F1EA] font-numeric outline-none text-start"
                   />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 pointer-events-none">
-                    جرام
+                  <span className="absolute end-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 pointer-events-none">
+                    {t.grams}
                   </span>
                 </div>
               </div>
@@ -1104,11 +972,10 @@ export const ZakatCalculator: React.FC<ZakatCalculatorProps> = ({
             exit={{ opacity: 0, y: -6 }}
             className="space-y-3"
           >
-            {/* Stocks Quick Config Bar */}
-            <div className="p-3 rounded-2xl bg-white/[0.02] border border-white/[0.06] flex items-center justify-between gap-3 text-xs">
+            <div className="p-3 rounded-2xl bg-[#11161C] border border-white/[0.06] flex items-center justify-between gap-3 text-xs">
               <div className="flex items-center gap-2 text-slate-300">
                 <TrendingUp size={14} className="text-[#D9B978]" />
-                <span>إعداد وحساب زكاة المحافظ الاستثمارية والأسهم:</span>
+                <span>{t.stocksInvestManagement}</span>
               </div>
               <button
                 type="button"
@@ -1116,25 +983,24 @@ export const ZakatCalculator: React.FC<ZakatCalculatorProps> = ({
                 className="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 text-[11px] font-semibold transition-all shrink-0 flex items-center gap-1"
               >
                 <SlidersHorizontal size={12} />
-                <span>تعديل الأسهم والاستثمارات</span>
+                <span>{t.editStocksAndInvestments}</span>
               </button>
             </div>
 
-            {/* Trading Stocks */}
             <AssetItemRow
               id="trading-stocks"
               icon={<TrendingUp size={18} />}
               iconBg="bg-blue-500/10 border-blue-500/20"
               iconColor="text-blue-400"
-              title="أسهم المضاربة والتداول السريع"
+              title={t.tradingStocks}
               codeBadge="STK-TRD"
               badgeColor="bg-blue-500/15 text-blue-400 border-blue-500/30"
-              description="أسهم مشتراة بنية المتاجرة والربح الرأسمالي (تزكى بكامل قيمتها السوقية)"
+              description={t.tradingStocksDesc}
               valueDisplay={formatFinancialNumber(activeProfile.tradingStocksValue || 0)}
               currencyCode={displaySymbol}
             >
               <div className="flex items-center gap-3 pt-1">
-                <label className="text-xs text-slate-400 shrink-0">القيمة السوقية الحالية:</label>
+                <label className="text-xs text-slate-400 shrink-0">{t.currentMarketValue}</label>
                 <div className="relative flex-1 max-w-sm">
                   <input
                     type="number"
@@ -1142,25 +1008,24 @@ export const ZakatCalculator: React.FC<ZakatCalculatorProps> = ({
                     placeholder="0.00"
                     value={activeProfile.tradingStocksValue || ''}
                     onChange={(e) => updateActiveProfile({ tradingStocksValue: parseFloat(e.target.value) || 0 })}
-                    className="w-full bg-black/40 border border-white/10 focus:border-blue-400 rounded-xl pl-16 pr-3 py-2 text-sm text-white font-numeric outline-none text-left"
+                    className="w-full bg-black/40 border border-white/10 focus:border-blue-400 rounded-xl ps-3 pe-16 py-2 text-sm text-[#F4F1EA] font-numeric outline-none text-start"
                   />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 pointer-events-none">
+                  <span className="absolute end-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 pointer-events-none">
                     {displaySymbol}
                   </span>
                 </div>
               </div>
             </AssetItemRow>
 
-            {/* Long-Term / Dividend Stocks */}
             <AssetItemRow
               id="longterm-stocks"
               icon={<Landmark size={18} />}
               iconBg="bg-indigo-500/10 border-indigo-500/20"
               iconColor="text-indigo-400"
-              title="أسهم الاستثمار طويل الأجل (عوائد)"
+              title={t.longTermStocks}
               codeBadge="STK-DIV"
               badgeColor="bg-indigo-500/15 text-indigo-400 border-indigo-500/30"
-              description="أسهم اقتناء لعوائد دورية دون نية البيع السريع"
+              description={t.longTermStocksDesc}
               valueDisplay={formatFinancialNumber(zakat.longTermBase)}
               currencyCode={displaySymbol}
               actionElement={
@@ -1174,7 +1039,7 @@ export const ZakatCalculator: React.FC<ZakatCalculatorProps> = ({
                         : 'bg-white/5 border-white/10 text-slate-400 hover:text-white'
                     }`}
                   >
-                    نسبة الأصول (10%)
+                    {t.assetRatio10}
                   </button>
                   <button
                     type="button"
@@ -1185,7 +1050,7 @@ export const ZakatCalculator: React.FC<ZakatCalculatorProps> = ({
                         : 'bg-white/5 border-white/10 text-slate-400 hover:text-white'
                     }`}
                   >
-                    الأرباح فقط
+                    {t.dividendsOnly}
                   </button>
                 </div>
               }
@@ -1193,7 +1058,7 @@ export const ZakatCalculator: React.FC<ZakatCalculatorProps> = ({
               <div className="pt-1">
                 {activeProfile.investmentStocksMethod === 'liquid_ratio' ? (
                   <div className="flex items-center gap-3">
-                    <label className="text-xs text-slate-400 shrink-0">إجمالي قيمة المحفظة:</label>
+                    <label className="text-xs text-slate-400 shrink-0">{t.totalPortfolioValue}</label>
                     <div className="relative flex-1 max-w-sm">
                       <input
                         type="number"
@@ -1201,16 +1066,16 @@ export const ZakatCalculator: React.FC<ZakatCalculatorProps> = ({
                         placeholder="0.00"
                         value={activeProfile.longTermStocksValue || ''}
                         onChange={(e) => updateActiveProfile({ longTermStocksValue: parseFloat(e.target.value) || 0 })}
-                        className="w-full bg-black/40 border border-white/10 focus:border-indigo-400 rounded-xl pl-16 pr-3 py-2 text-sm text-white font-numeric outline-none text-left"
+                        className="w-full bg-black/40 border border-white/10 focus:border-indigo-400 rounded-xl ps-3 pe-16 py-2 text-sm text-[#F4F1EA] font-numeric outline-none text-start"
                       />
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 pointer-events-none">
+                      <span className="absolute end-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 pointer-events-none">
                         {displaySymbol}
                       </span>
                     </div>
                   </div>
                 ) : (
                   <div className="flex items-center gap-3">
-                    <label className="text-xs text-slate-400 shrink-0">الأرباح الموزعة المستلمة:</label>
+                    <label className="text-xs text-slate-400 shrink-0">{t.receivedDividends}</label>
                     <div className="relative flex-1 max-w-sm">
                       <input
                         type="number"
@@ -1218,9 +1083,9 @@ export const ZakatCalculator: React.FC<ZakatCalculatorProps> = ({
                         placeholder="0.00"
                         value={activeProfile.longTermDividendsValue || ''}
                         onChange={(e) => updateActiveProfile({ longTermDividendsValue: parseFloat(e.target.value) || 0 })}
-                        className="w-full bg-black/40 border border-white/10 focus:border-indigo-400 rounded-xl pl-16 pr-3 py-2 text-sm text-white font-numeric outline-none text-left"
+                        className="w-full bg-black/40 border border-white/10 focus:border-indigo-400 rounded-xl ps-3 pe-16 py-2 text-sm text-[#F4F1EA] font-numeric outline-none text-start"
                       />
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 pointer-events-none">
+                      <span className="absolute end-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 pointer-events-none">
                         {displaySymbol}
                       </span>
                     </div>
@@ -1229,21 +1094,20 @@ export const ZakatCalculator: React.FC<ZakatCalculatorProps> = ({
               </div>
             </AssetItemRow>
 
-            {/* Investment Funds & Sukuk */}
             <AssetItemRow
               id="investment-funds"
               icon={<Layers size={18} />}
               iconBg="bg-violet-500/10 border-violet-500/20"
               iconColor="text-violet-400"
-              title="الصناديق الاستثمارية والصكوك"
+              title={t.investmentFundsAndSukuk}
               codeBadge="FND-SKK"
               badgeColor="bg-violet-500/15 text-violet-400 border-violet-500/30"
-              description="صناديق المرابحة، السيولة، والصكوك المتداولة الخاضعة للزكاة"
+              description={t.fundsSukukDesc}
               valueDisplay={formatFinancialNumber(activeProfile.investmentFundsValue || 0)}
               currencyCode={displaySymbol}
             >
               <div className="flex items-center gap-3 pt-1">
-                <label className="text-xs text-slate-400 shrink-0">القيمة الإجمالية للصناديق:</label>
+                <label className="text-xs text-slate-400 shrink-0">{t.totalFundsValue}</label>
                 <div className="relative flex-1 max-w-sm">
                   <input
                     type="number"
@@ -1251,9 +1115,9 @@ export const ZakatCalculator: React.FC<ZakatCalculatorProps> = ({
                     placeholder="0.00"
                     value={activeProfile.investmentFundsValue || ''}
                     onChange={(e) => updateActiveProfile({ investmentFundsValue: parseFloat(e.target.value) || 0 })}
-                    className="w-full bg-black/40 border border-white/10 focus:border-violet-400 rounded-xl pl-16 pr-3 py-2 text-sm text-white font-numeric outline-none text-left"
+                    className="w-full bg-black/40 border border-white/10 focus:border-violet-400 rounded-xl ps-3 pe-16 py-2 text-sm text-[#F4F1EA] font-numeric outline-none text-start"
                   />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 pointer-events-none">
+                  <span className="absolute end-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 pointer-events-none">
                     {displaySymbol}
                   </span>
                 </div>
@@ -1271,11 +1135,10 @@ export const ZakatCalculator: React.FC<ZakatCalculatorProps> = ({
             exit={{ opacity: 0, y: -6 }}
             className="space-y-3"
           >
-            {/* Real Estate Quick Config Bar */}
-            <div className="p-3 rounded-2xl bg-white/[0.02] border border-white/[0.06] flex items-center justify-between gap-3 text-xs">
+            <div className="p-3 rounded-2xl bg-[#11161C] border border-white/[0.06] flex items-center justify-between gap-3 text-xs">
               <div className="flex items-center gap-2 text-slate-300">
                 <Building size={14} className="text-[#D9B978]" />
-                <span>إدارة عروض التجارة والعقارات وعوائد الإيجار:</span>
+                <span>{t.realEstateManagement}</span>
               </div>
               <button
                 type="button"
@@ -1283,25 +1146,24 @@ export const ZakatCalculator: React.FC<ZakatCalculatorProps> = ({
                 className="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 text-[11px] font-semibold transition-all shrink-0 flex items-center gap-1"
               >
                 <SlidersHorizontal size={12} />
-                <span>تعديل العقارات والعروض</span>
+                <span>{t.editRealEstateAndTrade}</span>
               </button>
             </div>
 
-            {/* Trade Inventory */}
             <AssetItemRow
               id="trade-inventory"
               icon={<Building size={18} />}
               iconBg="bg-amber-500/10 border-amber-500/20"
               iconColor="text-amber-400"
-              title="عروض التجارة والبضائع المعدة للبيع"
+              title={t.tradeInventoryAndGoods}
               codeBadge="INV-TRD"
               badgeColor="bg-amber-500/15 text-amber-400 border-amber-500/30"
-              description="تقوم البضائع بقيمتها السوقية بسعر الجملة وقت وجوب الزكاة"
+              description={t.tradeInventoryDesc}
               valueDisplay={formatFinancialNumber(activeProfile.tradeInventoryValue || 0)}
               currencyCode={displaySymbol}
             >
               <div className="flex items-center gap-3 pt-1">
-                <label className="text-xs text-slate-400 shrink-0">القيمة السوقية للبضائع:</label>
+                <label className="text-xs text-slate-400 shrink-0">{t.goodsMarketValue}</label>
                 <div className="relative flex-1 max-w-sm">
                   <input
                     type="number"
@@ -1309,30 +1171,29 @@ export const ZakatCalculator: React.FC<ZakatCalculatorProps> = ({
                     placeholder="0.00"
                     value={activeProfile.tradeInventoryValue || ''}
                     onChange={(e) => updateActiveProfile({ tradeInventoryValue: parseFloat(e.target.value) || 0 })}
-                    className="w-full bg-black/40 border border-white/10 focus:border-amber-400 rounded-xl pl-16 pr-3 py-2 text-sm text-white font-numeric outline-none text-left"
+                    className="w-full bg-black/40 border border-white/10 focus:border-amber-400 rounded-xl ps-3 pe-16 py-2 text-sm text-[#F4F1EA] font-numeric outline-none text-start"
                   />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 pointer-events-none">
+                  <span className="absolute end-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 pointer-events-none">
                     {displaySymbol}
                   </span>
                 </div>
               </div>
             </AssetItemRow>
 
-            {/* Real Estate for Trading */}
             <AssetItemRow
               id="real-estate-trade"
               icon={<Building size={18} />}
               iconBg="bg-emerald-500/10 border-emerald-500/20"
               iconColor="text-emerald-400"
-              title="عقارات معدة للمتاجرة والبيع (أراضي ومخططات)"
+              title={t.realEstateForTrade}
               codeBadge="EST-TRD"
               badgeColor="bg-emerald-500/15 text-emerald-400 border-emerald-500/30"
-              description="أراضي أو مباني مشتراة بنية البيع والربح (تزكى بكامل قيمتها السوقية)"
+              description={t.realEstateTradeDesc}
               valueDisplay={formatFinancialNumber(activeProfile.realEstateTradeValue || 0)}
               currencyCode={displaySymbol}
             >
               <div className="flex items-center gap-3 pt-1">
-                <label className="text-xs text-slate-400 shrink-0">القيمة السوقية الحالية للعقارات:</label>
+                <label className="text-xs text-slate-400 shrink-0">{t.currentRealEstateValue}</label>
                 <div className="relative flex-1 max-w-sm">
                   <input
                     type="number"
@@ -1340,30 +1201,29 @@ export const ZakatCalculator: React.FC<ZakatCalculatorProps> = ({
                     placeholder="0.00"
                     value={activeProfile.realEstateTradeValue || ''}
                     onChange={(e) => updateActiveProfile({ realEstateTradeValue: parseFloat(e.target.value) || 0 })}
-                    className="w-full bg-black/40 border border-white/10 focus:border-emerald-400 rounded-xl pl-16 pr-3 py-2 text-sm text-white font-numeric outline-none text-left"
+                    className="w-full bg-black/40 border border-white/10 focus:border-emerald-400 rounded-xl ps-3 pe-16 py-2 text-sm text-[#F4F1EA] font-numeric outline-none text-start"
                   />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 pointer-events-none">
+                  <span className="absolute end-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 pointer-events-none">
                     {displaySymbol}
                   </span>
                 </div>
               </div>
             </AssetItemRow>
 
-            {/* Rental Income */}
             <AssetItemRow
               id="rental-income"
               icon={<Landmark size={18} />}
               iconBg="bg-cyan-500/10 border-cyan-500/20"
               iconColor="text-cyan-400"
-              title="ريع وعوائد العقارات المؤجرة"
+              title={t.rentalIncomeAndYields}
               codeBadge="EST-RNT"
               badgeColor="bg-cyan-500/15 text-cyan-400 border-cyan-500/30"
-              description="أصل العقار المؤجر معفى، وتجب الزكاة في الإيجار المحصل إذا دار عليه الحول"
+              description={t.rentalIncomeDesc}
               valueDisplay={formatFinancialNumber(activeProfile.rentalIncomeValue || 0)}
               currencyCode={displaySymbol}
             >
               <div className="flex items-center gap-3 pt-1">
-                <label className="text-xs text-slate-400 shrink-0">صافي الإيجارات المحصلة:</label>
+                <label className="text-xs text-slate-400 shrink-0">{t.netCollectedRent}</label>
                 <div className="relative flex-1 max-w-sm">
                   <input
                     type="number"
@@ -1371,23 +1231,22 @@ export const ZakatCalculator: React.FC<ZakatCalculatorProps> = ({
                     placeholder="0.00"
                     value={activeProfile.rentalIncomeValue || ''}
                     onChange={(e) => updateActiveProfile({ rentalIncomeValue: parseFloat(e.target.value) || 0 })}
-                    className="w-full bg-black/40 border border-white/10 focus:border-cyan-400 rounded-xl pl-16 pr-3 py-2 text-sm text-white font-numeric outline-none text-left"
+                    className="w-full bg-black/40 border border-white/10 focus:border-cyan-400 rounded-xl ps-3 pe-16 py-2 text-sm text-[#F4F1EA] font-numeric outline-none text-start"
                   />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 pointer-events-none">
+                  <span className="absolute end-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 pointer-events-none">
                     {displaySymbol}
                   </span>
                 </div>
               </div>
             </AssetItemRow>
 
-            {/* Sharia Exemption Banner for Fixed Assets */}
-            <div className="p-3 rounded-2xl bg-white/[0.02] border border-white/[0.05] flex items-center justify-between gap-3 text-xs">
+            <div className="p-3 rounded-2xl bg-[#11161C] border border-white/[0.05] flex items-center justify-between gap-3 text-xs">
               <div className="flex items-center gap-2 text-slate-400">
                 <Info size={15} className="text-amber-400 shrink-0" />
-                <span>الأصول الثابتة والمعدات التشغيلية والمباني المشغولة والسيارات الشخصية معفاة شرعاً من الزكاة.</span>
+                <span>{t.fixedAssetsExemptNotice}</span>
               </div>
-              <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 font-bold text-[10px] shrink-0 border border-emerald-500/20">
-                معفاة شرعاً
+              <span className="px-2.5 py-0.5 rounded-full bg-[#8EB9A7]/10 text-[#8EB9A7] font-bold text-[10px] shrink-0 border border-[#8EB9A7]/20">
+                {t.legallyExempt}
               </span>
             </div>
           </motion.div>
@@ -1402,11 +1261,10 @@ export const ZakatCalculator: React.FC<ZakatCalculatorProps> = ({
             exit={{ opacity: 0, y: -6 }}
             className="space-y-3"
           >
-            {/* Debts Quick Config Bar */}
-            <div className="p-3 rounded-2xl bg-white/[0.02] border border-white/[0.06] flex items-center justify-between gap-3 text-xs">
+            <div className="p-3 rounded-2xl bg-[#11161C] border border-white/[0.06] flex items-center justify-between gap-3 text-xs">
               <div className="flex items-center gap-2 text-slate-300">
                 <HandCoins size={14} className="text-[#D9B978]" />
-                <span>إدارة الديون المرجوة والالتزامات الواجبة والخصومات:</span>
+                <span>{t.debtsManagement}</span>
               </div>
               <button
                 type="button"
@@ -1414,19 +1272,19 @@ export const ZakatCalculator: React.FC<ZakatCalculatorProps> = ({
                 className="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 text-[11px] font-semibold transition-all shrink-0 flex items-center gap-1"
               >
                 <SlidersHorizontal size={12} />
-                <span>تعديل الديون والالتزامات</span>
+                <span>{t.editDebtsAndLiabilities}</span>
               </button>
             </div>
-            {/* Receivables (To Me) */}
+
             <AssetItemRow
               id="debts-to-me"
               icon={<HandCoins size={18} />}
               iconBg="bg-emerald-500/10 border-emerald-500/20"
               iconColor="text-emerald-400"
-              title="ديون لك عند الغير (مرجوة السداد)"
+              title={t.receivablesToMe}
               codeBadge="REC-DBT"
               badgeColor="bg-emerald-500/15 text-emerald-400 border-emerald-500/30"
-              description="ديون على مليء مقر بالدين يرجى استردادها (تضاف للوعاء الزكوي)"
+              description={t.debtsToMeDesc}
               valueDisplay={formatFinancialNumber(scopedDebts.includedToMe)}
               currencyCode={displaySymbol}
               isPositiveAddition={activeProfile.includeDebtsToMe && scopedDebts.includedToMe > 0}
@@ -1441,21 +1299,20 @@ export const ZakatCalculator: React.FC<ZakatCalculatorProps> = ({
                   }`}
                 >
                   <Check size={13} className={activeProfile.includeDebtsToMe ? 'opacity-100' : 'opacity-0'} />
-                  <span>{activeProfile.includeDebtsToMe ? 'مضمنة في الوعاء' : 'مستبعدة'}</span>
+                  <span>{activeProfile.includeDebtsToMe ? t.includedInPool : t.excluded}</span>
                 </button>
               }
             />
 
-            {/* Payables (On Me) */}
             <AssetItemRow
               id="debts-on-me"
               icon={<HandCoins size={18} />}
-              iconBg="bg-rose-500/10 border-rose-500/20"
-              iconColor="text-rose-400"
-              title="ديون عليك للغير (حالّة السداد)"
+              iconBg="bg-[#C98387]/10 border-[#C98387]/20"
+              iconColor="text-[#C98387]"
+              title={t.payablesOnMe}
               codeBadge="PAY-DBT"
-              badgeColor="bg-rose-500/15 text-rose-400 border-rose-500/30"
-              description="التزامات وديون تجب تأديتها فوراً قبل حلول الحول (تخصم من الوعاء)"
+              badgeColor="bg-[#C98387]/15 text-[#C98387] border-[#C98387]/30"
+              description={t.debtsOnMeDesc}
               valueDisplay={formatFinancialNumber(scopedDebts.includedOnMe)}
               currencyCode={displaySymbol}
               isDeduction={activeProfile.includeDebtsOnMe && scopedDebts.includedOnMe > 0}
@@ -1465,32 +1322,31 @@ export const ZakatCalculator: React.FC<ZakatCalculatorProps> = ({
                   onClick={() => updateActiveProfile({ includeDebtsOnMe: !activeProfile.includeDebtsOnMe })}
                   className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all flex items-center gap-1.5 ${
                     activeProfile.includeDebtsOnMe
-                      ? 'bg-rose-500/20 border-rose-500/40 text-rose-300'
+                      ? 'bg-[#C98387]/20 border-[#C98387]/40 text-[#C98387]'
                       : 'bg-white/5 border-white/10 text-slate-400 hover:text-white'
                   }`}
                 >
                   <Check size={13} className={activeProfile.includeDebtsOnMe ? 'opacity-100' : 'opacity-0'} />
-                  <span>{activeProfile.includeDebtsOnMe ? 'مخصومة من الوعاء' : 'مستبعدة'}</span>
+                  <span>{activeProfile.includeDebtsOnMe ? t.deductedFromPool : t.excluded}</span>
                 </button>
               }
             />
 
-            {/* Custom Deductions */}
             <AssetItemRow
               id="custom-deductions"
               icon={<BadgeAlert size={18} />}
-              iconBg="bg-rose-500/10 border-rose-500/20"
-              iconColor="text-rose-400"
-              title="خصومات والتزامات تشغيلية أخرى"
+              iconBg="bg-[#C98387]/10 border-[#C98387]/20"
+              iconColor="text-[#C98387]"
+              title={t.urgentOperationalDeductions}
               codeBadge="DED-OPS"
-              badgeColor="bg-rose-500/15 text-rose-400 border-rose-500/30"
-              description="أي التزامات عاجلة واجبة السداد تخصم شرعاً من الوعاء الزكوي"
+              badgeColor="bg-[#C98387]/15 text-[#C98387] border-[#C98387]/30"
+              description={t.customDeductionsDesc}
               valueDisplay={formatFinancialNumber(activeProfile.customDeductions || 0)}
               currencyCode={displaySymbol}
               isDeduction={(activeProfile.customDeductions || 0) > 0}
             >
               <div className="flex items-center gap-3 pt-1">
-                <label className="text-xs text-slate-400 shrink-0">مبلغ الخصومات الإضافية:</label>
+                <label className="text-xs text-slate-400 shrink-0">{t.additionalDeductionsAmount}</label>
                 <div className="relative flex-1 max-w-sm">
                   <input
                     type="number"
@@ -1498,9 +1354,9 @@ export const ZakatCalculator: React.FC<ZakatCalculatorProps> = ({
                     placeholder="0.00"
                     value={activeProfile.customDeductions || ''}
                     onChange={(e) => updateActiveProfile({ customDeductions: parseFloat(e.target.value) || 0 })}
-                    className="w-full bg-black/40 border border-white/10 focus:border-rose-400 rounded-xl pl-16 pr-3 py-2 text-sm text-white font-numeric outline-none text-left"
+                    className="w-full bg-black/40 border border-white/10 focus:border-[#C98387] rounded-xl ps-3 pe-16 py-2 text-sm text-[#F4F1EA] font-numeric outline-none text-start"
                   />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 pointer-events-none">
+                  <span className="absolute end-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 pointer-events-none">
                     {displaySymbol}
                   </span>
                 </div>
@@ -1517,10 +1373,10 @@ export const ZakatCalculator: React.FC<ZakatCalculatorProps> = ({
         <section className="space-y-3 pt-4 border-t border-white/[0.04]">
           <div className="flex items-center justify-between px-1">
             <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-              سجل مدفوعات الزكاة السابقة
+              {t.previousZakatPayments}
             </h3>
             <span className="text-xs text-slate-500 font-numeric">
-              {payments.length} دفعات موثقة
+              {payments.length} {t.documentedPayments}
             </span>
           </div>
 
@@ -1529,7 +1385,7 @@ export const ZakatCalculator: React.FC<ZakatCalculatorProps> = ({
               <div key={p.id} className="flex items-center justify-between py-3 px-2">
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-semibold text-white/95">{p.recipient}</span>
+                    <span className="text-xs font-semibold text-[#F4F1EA]">{p.recipient}</span>
                     <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/[0.04] text-slate-400 font-mono">
                       {p.profileName}
                     </span>
@@ -1545,7 +1401,7 @@ export const ZakatCalculator: React.FC<ZakatCalculatorProps> = ({
                   </div>
                 </div>
 
-                <span className="text-xs sm:text-sm font-bold text-emerald-400 font-numeric" dir="ltr">
+                <span className="text-xs sm:text-sm font-bold text-[#8EB9A7] font-numeric" dir="ltr">
                   {formatFinancialNumber(p.amount)} {p.currency}
                 </span>
               </div>
@@ -1554,9 +1410,6 @@ export const ZakatCalculator: React.FC<ZakatCalculatorProps> = ({
         </section>
       )}
 
-      {/* ─────────────────────────────────────────────────────────────
-          CENTRALIZED ISOLATED CONFIGURATION MODAL (Single-source State Update)
-      ───────────────────────────────────────────────────────────── */}
       <ZakatAssetConfigModal
         isOpen={showConfigModal}
         onClose={() => setShowConfigModal(false)}
@@ -1589,9 +1442,7 @@ export const ZakatCalculator: React.FC<ZakatCalculatorProps> = ({
         theme="dark"
       />
 
-      {/* ─────────────────────────────────────────────────────────────
-          MODAL: NEW ZAKAT PROFILE
-      ───────────────────────────────────────────────────────────── */}
+      {/* MODAL: NEW ZAKAT PROFILE */}
       <AnimatePresence>
         {showNewProfileModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
@@ -1599,27 +1450,27 @@ export const ZakatCalculator: React.FC<ZakatCalculatorProps> = ({
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="w-full max-w-md bg-[#0E131F] border border-white/10 rounded-3xl p-6 space-y-5 shadow-2xl text-right"
+              className="w-full max-w-md bg-[#11161C] border border-white/10 rounded-3xl p-6 space-y-5 shadow-2xl text-start"
             >
               <div className="flex items-center justify-between border-b border-white/[0.06] pb-3">
-                <h3 className="text-base font-semibold text-white">إنشاء ملف زكاة جديد</h3>
+                <h3 className="text-base font-semibold text-[#F4F1EA]">{t.createNewZakatProfile}</h3>
                 <button onClick={() => setShowNewProfileModal(false)} className="text-slate-400 hover:text-white">
                   <X size={18} />
                 </button>
               </div>
 
               <div className="space-y-3">
-                <label className="text-xs text-slate-400 block">اسم الملف (مثال: زكاة المتجر، زكاة الاستثمار)</label>
+                <label className="text-xs text-slate-400 block">{t.profileNameExample}</label>
                 <input
                   type="text"
-                  placeholder="مثال: زكاة المحل التجاري"
+                  placeholder={t.profilePlaceholder}
                   value={editingProfileName}
                   onChange={(e) => setEditingProfileName(e.target.value)}
-                  className="w-full bg-white/[0.04] border border-white/10 focus:border-[#D9B978] rounded-2xl px-4 py-3 text-sm text-white outline-none"
+                  className="w-full bg-white/[0.04] border border-white/10 focus:border-[#D9B978] rounded-2xl px-4 py-3 text-sm text-[#F4F1EA] outline-none"
                   autoFocus
                 />
                 <p className="text-[11px] text-slate-400 leading-relaxed">
-                  يسمح لك كل ملف بحفظ نطاق منفصل تماماً من المحافظ والأصول، ويمكنك استخدامه سنوياً بضغطة واحدة.
+                  {t.profileInfoDesc}
                 </p>
               </div>
 
@@ -1628,16 +1479,16 @@ export const ZakatCalculator: React.FC<ZakatCalculatorProps> = ({
                   type="button"
                   onClick={handleCreateProfile}
                   disabled={!editingProfileName.trim()}
-                  className="flex-1 py-3 rounded-2xl bg-[#D9B978] hover:bg-[#E5C17B] text-slate-950 text-xs font-bold transition-all disabled:opacity-50"
+                  className="flex-1 py-3 rounded-2xl bg-[#D9B978] hover:bg-[#E5C17B] text-[#0A0D10] text-xs font-bold transition-all disabled:opacity-50"
                 >
-                  حفظ وتفعيل الملف
+                  {t.saveAndActivateProfile}
                 </button>
                 <button
                   type="button"
                   onClick={() => setShowNewProfileModal(false)}
                   className="px-5 py-3 rounded-2xl bg-white/[0.03] text-slate-400 hover:text-white text-xs font-medium"
                 >
-                  إلغاء
+                  {t.cancel}
                 </button>
               </div>
             </motion.div>
@@ -1645,9 +1496,7 @@ export const ZakatCalculator: React.FC<ZakatCalculatorProps> = ({
         )}
       </AnimatePresence>
 
-      {/* ─────────────────────────────────────────────────────────────
-          MODAL: RECORD ZAKAT PAYMENT
-      ───────────────────────────────────────────────────────────── */}
+      {/* MODAL: RECORD ZAKAT PAYMENT */}
       <AnimatePresence>
         {showPaymentModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
@@ -1655,10 +1504,10 @@ export const ZakatCalculator: React.FC<ZakatCalculatorProps> = ({
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="w-full max-w-md bg-[#0E131F] border border-white/10 rounded-3xl p-6 space-y-4 shadow-2xl text-right"
+              className="w-full max-w-md bg-[#11161C] border border-white/10 rounded-3xl p-6 space-y-4 shadow-2xl text-start"
             >
               <div className="flex items-center justify-between border-b border-white/[0.06] pb-3">
-                <h3 className="text-base font-semibold text-white">توثيق إخراج زكاة</h3>
+                <h3 className="text-base font-semibold text-[#F4F1EA]">{t.documentZakatPayment}</h3>
                 <button onClick={() => setShowPaymentModal(false)} className="text-slate-400 hover:text-white">
                   <X size={18} />
                 </button>
@@ -1666,36 +1515,36 @@ export const ZakatCalculator: React.FC<ZakatCalculatorProps> = ({
 
               <div className="space-y-3">
                 <div>
-                  <label className="text-xs text-slate-400 block mb-1">المبلغ المخرج ({displaySymbol})</label>
+                  <label className="text-xs text-slate-400 block mb-1">{t.zakatPaymentAmount} ({displaySymbol})</label>
                   <input
                     type="number"
                     placeholder="0.00"
                     value={paymentAmount}
                     onChange={(e) => setPaymentAmount(e.target.value)}
-                    className="w-full bg-white/[0.04] border border-white/10 focus:border-emerald-400 rounded-2xl px-4 py-2.5 text-sm text-white font-numeric outline-none"
+                    className="w-full bg-white/[0.04] border border-white/10 focus:border-[#8EB9A7] rounded-2xl px-4 py-2.5 text-sm text-[#F4F1EA] font-numeric outline-none"
                     autoFocus
                   />
                 </div>
 
                 <div>
-                  <label className="text-xs text-slate-400 block mb-1">المستحق / الجهة المستلمة</label>
+                  <label className="text-xs text-slate-400 block mb-1">{t.recipientOrEntity}</label>
                   <input
                     type="text"
-                    placeholder="مثال: أسرة محتاجة، جمعية البر، منصة إحسان"
+                    placeholder={t.recipientPlaceholder}
                     value={paymentRecipient}
                     onChange={(e) => setPaymentRecipient(e.target.value)}
-                    className="w-full bg-white/[0.04] border border-white/10 focus:border-emerald-400 rounded-2xl px-4 py-2.5 text-sm text-white outline-none"
+                    className="w-full bg-white/[0.04] border border-white/10 focus:border-[#8EB9A7] rounded-2xl px-4 py-2.5 text-sm text-[#F4F1EA] outline-none"
                   />
                 </div>
 
                 <div>
-                  <label className="text-xs text-slate-400 block mb-1">المحفظة المسحوب منها (اختياري)</label>
+                  <label className="text-xs text-slate-400 block mb-1">{t.walletWithdrawalOptional}</label>
                   <select
                     value={paymentWalletId}
                     onChange={(e) => setPaymentWalletId(e.target.value)}
-                    className="w-full bg-slate-800 border border-white/10 focus:border-emerald-400 rounded-2xl px-4 py-2.5 text-sm text-white outline-none"
+                    className="w-full bg-slate-800 border border-white/10 focus:border-[#8EB9A7] rounded-2xl px-4 py-2.5 text-sm text-[#F4F1EA] outline-none"
                   >
-                    <option value="">-- بدون خصم من محفظة محددة --</option>
+                    <option value="">{t.noWalletSelected}</option>
                     {wallets.map(w => (
                       <option key={w.id} value={w.id}>{w.name} ({w.currencyCode})</option>
                     ))}
@@ -1703,13 +1552,13 @@ export const ZakatCalculator: React.FC<ZakatCalculatorProps> = ({
                 </div>
 
                 <div>
-                  <label className="text-xs text-slate-400 block mb-1">ملاحظات إضافية</label>
+                  <label className="text-xs text-slate-400 block mb-1">{t.additionalNotes}</label>
                   <input
                     type="text"
-                    placeholder="مثال: دفعة زكاة الفطر / زكاة المال لعام 1447هـ"
+                    placeholder={t.notesPlaceholder}
                     value={paymentNote}
                     onChange={(e) => setPaymentNote(e.target.value)}
-                    className="w-full bg-white/[0.04] border border-white/10 focus:border-emerald-400 rounded-2xl px-4 py-2.5 text-sm text-white outline-none"
+                    className="w-full bg-white/[0.04] border border-white/10 focus:border-[#8EB9A7] rounded-2xl px-4 py-2.5 text-sm text-[#F4F1EA] outline-none"
                   />
                 </div>
               </div>
@@ -1719,16 +1568,16 @@ export const ZakatCalculator: React.FC<ZakatCalculatorProps> = ({
                   type="button"
                   onClick={handleAddPayment}
                   disabled={!paymentAmount || Number(paymentAmount) <= 0}
-                  className="flex-1 py-3 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold transition-all disabled:opacity-50"
+                  className="flex-1 py-3 rounded-2xl bg-[#8EB9A7] hover:bg-[#7da896] text-[#0A0D10] text-xs font-bold transition-all disabled:opacity-50"
                 >
-                  توثيق الدفعة
+                  {t.documentPaymentBtn}
                 </button>
                 <button
                   type="button"
                   onClick={() => setShowPaymentModal(false)}
                   className="px-5 py-3 rounded-2xl bg-white/[0.03] text-slate-400 hover:text-white text-xs font-medium"
                 >
-                  إلغاء
+                  {t.cancel}
                 </button>
               </div>
             </motion.div>
@@ -1736,9 +1585,7 @@ export const ZakatCalculator: React.FC<ZakatCalculatorProps> = ({
         )}
       </AnimatePresence>
 
-      {/* ─────────────────────────────────────────────────────────────
-          MODAL: RESET HAWL CONFIRMATION
-      ───────────────────────────────────────────────────────────── */}
+      {/* MODAL: RESET HAWL CONFIRMATION */}
       <AnimatePresence>
         {showHawlResetConfirm && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
@@ -1746,16 +1593,15 @@ export const ZakatCalculator: React.FC<ZakatCalculatorProps> = ({
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="w-full max-w-md bg-[#0E131F] border border-white/10 rounded-3xl p-6 space-y-4 shadow-2xl text-right"
+              className="w-full max-w-md bg-[#11161C] border border-white/10 rounded-3xl p-6 space-y-4 shadow-2xl text-start"
             >
               <div className="flex items-center gap-3 text-amber-400 border-b border-white/[0.06] pb-3">
                 <RotateCcw size={20} />
-                <h3 className="text-base font-semibold text-white">بدء دورة حول جديدة</h3>
+                <h3 className="text-base font-semibold text-[#F4F1EA]">{t.startNewHawlCycleTitle}</h3>
               </div>
 
               <p className="text-xs text-slate-300 leading-relaxed">
-                هل ترغب في إعادة ضبط تاريخ بداية الحول لملف <strong>{activeProfile.name}</strong> إلى تاريخ اليوم؟
-                سيتم الاحتفاظ بكافة إعدادات النطاق والمحافظ المحددة.
+                {t.hawlResetConfirmText} <strong>{activeProfile.name}</strong> {t.hawlResetConfirmText2}
               </p>
 
               <div className="flex gap-2 pt-2">
@@ -1764,14 +1610,14 @@ export const ZakatCalculator: React.FC<ZakatCalculatorProps> = ({
                   onClick={handleStartNewCycle}
                   className="flex-1 py-3 rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold transition-all"
                 >
-                  تأكيد وبدء الحول من اليوم
+                  {t.confirmAndStartHawlToday}
                 </button>
                 <button
                   type="button"
                   onClick={() => setShowHawlResetConfirm(false)}
                   className="px-5 py-3 rounded-2xl bg-white/[0.03] text-slate-400 hover:text-white text-xs font-medium"
                 >
-                  إلغاء
+                  {t.cancel}
                 </button>
               </div>
             </motion.div>

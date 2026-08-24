@@ -77,8 +77,8 @@ const GoalTracker: React.FC<GoalTrackerProps> = ({ goals, wallets, transactions,
 
               <div className="space-y-2">
                 <div className="flex justify-between text-[9px] font-black text-slate-500 uppercase tracking-widest">
-                  <span>المحقق: {goal.currentAmount.toLocaleString()}</span>
-                  <span>الهدف: {goal.targetAmount.toLocaleString()}</span>
+                  <span>المحقق: {goal.currentAmount.toLocaleString()} {currencySymbol}</span>
+                  <span>الهدف: {goal.targetAmount.toLocaleString()} {currencySymbol}</span>
                 </div>
                 <div className="h-3 bg-slate-950 rounded-full overflow-hidden p-[2px]">
                    <div className={`h-full rounded-full transition-all duration-1000 ${isCompleted ? 'bg-emerald-500' : 'bg-amber-500'}`} style={{ width: `${progress}%` }} />

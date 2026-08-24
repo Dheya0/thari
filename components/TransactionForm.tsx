@@ -17,6 +17,8 @@ import {
   FinancialEventType 
 } from '../types';
 import { getIcon, DEFAULT_CURRENCIES, convertCurrency } from '../constants';
+import { getLocalizedCurrency, LanguageKey } from '../utils/translations';
+import { getCurrencySymbol } from '../utils/formatters';
 
 interface TransactionFormProps {
   categories: Category[];
@@ -37,6 +39,8 @@ interface TransactionFormProps {
   initialData?: Transaction | null;
   exchangeRates: Record<string, number>;
   defaultType?: FinancialEventType | TransactionType;
+  language?: LanguageKey;
+  t: any;
 }
 
 const TransactionForm: React.FC<TransactionFormProps> = ({
@@ -51,8 +55,9 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
   initialData,
   exchangeRates,
   defaultType,
+  language = 'ar',
+  t,
 }) => {
-  // Map initial type to financial event type
   const mapInitialEventType = (): FinancialEventType | null => {
     if (initialData) {
       if (initialData.type === 'income') return 'income';
@@ -76,7 +81,6 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
   const [isEditingExisting, setIsEditingExisting] = useState<boolean>(Boolean(initialData));
   const [selectedTxForEdit, setSelectedTxForEdit] = useState<string>(initialData?.id || '');
 
-  // Form Fields State
   const [amount, setAmount] = useState(initialData ? initialData.amount.toString() : '');
   const [categoryId, setCategoryId] = useState(initialData?.categoryId || '');
   const [walletId, setWalletId] = useState(initialData?.walletId || wallets[0]?.id || '');
@@ -94,7 +98,6 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Debt Specific States
   const [personName, setPersonName] = useState('');
   const [personPhone, setPersonPhone] = useState('');
   const [debtDueDate, setDebtDueDate] = useState('');
@@ -103,7 +106,6 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
     debts.find(d => !d.isPaid)?.id || ''
   );
 
-  // Balance Adjustment Specific States
   const [actualRealBalance, setActualRealBalance] = useState('');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -115,7 +117,6 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
     initialData?.currency || selectedSourceWallet?.currencyCode || 'SAR'
   );
 
-  // Sync default category when changing event type
   useEffect(() => {
     if (selectedEvent === 'expense' && !categoryId) {
       const firstExp = categories.find(c => c.type === 'expense');
@@ -126,24 +127,20 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
     }
   }, [selectedEvent, categories]);
 
-  // Keep currency in sync with selected source wallet unless manually modified
   useEffect(() => {
     if (selectedSourceWallet && !initialData && selectedEvent !== 'transfer') {
       setInputCurrency(selectedSourceWallet.currencyCode);
     }
   }, [walletId, selectedEvent]);
 
-  // List of active (unsettled) debts for repayment
   const activeDebts = useMemo(() => {
     return debts.filter(d => !d.isPaid);
   }, [debts]);
 
-  // Selected debt details for repayment
   const currentSelectedDebt = useMemo(() => {
     return debts.find(d => d.id === selectedDebtIdForRepayment);
   }, [debts, selectedDebtIdForRepayment]);
 
-  // Unique past contact names for autocomplete
   const knownContacts = useMemo(() => {
     const names = new Set<string>();
     debts.forEach(d => {
@@ -152,7 +149,6 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
     return Array.from(names);
   }, [debts]);
 
-  // Handle transaction selection in edit mode
   const handleSelectTxForEdit = (txId: string) => {
     const tx = transactions.find(t => t.id === txId);
     if (!tx) return;
@@ -176,7 +172,6 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
     } else setSelectedEvent('expense');
   };
 
-  // Image Upload Handler
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -199,300 +194,193 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
     }
   };
 
-  // Form Submissions
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setErrorMessage('');
-
-    if (!selectedEvent) {
-      setErrorMessage('يرجى اختيار نوع الحدث المالي أولاً');
-      return;
-    }
-
-    const numericAmount = parseFloat(amount);
-
-    // 1. EXPENSE EVENT
-    if (selectedEvent === 'expense') {
-      if (isNaN(numericAmount) || numericAmount <= 0) {
-        setErrorMessage('يرجى إدخال مبلغ صحيح أكبر من الصفر');
-        return;
-      }
-      if (!walletId) {
-        setErrorMessage('يرجى اختيار محفظة الدفع');
-        return;
-      }
-
-      setIsSubmitting(true);
-      const rate = exchangeRates[inputCurrency] || 1;
-      const walletCurrency = selectedSourceWallet?.currencyCode || inputCurrency;
-      const convertedToWallet = inputCurrency === walletCurrency 
-        ? numericAmount 
-        : convertCurrency(numericAmount, inputCurrency, walletCurrency, exchangeRates);
-
-      const targetId = initialData?.id || (isEditingExisting ? selectedTxForEdit : undefined);
-
-      onSubmit({
-        ...(targetId ? { id: targetId } : {}),
-        amount: numericAmount,
-        type: 'expense',
-        categoryId: categoryId || 'general-expense',
-        walletId,
-        currency: inputCurrency,
-        exchangeRateUsed: rate,
-        convertedAmountInWalletCurrency: convertedToWallet,
-        date,
-        time,
-        frequency: 'once',
-        note: note.trim(),
-        receipt,
-      });
-      return;
-    }
-
-    // 2. INCOME EVENT
-    if (selectedEvent === 'income') {
-      if (isNaN(numericAmount) || numericAmount <= 0) {
-        setErrorMessage('يرجى إدخال مبلغ صحيح أكبر من الصفر');
-        return;
-      }
-      if (!walletId) {
-        setErrorMessage('يرجى اختيار محفظة الإيداع');
-        return;
-      }
-
-      setIsSubmitting(true);
-      const rate = exchangeRates[inputCurrency] || 1;
-      const walletCurrency = selectedSourceWallet?.currencyCode || inputCurrency;
-      const convertedToWallet = inputCurrency === walletCurrency 
-        ? numericAmount 
-        : convertCurrency(numericAmount, inputCurrency, walletCurrency, exchangeRates);
-
-      const targetId = initialData?.id || (isEditingExisting ? selectedTxForEdit : undefined);
-
-      onSubmit({
-        ...(targetId ? { id: targetId } : {}),
-        amount: numericAmount,
-        type: 'income',
-        categoryId: categoryId || 'general-income',
-        walletId,
-        currency: inputCurrency,
-        exchangeRateUsed: rate,
-        convertedAmountInWalletCurrency: convertedToWallet,
-        date,
-        time,
-        frequency: 'once',
-        note: note.trim(),
-        receipt,
-      });
-      return;
-    }
-
-    // 3. TRANSFER EVENT
-    if (selectedEvent === 'transfer') {
-      if (isNaN(numericAmount) || numericAmount <= 0) {
-        setErrorMessage('يرجى إدخال مبلغ التحويل بشكل صحيح');
-        return;
-      }
-      if (!walletId || !destinationWalletId) {
-        setErrorMessage('يرجى اختيار المحفظة المرسلة والمستلمة');
-        return;
-      }
-      if (walletId === destinationWalletId) {
-        setErrorMessage('لا يمكن التحويل لنفس المحفظة');
-        return;
-      }
-
-      setIsSubmitting(true);
-      const sourceCurrency = selectedSourceWallet?.currencyCode || 'SAR';
-      const destCurrency = selectedDestWallet?.currencyCode || sourceCurrency;
-      
-      let parsedDestAmount = parseFloat(destinationAmount);
-      if (isNaN(parsedDestAmount) || parsedDestAmount <= 0) {
-        parsedDestAmount = sourceCurrency === destCurrency 
-          ? numericAmount 
-          : convertCurrency(numericAmount, sourceCurrency, destCurrency, exchangeRates);
-      }
-
-      const targetId = initialData?.id || (isEditingExisting ? selectedTxForEdit : undefined);
-
-      onSubmit({
-        ...(targetId ? { id: targetId } : {}),
-        amount: numericAmount,
-        type: 'transfer',
-        categoryId: 'transfer-internal',
-        walletId,
-        destinationWalletId,
-        destinationAmount: parsedDestAmount,
-        destinationCurrency: destCurrency,
-        currency: sourceCurrency,
-        exchangeRateUsed: exchangeRates[sourceCurrency] || 1,
-        convertedAmountInWalletCurrency: numericAmount,
-        date,
-        time,
-        frequency: 'once',
-        note: note.trim() || `تحويل من ${selectedSourceWallet?.name} إلى ${selectedDestWallet?.name}`,
-      });
-      return;
-    }
-
-    // 4. DEBT TO ME (دين لي)
-    if (selectedEvent === 'debt_to_me') {
-      if (!personName.trim()) {
-        setErrorMessage('يرجى إدخال اسم الشخص أو الجهة المدين');
-        return;
-      }
-      if (isNaN(numericAmount) || numericAmount <= 0) {
-        setErrorMessage('يرجى إدخال مبلغ الدين بشكل صحيح');
-        return;
-      }
-
-      setIsSubmitting(true);
-      if (onAddDebt) {
-        onAddDebt({
-          personName: personName.trim(),
-          personPhone: personPhone.trim() || undefined,
-          amount: numericAmount,
-          originalAmount: numericAmount,
-          paidAmount: 0,
-          type: 'to_me',
-          currency: inputCurrency,
-          createdAt: date ? `${date}T${time}:00.000Z` : new Date().toISOString(),
-          dueDate: debtDueDate || undefined,
-          isPaid: false,
-          status: 'active',
-          note: note.trim(),
-          payments: []
-        }, linkDebtToWallet ? walletId : undefined);
-      }
-      onClose();
-      return;
-    }
-
-    // 5. DEBT ON ME (دين عليّ)
-    if (selectedEvent === 'debt_on_me') {
-      if (!personName.trim()) {
-        setErrorMessage('يرجى إدخال اسم صاحب الدين (الدائن)');
-        return;
-      }
-      if (isNaN(numericAmount) || numericAmount <= 0) {
-        setErrorMessage('يرجى إدخال مبلغ الدين بشكل صحيح');
-        return;
-      }
-
-      setIsSubmitting(true);
-      if (onAddDebt) {
-        onAddDebt({
-          personName: personName.trim(),
-          personPhone: personPhone.trim() || undefined,
-          amount: numericAmount,
-          originalAmount: numericAmount,
-          paidAmount: 0,
-          type: 'on_me',
-          currency: inputCurrency,
-          createdAt: date ? `${date}T${time}:00.000Z` : new Date().toISOString(),
-          dueDate: debtDueDate || undefined,
-          isPaid: false,
-          status: 'active',
-          note: note.trim(),
-          payments: []
-        }, linkDebtToWallet ? walletId : undefined);
-      }
-      onClose();
-      return;
-    }
-
-    // 6. DEBT REPAYMENT (تسديد دين)
-    if (selectedEvent === 'debt_repayment') {
-      if (!selectedDebtIdForRepayment) {
-        setErrorMessage('يرجى تحديد الدين المراد سداده');
-        return;
-      }
-      if (isNaN(numericAmount) || numericAmount <= 0) {
-        setErrorMessage('يرجى إدخال مبلغ السداد');
-        return;
-      }
-
-      setIsSubmitting(true);
-      if (onPayDebt) {
-        onPayDebt(
-          selectedDebtIdForRepayment,
-          numericAmount,
-          linkDebtToWallet ? walletId : undefined,
-          note.trim(),
-          undefined,
-          date
-        );
-      }
-      onClose();
-      return;
-    }
-
-    // 7. BALANCE ADJUSTMENT (تصحيح الرصيد)
-    if (selectedEvent === 'balance_adjustment') {
-      if (!walletId) {
-        setErrorMessage('يرجى اختيار المحفظة المراد تسوية رصيدها');
-        return;
-      }
-
-      const realBal = parseFloat(actualRealBalance);
-      if (isNaN(realBal)) {
-        setErrorMessage('يرجى إدخال الرصيد الفعلي الحقيقي الموجود في المحفظة');
-        return;
-      }
-
-      const currentLedgerBal = selectedSourceWallet ? (selectedSourceWallet.currentBalance || selectedSourceWallet.openingBalance || 0) : 0;
-      const difference = realBal - currentLedgerBal;
-
-      if (Math.abs(difference) < 0.001) {
-        setErrorMessage('الرصيد الفعلي مطابق للرصيد المسجل، لا توجد فروقات للتصحيح');
-        return;
-      }
-
-      setIsSubmitting(true);
-      const walletCurrency = selectedSourceWallet?.currencyCode || 'SAR';
-
-      const targetId = initialData?.id || (isEditingExisting ? selectedTxForEdit : undefined);
-
-      onSubmit({
-        ...(targetId ? { id: targetId } : {}),
-        amount: Math.abs(difference),
-        type: 'adjustment',
-        categoryId: 'balance-reconciliation',
-        walletId,
-        currency: walletCurrency,
-        exchangeRateUsed: exchangeRates[walletCurrency] || 1,
-        convertedAmountInWalletCurrency: Math.abs(difference),
-        date,
-        time,
-        frequency: 'once',
-        note: note.trim() || `تسوية رصيد: تعديل من ${currentLedgerBal.toLocaleString()} إلى ${realBal.toLocaleString()} ${walletCurrency}`,
-      });
-      return;
-    }
-  };
-
-  // Helper calculation for Adjustment
   const adjustmentCalc = useMemo(() => {
-    if (selectedEvent !== 'balance_adjustment' || !selectedSourceWallet) return null;
-    const current = selectedSourceWallet.currentBalance ?? selectedSourceWallet.openingBalance ?? 0;
-    const actual = parseFloat(actualRealBalance);
-    if (isNaN(actual)) return { current, actual: null, diff: 0, isIncrease: true };
+    if (selectedEvent !== 'balance_adjustment') return null;
+    const current = selectedSourceWallet ? (selectedSourceWallet.currentBalance ?? selectedSourceWallet.openingBalance ?? 0) : 0;
+    const actual = actualRealBalance === '' ? null : parseFloat(actualRealBalance);
+    if (actual === null || isNaN(actual)) return { current, actual: null, diff: 0, isIncrease: true, absDiff: 0 };
     const diff = actual - current;
     return {
       current,
       actual,
       diff,
-      isIncrease: diff > 0,
+      isIncrease: diff >= 0,
       absDiff: Math.abs(diff)
     };
   }, [selectedEvent, selectedSourceWallet, actualRealBalance]);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMessage('');
+
+    const numAmount = parseFloat(amount);
+    if (isNaN(numAmount) || numAmount <= 0) {
+      setErrorMessage('الرجاء إدخال مبلغ صحيح أكبر من الصفر');
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      if (selectedEvent === 'expense') {
+        let finalAmount = numAmount;
+        if (inputCurrency !== selectedSourceWallet?.currencyCode && exchangeRates) {
+          finalAmount = convertCurrency(numAmount, inputCurrency, selectedSourceWallet.currencyCode, exchangeRates);
+        }
+        onSubmit({
+          id: initialData?.id,
+          type: 'expense',
+          amount: finalAmount,
+          currency: selectedSourceWallet?.currencyCode || 'SAR',
+          walletId,
+          categoryId: categoryId || categories.find(c => c.type === 'expense')?.id || 'general',
+          note,
+          date,
+          time,
+          frequency: 'once',
+          receipt
+        });
+      } else if (selectedEvent === 'income') {
+        let finalAmount = numAmount;
+        if (inputCurrency !== selectedSourceWallet?.currencyCode && exchangeRates) {
+          finalAmount = convertCurrency(numAmount, inputCurrency, selectedSourceWallet.currencyCode, exchangeRates);
+        }
+        onSubmit({
+          id: initialData?.id,
+          type: 'income',
+          amount: finalAmount,
+          currency: selectedSourceWallet?.currencyCode || 'SAR',
+          walletId,
+          categoryId: categoryId || categories.find(c => c.type === 'income')?.id || 'general',
+          note,
+          date,
+          time,
+          frequency: 'once'
+        });
+      } else if (selectedEvent === 'transfer') {
+        if (walletId === destinationWalletId) {
+          setErrorMessage('لا يمكن التحويل بين نفس المحفظة');
+          setIsSubmitting(false);
+          return;
+        }
+        const destWallet = wallets.find(w => w.id === destinationWalletId);
+        let finalDestAmount = destinationAmount ? parseFloat(destinationAmount) : numAmount;
+        if (selectedSourceWallet?.currencyCode !== destWallet?.currencyCode && !destinationAmount && exchangeRates) {
+          finalDestAmount = convertCurrency(numAmount, selectedSourceWallet.currencyCode, destWallet?.currencyCode || 'SAR', exchangeRates);
+        }
+        onSubmit({
+          id: initialData?.id,
+          type: 'transfer',
+          amount: numAmount,
+          currency: selectedSourceWallet?.currencyCode || 'SAR',
+          walletId,
+          destinationWalletId,
+          destinationAmount: finalDestAmount,
+          categoryId: categoryId || categories[0]?.id || 'general',
+          note,
+          date,
+          time,
+          frequency: 'once'
+        });
+      } else if (selectedEvent === 'debt_to_me') {
+        if (!personName.trim()) {
+          setErrorMessage('الرجاء إدخال اسم المدين');
+          setIsSubmitting(false);
+          return;
+        }
+        let finalAmount = numAmount;
+        if (inputCurrency !== selectedSourceWallet?.currencyCode && exchangeRates) {
+          finalAmount = convertCurrency(numAmount, inputCurrency, selectedSourceWallet.currencyCode, exchangeRates);
+        }
+        if (onAddDebt) {
+          onAddDebt({
+            type: 'to_me',
+            personName: personName.trim(),
+            personPhone: personPhone.trim(),
+            amount: finalAmount,
+            originalAmount: finalAmount,
+            paidAmount: 0,
+            currency: selectedSourceWallet?.currencyCode || 'SAR',
+            dueDate: debtDueDate || undefined,
+            isPaid: false,
+            note: note || '',
+            createdAt: new Date().toISOString()
+          }, linkDebtToWallet ? walletId : undefined);
+        }
+        onClose();
+      } else if (selectedEvent === 'debt_on_me') {
+        if (!personName.trim()) {
+          setErrorMessage('الرجاء إدخال اسم صاحب الدين (الدائن)');
+          setIsSubmitting(false);
+          return;
+        }
+        let finalAmount = numAmount;
+        if (inputCurrency !== selectedSourceWallet?.currencyCode && exchangeRates) {
+          finalAmount = convertCurrency(numAmount, inputCurrency, selectedSourceWallet.currencyCode, exchangeRates);
+        }
+        if (onAddDebt) {
+          onAddDebt({
+            type: 'on_me',
+            personName: personName.trim(),
+            personPhone: personPhone.trim(),
+            amount: finalAmount,
+            originalAmount: finalAmount,
+            paidAmount: 0,
+            currency: selectedSourceWallet?.currencyCode || 'SAR',
+            dueDate: debtDueDate || undefined,
+            isPaid: false,
+            note: note || '',
+            createdAt: new Date().toISOString()
+          }, linkDebtToWallet ? walletId : undefined);
+        }
+        onClose();
+      } else if (selectedEvent === 'debt_repayment') {
+        if (!currentSelectedDebt) {
+          setErrorMessage('الرجاء اختيار الذمة المالية المراد سدادها');
+          setIsSubmitting(false);
+          return;
+        }
+        const rem = Math.max(0, (currentSelectedDebt.originalAmount || currentSelectedDebt.amount) - (currentSelectedDebt.paidAmount || 0));
+        if (numAmount > rem + 0.01) {
+          setErrorMessage('مبلغ الدفعة أكبر من المتبقي في الذمة المالية');
+          setIsSubmitting(false);
+          return;
+        }
+        if (onPayDebt) {
+          onPayDebt(currentSelectedDebt.id, numAmount, walletId, note ? ` - ${note}` : undefined, undefined, date);
+        }
+        onClose();
+      } else if (selectedEvent === 'balance_adjustment') {
+        if (!adjustmentCalc || adjustmentCalc.actual === null) {
+          setErrorMessage('الرجاء إدخال الرصيد الفعلي');
+          setIsSubmitting(false);
+          return;
+        }
+        onSubmit({
+          type: 'adjustment',
+          amount: adjustmentCalc.diff,
+          currency: selectedSourceWallet?.currencyCode || 'SAR',
+          walletId,
+          categoryId: categoryId || categories[0]?.id || 'general',
+          note: note || `تسوية رصيد محفظة ${selectedSourceWallet?.name} إلى ${adjustmentCalc.actual}`,
+          date,
+          time,
+          frequency: 'once'
+        });
+      }
+    } catch (err: any) {
+      setErrorMessage(err.message || 'حدث خطأ أثناء حفظ المعاملة');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <motion.div 
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/80 backdrop-blur-md overflow-y-auto"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -501,10 +389,10 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
         initial={{ scale: 0.95, opacity: 0, y: 15 }}
         animate={{ scale: 1, opacity: 1, y: 0 }}
         exit={{ scale: 0.95, opacity: 0, y: 15 }}
-        className="w-full max-w-lg bg-slate-900 border border-white/10 rounded-3xl shadow-2xl overflow-hidden my-auto"
+        className="w-full max-w-lg bg-[#0A0D10] border border-[#D9B978]/20 rounded-3xl shadow-2xl overflow-hidden my-auto"
       >
         {/* TOP BAR / NAVIGATION */}
-        <div className="p-4 sm:p-5 border-b border-white/5 flex items-center justify-between bg-slate-950/50">
+        <div className="p-4 sm:p-5 border-b border-[#D9B978]/10 flex items-center justify-between bg-[#11161C]">
           <div className="flex items-center gap-2.5">
             {selectedEvent && !initialData && (
               <button 
@@ -513,7 +401,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
                   setSelectedEvent(null);
                   setErrorMessage('');
                 }}
-                className="w-9 h-9 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 flex items-center justify-center transition-colors"
+                className="w-9 h-9 rounded-xl bg-[#11161C] hover:bg-[#D9B978]/15 text-[#F4F1EA] flex items-center justify-center transition-colors border border-[#D9B978]/20"
                 title="الرجوع لقائمة الأحداث"
               >
                 <ChevronRight size={20} />
@@ -521,22 +409,22 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
             )}
 
             <div>
-              <h3 className="font-black text-white text-base sm:text-lg">
+              <h3 className="font-black text-[#F4F1EA] text-base sm:text-lg">
                 {!selectedEvent 
-                  ? 'ماذا حدث؟' 
-                  : selectedEvent === 'expense' ? 'تسجيل مصروف'
-                  : selectedEvent === 'income' ? 'إيداع دخل'
-                  : selectedEvent === 'transfer' ? 'تحويل مالي بين المحافظ'
-                  : selectedEvent === 'debt_to_me' ? 'قيد دين لي (مستحق لي)'
-                  : selectedEvent === 'debt_on_me' ? 'قيد دين عليّ (التزام)'
-                  : selectedEvent === 'debt_repayment' ? 'تسديد دفعة دين'
-                  : 'تصحيح وتسوية الرصيد'
+                  ? t.whatHappened 
+                  : selectedEvent === 'expense' ? t.recordExpense
+                  : selectedEvent === 'income' ? t.recordIncome
+                  : selectedEvent === 'transfer' ? t.transferWallet
+                  : selectedEvent === 'debt_to_me' ? t.debtToMeTitle
+                  : selectedEvent === 'debt_on_me' ? t.debtOnMeTitle
+                  : selectedEvent === 'debt_repayment' ? t.debtRepaymentTitle
+                  : t.balanceAdjustmentTitle
                 }
               </h3>
-              <p className="text-[11px] font-medium text-slate-400">
+              <p className="text-[11px] font-medium text-[#F4F1EA]/60">
                 {!selectedEvent 
-                  ? 'اختر نوع الحدث المالي للتسجيل الدفتري'
-                  : 'تسجيل في دفتر القيود المحاسبية'
+                  ? t.selectFinancialEvent
+                  : t.accountingLedgerRecord
                 }
               </p>
             </div>
@@ -554,19 +442,19 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
                 }}
                 className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1 border ${
                   isEditingExisting 
-                    ? 'bg-amber-500/20 text-amber-300 border-amber-500/30' 
-                    : 'bg-slate-800 text-slate-300 border-white/5 hover:bg-slate-700'
+                    ? 'bg-[#D9B978]/20 text-[#D9B978] border-[#D9B978]/40' 
+                    : 'bg-[#11161C] text-[#F4F1EA]/80 border-[#D9B978]/20 hover:text-[#F4F1EA]'
                 }`}
               >
                 <Edit3 size={13} />
-                <span>تعديل سابق</span>
+                <span>{t.editPrevious}</span>
               </button>
             )}
 
             <button 
               type="button"
               onClick={onClose}
-              className="w-9 h-9 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition-colors"
+              className="w-9 h-9 rounded-xl bg-[#11161C] hover:bg-[#D9B978]/15 text-[#F4F1EA]/70 hover:text-[#F4F1EA] flex items-center justify-center transition-colors border border-[#D9B978]/20"
             >
               <X size={18} />
             </button>
@@ -575,7 +463,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
 
         {/* ERROR BANNER */}
         {errorMessage && (
-          <div className="mx-4 mt-3 p-3 bg-rose-500/10 border border-rose-500/20 rounded-2xl flex items-center gap-2.5 text-rose-400 text-xs font-bold">
+          <div className="mx-4 mt-3 p-3 bg-[#C98387]/15 border border-[#C98387]/30 rounded-2xl flex items-center gap-2.5 text-[#C98387] text-xs font-bold">
             <AlertCircle size={16} className="shrink-0" />
             <span>{errorMessage}</span>
           </div>
@@ -583,40 +471,40 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
 
         {/* SCREEN 1: EVENT SELECTION GRID ("ماذا حدث؟") */}
         {!selectedEvent && (
-          <div className="p-4 sm:p-6 space-y-4">
-            {/* If Edit mode selected from selector */}
+          <div className="p-4 sm:p-6 space-y-4 bg-[#0A0D10]">
             {isEditingExisting && (
-              <div className="p-3.5 bg-amber-500/5 rounded-2xl border border-amber-500/20 space-y-3 animate-fade">
+              <div className="p-3.5 bg-[#11161C] rounded-2xl border border-[#D9B978]/30 space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <Edit3 size={15} className="text-amber-400" />
-                    <span className="text-xs font-bold text-amber-300">تعديل عملية مسجلة سابقة</span>
+                    <Edit3 size={15} className="text-[#D9B978]" />
+                    <span className="text-xs font-bold text-[#D9B978]">{t.editPreviousRegistered}</span>
                   </div>
                   <button
                     type="button"
                     onClick={() => setIsEditingExisting(false)}
-                    className="text-[11px] text-slate-400 hover:text-white px-2 py-0.5 rounded-lg bg-slate-800/80"
+                    className="text-[11px] text-[#F4F1EA]/70 hover:text-[#F4F1EA] px-2 py-0.5 rounded-lg bg-[#0A0D10] border border-[#D9B978]/20"
                   >
-                    إلغاء التعديل
+                    {t.cancelEdit}
                   </button>
                 </div>
 
                 {transactions.length === 0 ? (
-                  <p className="text-xs text-slate-400 py-2 text-center">لا توجد عمليات مسجلة حتى الآن للتعديل.</p>
+                  <p className="text-xs text-[#F4F1EA]/50 py-2 text-center">{t.noTransactionsToEdit}</p>
                 ) : (
                   <div className="space-y-2">
-                    <label className="text-[11px] font-bold text-slate-400 block">اختر العملية من السجل:</label>
+                    <label className="text-[11px] font-bold text-[#F4F1EA]/70 block">{t.selectTxFromLog}</label>
                     <select
                       value={selectedTxForEdit}
                       onChange={(e) => handleSelectTxForEdit(e.target.value)}
-                      className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-amber-500 font-bold"
+                      className="w-full bg-[#0A0D10] border border-[#D9B978]/30 rounded-xl px-3 py-2.5 text-xs text-[#F4F1EA] focus:outline-none focus:border-[#D9B978] font-bold"
                     >
-                      {transactions.slice(0, 40).map(t => {
-                        const cat = categories.find(c => c.id === t.categoryId);
-                        const typeLabel = t.type === 'expense' ? 'مصروف' : t.type === 'income' ? 'دخل' : t.type === 'transfer' ? 'تحويل' : 'تسوية';
+                      {transactions.slice(0, 40).map(tr => {
+                        const cat = categories.find(c => c.id === tr.categoryId);
+                        const typeLabel = tr.type === 'expense' ? t.expenses : tr.type === 'income' ? t.income : tr.type === 'transfer' ? t.transfer : t.adjustment;
+                        const trCurrLoc = getLocalizedCurrency(tr.currency || 'SAR', undefined, undefined, language);
                         return (
-                          <option key={t.id} value={t.id}>
-                            {t.date} | {typeLabel} ({cat?.name || 'عام'}): {t.amount.toLocaleString()} {t.currency || 'SAR'} {t.note ? `- ${t.note}` : ''}
+                          <option key={tr.id} value={tr.id} className="bg-[#0A0D10] text-[#F4F1EA]">
+                            {tr.date} | {typeLabel} ({cat?.name || t.generalSettings}): {tr.amount.toLocaleString()} {trCurrLoc.symbol} ({trCurrLoc.code}) {tr.note ? `- ${tr.note}` : ''}
                           </option>
                         );
                       })}
@@ -627,12 +515,12 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
                         <button
                           type="button"
                           onClick={() => {
-                            const tx = transactions.find(t => t.id === selectedTxForEdit);
+                            const tx = transactions.find(item => item.id === selectedTxForEdit);
                             if (tx) handleSelectTxForEdit(tx.id);
                           }}
-                          className="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded-xl text-xs flex items-center gap-1.5 transition-all shadow-md"
+                          className="px-3.5 py-1.5 bg-[#D9B978] hover:bg-[#D9B978]/90 text-[#0A0D10] font-black rounded-xl text-xs flex items-center gap-1.5 transition-all shadow-md"
                         >
-                          <span>فتح نموذج التعديل</span>
+                          <span>{t.openEditForm}</span>
                           <ChevronRight size={14} className="rotate-180" />
                         </button>
                       </div>
@@ -647,105 +535,105 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
               <button
                 type="button"
                 onClick={() => setSelectedEvent('expense')}
-                className="p-4 rounded-2xl bg-slate-950/60 border border-white/5 hover:border-rose-500/40 hover:bg-rose-500/5 transition-all text-right group flex flex-col justify-between min-h-[95px] relative overflow-hidden"
+                className="p-4 rounded-2xl bg-[#11161C] border border-[#D9B978]/20 hover:border-[#C98387] hover:bg-[#C98387]/10 transition-all text-start group flex flex-col justify-between min-h-[95px] relative overflow-hidden shadow-md"
               >
                 <div className="flex items-center justify-between w-full">
-                  <span className="font-black text-white text-sm sm:text-base group-hover:text-rose-400 transition-colors">مصروف</span>
-                  <div className="w-8 h-8 rounded-xl bg-rose-500/10 text-rose-400 flex items-center justify-center group-hover:scale-110 transition-transform border border-rose-500/20">
+                  <span className="font-black text-[#F4F1EA] text-sm sm:text-base group-hover:text-[#C98387] transition-colors">{t.expenses}</span>
+                  <div className="w-8 h-8 rounded-xl bg-[#C98387]/15 text-[#C98387] flex items-center justify-center group-hover:scale-110 transition-transform border border-[#C98387]/30">
                     <ArrowDownLeft size={18} />
                   </div>
                 </div>
-                <p className="text-[10px] text-slate-400 mt-2 font-medium">تسجيل نفقة، شراء، فواتير</p>
+                <p className="text-[10px] text-[#F4F1EA]/60 mt-2 font-medium">{t.expenseDesc}</p>
               </button>
 
               {/* 2. INCOME */}
               <button
                 type="button"
                 onClick={() => setSelectedEvent('income')}
-                className="p-4 rounded-2xl bg-slate-950/60 border border-white/5 hover:border-emerald-500/40 hover:bg-emerald-500/5 transition-all text-right group flex flex-col justify-between min-h-[95px]"
+                className="p-4 rounded-2xl bg-[#11161C] border border-[#D9B978]/20 hover:border-[#8EB9A7] hover:bg-[#8EB9A7]/10 transition-all text-start group flex flex-col justify-between min-h-[95px] shadow-md"
               >
                 <div className="flex items-center justify-between w-full">
-                  <span className="font-black text-white text-sm sm:text-base group-hover:text-emerald-400 transition-colors">دخل</span>
-                  <div className="w-8 h-8 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center group-hover:scale-110 transition-transform border border-emerald-500/20">
+                  <span className="font-black text-[#F4F1EA] text-sm sm:text-base group-hover:text-[#8EB9A7] transition-colors">{t.income}</span>
+                  <div className="w-8 h-8 rounded-xl bg-[#8EB9A7]/15 text-[#8EB9A7] flex items-center justify-center group-hover:scale-110 transition-transform border border-[#8EB9A7]/30">
                     <ArrowUpRight size={18} />
                   </div>
                 </div>
-                <p className="text-[10px] text-slate-400 mt-2 font-medium">إيداع راتب، أرباح، إيرادات</p>
+                <p className="text-[10px] text-[#F4F1EA]/60 mt-2 font-medium">{t.incomeDesc}</p>
               </button>
 
               {/* 3. TRANSFER */}
               <button
                 type="button"
                 onClick={() => setSelectedEvent('transfer')}
-                className="p-4 rounded-2xl bg-slate-950/60 border border-white/5 hover:border-blue-500/40 hover:bg-blue-500/5 transition-all text-right group flex flex-col justify-between min-h-[95px]"
+                className="p-4 rounded-2xl bg-[#11161C] border border-[#D9B978]/20 hover:border-[#D9B978] hover:bg-[#D9B978]/10 transition-all text-start group flex flex-col justify-between min-h-[95px] shadow-md"
               >
                 <div className="flex items-center justify-between w-full">
-                  <span className="font-black text-white text-sm sm:text-base group-hover:text-blue-400 transition-colors">تحويل</span>
-                  <div className="w-8 h-8 rounded-xl bg-blue-500/10 text-blue-400 flex items-center justify-center group-hover:scale-110 transition-transform border border-blue-500/20">
+                  <span className="font-black text-[#F4F1EA] text-sm sm:text-base group-hover:text-[#D9B978] transition-colors">{t.transfer}</span>
+                  <div className="w-8 h-8 rounded-xl bg-[#D9B978]/15 text-[#D9B978] flex items-center justify-center group-hover:scale-110 transition-transform border border-[#D9B978]/30">
                     <ArrowLeftRight size={18} />
                   </div>
                 </div>
-                <p className="text-[10px] text-slate-400 mt-2 font-medium">نقل أموال بين المحافظ والحسابات</p>
+                <p className="text-[10px] text-[#F4F1EA]/60 mt-2 font-medium">{t.transferDesc}</p>
               </button>
 
               {/* 4. DEBT TO ME */}
               <button
                 type="button"
                 onClick={() => setSelectedEvent('debt_to_me')}
-                className="p-4 rounded-2xl bg-slate-950/60 border border-white/5 hover:border-teal-500/40 hover:bg-teal-500/5 transition-all text-right group flex flex-col justify-between min-h-[95px]"
+                className="p-4 rounded-2xl bg-[#11161C] border border-[#D9B978]/20 hover:border-[#8EB9A7] hover:bg-[#8EB9A7]/10 transition-all text-start group flex flex-col justify-between min-h-[95px] shadow-md"
               >
                 <div className="flex items-center justify-between w-full">
-                  <span className="font-black text-white text-sm sm:text-base group-hover:text-teal-400 transition-colors">دين لي</span>
-                  <div className="w-8 h-8 rounded-xl bg-teal-500/10 text-teal-400 flex items-center justify-center group-hover:scale-110 transition-transform border border-teal-500/20">
+                  <span className="font-black text-[#F4F1EA] text-sm sm:text-base group-hover:text-[#8EB9A7] transition-colors">{t.youOweOthers}</span>
+                  <div className="w-8 h-8 rounded-xl bg-[#8EB9A7]/15 text-[#8EB9A7] flex items-center justify-center group-hover:scale-110 transition-transform border border-[#8EB9A7]/30">
                     <UserPlus size={18} />
                   </div>
                 </div>
-                <p className="text-[10px] text-slate-400 mt-2 font-medium">إقراض مبلغ لشخص (مستحق لي)</p>
+                <p className="text-[10px] text-[#F4F1EA]/60 mt-2 font-medium">{t.debtToMeDesc}</p>
               </button>
 
               {/* 5. DEBT ON ME */}
               <button
                 type="button"
                 onClick={() => setSelectedEvent('debt_on_me')}
-                className="p-4 rounded-2xl bg-slate-950/60 border border-white/5 hover:border-amber-500/40 hover:bg-amber-500/5 transition-all text-right group flex flex-col justify-between min-h-[95px]"
+                className="p-4 rounded-2xl bg-[#11161C] border border-[#D9B978]/20 hover:border-[#D9B978] hover:bg-[#D9B978]/10 transition-all text-start group flex flex-col justify-between min-h-[95px] shadow-md"
               >
                 <div className="flex items-center justify-between w-full">
-                  <span className="font-black text-white text-sm sm:text-base group-hover:text-amber-400 transition-colors">دين عليّ</span>
-                  <div className="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center group-hover:scale-110 transition-transform border border-amber-500/20">
+                  <span className="font-black text-[#F4F1EA] text-sm sm:text-base group-hover:text-[#D9B978] transition-colors">{t.othersOweYou}</span>
+                  <div className="w-8 h-8 rounded-xl bg-[#D9B978]/15 text-[#D9B978] flex items-center justify-center group-hover:scale-110 transition-transform border border-[#D9B978]/30">
                     <UserMinus size={18} />
                   </div>
                 </div>
-                <p className="text-[10px] text-slate-400 mt-2 font-medium">استلاف مبلغ أو التزام للغير</p>
+                <p className="text-[10px] text-[#F4F1EA]/60 mt-2 font-medium">{t.debtOnMeDesc}</p>
               </button>
 
               {/* 6. DEBT REPAYMENT */}
               <button
                 type="button"
                 onClick={() => setSelectedEvent('debt_repayment')}
-                className="p-4 rounded-2xl bg-slate-950/60 border border-white/5 hover:border-indigo-500/40 hover:bg-indigo-500/5 transition-all text-right group flex flex-col justify-between min-h-[95px]"
+                className="p-4 rounded-2xl bg-[#11161C] border border-[#D9B978]/20 hover:border-[#D9B978] hover:bg-[#D9B978]/10 transition-all text-start group flex flex-col justify-between min-h-[95px] shadow-md"
               >
                 <div className="flex items-center justify-between w-full">
-                  <span className="font-black text-white text-sm sm:text-base group-hover:text-indigo-400 transition-colors">تسديد دين</span>
-                  <div className="w-8 h-8 rounded-xl bg-indigo-500/10 text-indigo-400 flex items-center justify-center group-hover:scale-110 transition-transform border border-indigo-500/20">
+                  <span className="font-black text-[#F4F1EA] text-sm sm:text-base group-hover:text-[#D9B978] transition-colors">{t.debts}</span>
+                  <div className="w-8 h-8 rounded-xl bg-[#D9B978]/15 text-[#D9B978] flex items-center justify-center group-hover:scale-110 transition-transform border border-[#D9B978]/30">
                     <CheckCircle2 size={18} />
                   </div>
                 </div>
-                <p className="text-[10px] text-slate-400 mt-2 font-medium">دفع أو استرداد دفعة من ذمة</p>
+                <p className="text-[10px] text-[#F4F1EA]/60 mt-2 font-medium">{t.debtRepaymentDesc}</p>
               </button>
 
               {/* 7. BALANCE ADJUSTMENT */}
               <button
                 type="button"
                 onClick={() => setSelectedEvent('balance_adjustment')}
-                className="p-4 rounded-2xl bg-slate-950/60 border border-white/5 hover:border-purple-500/40 hover:bg-purple-500/5 transition-all text-right group flex flex-col justify-between min-h-[95px]"
+                className="p-4 rounded-2xl bg-[#11161C] border border-[#D9B978]/20 hover:border-[#D9B978] hover:bg-[#D9B978]/10 transition-all text-start group flex flex-col justify-between min-h-[95px] shadow-md"
               >
                 <div className="flex items-center justify-between w-full">
-                  <span className="font-black text-white text-sm sm:text-base group-hover:text-purple-400 transition-colors">تصحيح الرصيد</span>
-                  <div className="w-8 h-8 rounded-xl bg-purple-500/10 text-purple-400 flex items-center justify-center group-hover:scale-110 transition-transform border border-purple-500/20">
+                  <span className="font-black text-[#F4F1EA] text-sm sm:text-base group-hover:text-[#D9B978] transition-colors">{t.adjustment}</span>
+                  <div className="w-8 h-8 rounded-xl bg-[#D9B978]/15 text-[#D9B978] flex items-center justify-center group-hover:scale-110 transition-transform border border-[#D9B978]/30">
                     <Scale size={18} />
                   </div>
                 </div>
-                <p className="text-[10px] text-slate-400 mt-2 font-medium">تسوية ومطابقة الرصيد الفعلي</p>
+                <p className="text-[10px] text-[#F4F1EA]/60 mt-2 font-medium">{t.balanceAdjustmentDesc}</p>
               </button>
 
               {/* 8. EDIT PREVIOUS TRANSACTION */}
@@ -757,19 +645,19 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
                     handleSelectTxForEdit(selectedTxForEdit || transactions[0].id);
                   }
                 }}
-                className={`p-4 rounded-2xl border transition-all text-right group flex flex-col justify-between min-h-[95px] relative overflow-hidden ${
+                className={`p-4 rounded-2xl border transition-all text-start group flex flex-col justify-between min-h-[95px] relative overflow-hidden shadow-md ${
                   isEditingExisting
-                    ? 'bg-amber-500/15 border-amber-500/40 text-amber-300'
-                    : 'bg-slate-950/60 border-white/5 hover:border-amber-500/40 hover:bg-amber-500/5'
+                    ? 'bg-[#D9B978]/20 border-[#D9B978] text-[#D9B978]'
+                    : 'bg-[#11161C] border-[#D9B978]/20 hover:border-[#D9B978] hover:bg-[#D9B978]/10'
                 }`}
               >
                 <div className="flex items-center justify-between w-full">
-                  <span className="font-black text-white text-sm sm:text-base group-hover:text-amber-400 transition-colors">تعديل عملية سابقة</span>
-                  <div className="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center group-hover:scale-110 transition-transform border border-amber-500/20">
+                  <span className="font-black text-[#F4F1EA] text-sm sm:text-base group-hover:text-[#D9B978] transition-colors">{t.editPrevious}</span>
+                  <div className="w-8 h-8 rounded-xl bg-[#D9B978]/15 text-[#D9B978] flex items-center justify-center group-hover:scale-110 transition-transform border border-[#D9B978]/30">
                     <Edit3 size={18} />
                   </div>
                 </div>
-                <p className="text-[10px] text-slate-400 mt-2 font-medium">تعديل قيود المصاريف والدخل السابقة</p>
+                <p className="text-[10px] text-[#F4F1EA]/60 mt-2 font-medium">{t.editPreviousRegistered}</p>
               </button>
             </div>
           </div>
@@ -777,14 +665,13 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
 
         {/* SCREEN 2: DEDICATED EVENT FORM */}
         {selectedEvent && (
-          <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4 max-h-[80vh] overflow-y-auto custom-scrollbar">
+          <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4 max-h-[80vh] overflow-y-auto custom-scrollbar bg-[#0A0D10]">
             
             {/* === 1. EXPENSE VIEW === */}
             {selectedEvent === 'expense' && (
               <>
-                {/* Amount & Currency */}
-                <div className="p-4 bg-slate-950/80 rounded-2xl border border-white/5 space-y-2">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">مبلغ المصروف والعملة</label>
+                <div className="p-4 bg-[#11161C] rounded-2xl border border-[#D9B978]/20 space-y-2">
+                  <label className="text-[10px] font-bold text-[#F4F1EA]/70 uppercase tracking-wider block">{t.expenseAmountAndCurrency}</label>
                   <div className="flex items-center gap-2">
                     <input
                       type="number"
@@ -794,44 +681,45 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
                       placeholder="0.00"
                       value={amount}
                       onChange={(e) => setAmount(e.target.value)}
-                      className="w-full bg-transparent text-2xl sm:text-3xl font-black text-white focus:outline-none placeholder-slate-600"
+                      className="w-full bg-transparent text-2xl sm:text-3xl font-black text-[#C98387] focus:outline-none placeholder-[#F4F1EA]/30"
                     />
                     <select
                       value={inputCurrency}
                       onChange={(e) => setInputCurrency(e.target.value)}
-                      className="bg-slate-900 border border-white/10 rounded-xl px-2.5 py-1.5 text-xs text-amber-400 font-bold focus:outline-none shrink-0"
+                      className="bg-[#0A0D10] border border-[#D9B978]/30 rounded-xl px-2.5 py-1.5 text-xs text-[#D9B978] font-bold focus:outline-none shrink-0"
                     >
                       {DEFAULT_CURRENCIES.map(c => (
-                        <option key={c.code} value={c.code}>{c.symbol} - {c.name}</option>
+                        <option key={c.code} value={c.code} className="bg-[#0A0D10] text-[#F4F1EA]">{c.symbol} - {c.name}</option>
                       ))}
                     </select>
                   </div>
                 </div>
 
-                {/* Wallet to pay from */}
                 <div className="space-y-1.5">
-                  <label className="text-[11px] font-bold text-slate-400 flex items-center gap-1.5">
-                    <WalletIcon size={14} className="text-amber-400" />
-                    <span>الدفع من محفظة:</span>
+                  <label className="text-[11px] font-bold text-[#F4F1EA]/70 flex items-center gap-1.5">
+                    <WalletIcon size={14} className="text-[#D9B978]" />
+                    <span>{t.payFromWallet}</span>
                   </label>
                   <select
                     value={walletId}
                     onChange={(e) => setWalletId(e.target.value)}
-                    className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white font-bold focus:outline-none focus:border-amber-500"
+                    className="w-full bg-[#11161C] border border-[#D9B978]/30 rounded-xl px-3 py-2.5 text-xs text-[#F4F1EA] font-bold focus:outline-none focus:border-[#D9B978]"
                   >
-                    {wallets.map(w => (
-                      <option key={w.id} value={w.id}>
-                        {w.name} ({w.currencyCode}) — الرصيد: {(w.currentBalance ?? w.openingBalance ?? 0).toLocaleString()} {w.currencyCode}
-                      </option>
-                    ))}
+                    {wallets.map(w => {
+                      const wCurrLoc = getLocalizedCurrency(w.currencyCode, undefined, undefined, language);
+                      return (
+                        <option key={w.id} value={w.id} className="bg-[#0A0D10] text-[#F4F1EA]">
+                          {w.name} ({wCurrLoc.symbol}) — {t.totalBalance}: {(w.currentBalance ?? w.openingBalance ?? 0).toLocaleString()} {wCurrLoc.symbol}
+                        </option>
+                      );
+                    })}
                   </select>
                 </div>
 
-                {/* Expense Categories */}
                 <div className="space-y-2">
-                  <label className="text-[11px] font-bold text-slate-400 flex items-center gap-1.5">
-                    <Tag size={14} className="text-rose-400" />
-                    <span>تصنيف المصروف:</span>
+                  <label className="text-[11px] font-bold text-[#F4F1EA]/70 flex items-center gap-1.5">
+                    <Tag size={14} className="text-[#C98387]" />
+                    <span>{t.expenseCategory}</span>
                   </label>
                   <div className="grid grid-cols-3 sm:grid-cols-4 gap-1.5 max-h-36 overflow-y-auto custom-scrollbar p-1">
                     {categories.filter(c => c.type === 'expense').map(cat => {
@@ -843,8 +731,8 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
                           onClick={() => setCategoryId(cat.id)}
                           className={`p-2 rounded-xl border text-xs font-bold flex flex-col items-center gap-1 transition-all ${
                             isSelected 
-                              ? 'bg-rose-500/20 text-rose-300 border-rose-500/50 shadow-sm' 
-                              : 'bg-slate-950/60 border-white/5 text-slate-400 hover:text-white hover:bg-slate-900'
+                              ? 'bg-[#C98387]/20 text-[#C98387] border-[#C98387] shadow-sm' 
+                              : 'bg-[#11161C] border-[#D9B978]/20 text-[#F4F1EA]/70 hover:text-[#F4F1EA] hover:border-[#D9B978]/40'
                           }`}
                         >
                           <span className="text-[10px] truncate max-w-full">{cat.name}</span>
@@ -859,9 +747,8 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
             {/* === 2. INCOME VIEW === */}
             {selectedEvent === 'income' && (
               <>
-                {/* Amount & Currency */}
-                <div className="p-4 bg-slate-950/80 rounded-2xl border border-white/5 space-y-2">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">مبلغ الدخل والعملة</label>
+                <div className="p-4 bg-[#11161C] rounded-2xl border border-[#D9B978]/20 space-y-2">
+                  <label className="text-[10px] font-bold text-[#F4F1EA]/70 uppercase tracking-wider block">{t.incomeAmountAndCurrency}</label>
                   <div className="flex items-center gap-2">
                     <input
                       type="number"
@@ -871,44 +758,45 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
                       placeholder="0.00"
                       value={amount}
                       onChange={(e) => setAmount(e.target.value)}
-                      className="w-full bg-transparent text-2xl sm:text-3xl font-black text-emerald-400 focus:outline-none placeholder-slate-600"
+                      className="w-full bg-transparent text-2xl sm:text-3xl font-black text-[#8EB9A7] focus:outline-none placeholder-[#F4F1EA]/30"
                     />
                     <select
                       value={inputCurrency}
                       onChange={(e) => setInputCurrency(e.target.value)}
-                      className="bg-slate-900 border border-white/10 rounded-xl px-2.5 py-1.5 text-xs text-emerald-400 font-bold focus:outline-none shrink-0"
+                      className="bg-[#0A0D10] border border-[#D9B978]/30 rounded-xl px-2.5 py-1.5 text-xs text-[#8EB9A7] font-bold focus:outline-none shrink-0"
                     >
                       {DEFAULT_CURRENCIES.map(c => (
-                        <option key={c.code} value={c.code}>{c.symbol} - {c.name}</option>
+                        <option key={c.code} value={c.code} className="bg-[#0A0D10] text-[#F4F1EA]">{c.symbol} - {c.name}</option>
                       ))}
                     </select>
                   </div>
                 </div>
 
-                {/* Destination Wallet */}
                 <div className="space-y-1.5">
-                  <label className="text-[11px] font-bold text-slate-400 flex items-center gap-1.5">
-                    <WalletIcon size={14} className="text-emerald-400" />
-                    <span>الإيداع في محفظة:</span>
+                  <label className="text-[11px] font-bold text-[#F4F1EA]/70 flex items-center gap-1.5">
+                    <WalletIcon size={14} className="text-[#8EB9A7]" />
+                    <span>{t.depositToWallet}</span>
                   </label>
                   <select
                     value={walletId}
                     onChange={(e) => setWalletId(e.target.value)}
-                    className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white font-bold focus:outline-none focus:border-emerald-500"
+                    className="w-full bg-[#11161C] border border-[#D9B978]/30 rounded-xl px-3 py-2.5 text-xs text-[#F4F1EA] font-bold focus:outline-none focus:border-[#8EB9A7]"
                   >
-                    {wallets.map(w => (
-                      <option key={w.id} value={w.id}>
-                        {w.name} ({w.currencyCode}) — الرصيد: {(w.currentBalance ?? w.openingBalance ?? 0).toLocaleString()} {w.currencyCode}
-                      </option>
-                    ))}
+                    {wallets.map(w => {
+                      const wCurrLoc = getLocalizedCurrency(w.currencyCode, undefined, undefined, language);
+                      return (
+                        <option key={w.id} value={w.id} className="bg-[#0A0D10] text-[#F4F1EA]">
+                          {w.name} ({wCurrLoc.symbol}) — {t.totalBalance}: {(w.currentBalance ?? w.openingBalance ?? 0).toLocaleString()} {wCurrLoc.symbol}
+                        </option>
+                      );
+                    })}
                   </select>
                 </div>
 
-                {/* Income Categories */}
                 <div className="space-y-2">
-                  <label className="text-[11px] font-bold text-slate-400 flex items-center gap-1.5">
-                    <Tag size={14} className="text-emerald-400" />
-                    <span>مصدر / تصنيف الدخل:</span>
+                  <label className="text-[11px] font-bold text-[#F4F1EA]/70 flex items-center gap-1.5">
+                    <Tag size={14} className="text-[#8EB9A7]" />
+                    <span>{t.incomeSourceCategory}</span>
                   </label>
                   <div className="grid grid-cols-3 sm:grid-cols-4 gap-1.5 max-h-36 overflow-y-auto custom-scrollbar p-1">
                     {categories.filter(c => c.type === 'income').map(cat => {
@@ -920,8 +808,8 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
                           onClick={() => setCategoryId(cat.id)}
                           className={`p-2 rounded-xl border text-xs font-bold flex flex-col items-center gap-1 transition-all ${
                             isSelected 
-                              ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/50 shadow-sm' 
-                              : 'bg-slate-950/60 border-white/5 text-slate-400 hover:text-white hover:bg-slate-900'
+                              ? 'bg-[#8EB9A7]/20 text-[#8EB9A7] border-[#8EB9A7] shadow-sm' 
+                              : 'bg-[#11161C] border-[#D9B978]/20 text-[#F4F1EA]/70 hover:text-[#F4F1EA] hover:border-[#D9B978]/40'
                           }`}
                         >
                           <span className="text-[10px] truncate max-w-full">{cat.name}</span>
@@ -937,48 +825,53 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
             {selectedEvent === 'transfer' && (
               <>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {/* From Wallet */}
                   <div className="space-y-1.5">
-                    <label className="text-[11px] font-bold text-slate-400 flex items-center gap-1">
-                      <ArrowDownLeft size={13} className="text-rose-400" />
-                      <span>من محفظة (خصم):</span>
+                    <label className="text-[11px] font-bold text-[#F4F1EA]/70 flex items-center gap-1">
+                      <ArrowDownLeft size={13} className="text-[#C98387]" />
+                      <span>{t.transferFromWallet}</span>
                     </label>
                     <select
                       value={walletId}
                       onChange={(e) => setWalletId(e.target.value)}
-                      className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white font-bold focus:outline-none focus:border-blue-500"
+                      className="w-full bg-[#11161C] border border-[#D9B978]/30 rounded-xl px-3 py-2.5 text-xs text-[#F4F1EA] font-bold focus:outline-none focus:border-[#D9B978]"
                     >
-                      {wallets.map(w => (
-                        <option key={w.id} value={w.id} disabled={w.id === destinationWalletId}>
-                          {w.name} ({w.currencyCode})
-                        </option>
-                      ))}
+                      {wallets.map(w => {
+                        const wCurrLoc = getLocalizedCurrency(w.currencyCode, undefined, undefined, language);
+                        return (
+                          <option key={w.id} value={w.id} disabled={w.id === destinationWalletId} className="bg-[#0A0D10] text-[#F4F1EA]">
+                            {w.name} ({wCurrLoc.symbol})
+                          </option>
+                        );
+                      })}
                     </select>
                   </div>
 
-                  {/* To Wallet */}
                   <div className="space-y-1.5">
-                    <label className="text-[11px] font-bold text-slate-400 flex items-center gap-1">
-                      <ArrowUpRight size={13} className="text-emerald-400" />
-                      <span>إلى محفظة (استلام):</span>
+                    <label className="text-[11px] font-bold text-[#F4F1EA]/70 flex items-center gap-1">
+                      <ArrowUpRight size={13} className="text-[#8EB9A7]" />
+                      <span>{t.transferToWallet}</span>
                     </label>
                     <select
                       value={destinationWalletId}
                       onChange={(e) => setDestinationWalletId(e.target.value)}
-                      className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white font-bold focus:outline-none focus:border-blue-500"
+                      className="w-full bg-[#11161C] border border-[#D9B978]/30 rounded-xl px-3 py-2.5 text-xs text-[#F4F1EA] font-bold focus:outline-none focus:border-[#D9B978]"
                     >
-                      {wallets.map(w => (
-                        <option key={w.id} value={w.id} disabled={w.id === walletId}>
-                          {w.name} ({w.currencyCode})
-                        </option>
-                      ))}
+                      {wallets.map(w => {
+                        const wCurrLoc = getLocalizedCurrency(w.currencyCode, undefined, undefined, language);
+                        return (
+                          <option key={w.id} value={w.id} disabled={w.id === walletId} className="bg-[#0A0D10] text-[#F4F1EA]">
+                            {w.name} ({wCurrLoc.symbol})
+                          </option>
+                        );
+                      })}
                     </select>
                   </div>
                 </div>
 
-                {/* Amount to transfer */}
-                <div className="p-4 bg-slate-950/80 rounded-2xl border border-white/5 space-y-2">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">المبلغ المراد تحويله ({selectedSourceWallet?.currencyCode})</label>
+                <div className="p-4 bg-[#11161C] rounded-2xl border border-[#D9B978]/20 space-y-2">
+                  <label className="text-[10px] font-bold text-[#F4F1EA]/70 uppercase tracking-wider block">
+                    {t.amountToTransfer} ({getLocalizedCurrency(selectedSourceWallet?.currencyCode || 'SAR', undefined, undefined, language).symbol})
+                  </label>
                   <input
                     type="number"
                     step="any"
@@ -987,49 +880,48 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
                     placeholder="0.00"
                     value={amount}
                     onChange={(e) => setAmount(e.target.value)}
-                    className="w-full bg-transparent text-2xl sm:text-3xl font-black text-blue-400 focus:outline-none placeholder-slate-600"
+                    className="w-full bg-transparent text-2xl sm:text-3xl font-black text-[#D9B978] focus:outline-none placeholder-[#F4F1EA]/30"
                   />
                 </div>
 
-                {/* Multi-currency destination preview if currencies differ */}
                 {selectedSourceWallet?.currencyCode !== selectedDestWallet?.currencyCode && selectedDestWallet && (
-                  <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-2xl space-y-2">
+                  <div className="p-3 bg-[#D9B978]/10 border border-[#D9B978]/25 rounded-2xl space-y-2">
                     <div className="flex items-center justify-between text-xs">
-                      <span className="font-bold text-blue-300">المبلغ المستلم بالعملة المستهدفة:</span>
-                      <span className="text-[10px] text-slate-400">عملة {selectedDestWallet.currencyCode}</span>
+                      <span className="font-bold text-[#D9B978]">{t.receivedAmountTargetCurrency}</span>
+                      <span className="text-[10px] text-[#F4F1EA]/60 font-bold">
+                        {getLocalizedCurrency(selectedDestWallet.currencyCode, undefined, undefined, language).symbol} ({selectedDestWallet.currencyCode})
+                      </span>
                     </div>
                     <input
                       type="number"
                       step="any"
-                      placeholder={`المبلغ بـ ${selectedDestWallet.currencyCode}`}
+                      placeholder="0.00"
                       value={destinationAmount}
                       onChange={(e) => setDestinationAmount(e.target.value)}
-                      className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-sm text-white font-bold focus:outline-none focus:border-blue-400"
+                      className="w-full bg-[#0A0D10] border border-[#D9B978]/30 rounded-xl px-3 py-2 text-sm text-[#F4F1EA] font-bold focus:outline-none focus:border-[#D9B978]"
                     />
                   </div>
                 )}
               </>
             )}
 
-            {/* === 4. DEBT TO ME (دين لي) === */}
+            {/* === 4. DEBT TO ME === */}
             {selectedEvent === 'debt_to_me' && (
               <>
-                {/* Person Name */}
                 <div className="space-y-1.5">
-                  <label className="text-[11px] font-bold text-slate-400 flex items-center gap-1.5">
-                    <UserPlus size={14} className="text-teal-400" />
-                    <span>اسم الشخص أو الجهة المستدينة (المدين):</span>
+                  <label className="text-[11px] font-bold text-[#F4F1EA]/70 flex items-center gap-1.5">
+                    <UserPlus size={14} className="text-[#8EB9A7]" />
+                    <span>{t.debtorPersonName}</span>
                   </label>
                   <input
                     type="text"
                     required
                     autoFocus
-                    placeholder="مثال: أحمد محمد، مكتب المقاولات..."
+                    placeholder="e.g. Ahmad, Company..."
                     value={personName}
                     onChange={(e) => setPersonName(e.target.value)}
-                    className="w-full bg-slate-950 border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white font-bold focus:outline-none focus:border-teal-500"
+                    className="w-full bg-[#11161C] border border-[#D9B978]/30 rounded-xl px-3.5 py-2.5 text-xs text-[#F4F1EA] font-bold focus:outline-none focus:border-[#8EB9A7]"
                   />
-                  {/* Known Contacts Chips */}
                   {knownContacts.length > 0 && (
                     <div className="flex flex-wrap gap-1 mt-1">
                       {knownContacts.slice(0, 5).map(name => (
@@ -1037,7 +929,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
                           key={name}
                           type="button"
                           onClick={() => setPersonName(name)}
-                          className="px-2 py-0.5 rounded-lg bg-slate-800 text-[10px] text-slate-300 hover:text-white hover:bg-slate-700 font-medium"
+                          className="px-2 py-0.5 rounded-lg bg-[#11161C] text-[10px] text-[#F4F1EA]/80 hover:text-[#F4F1EA] hover:bg-[#D9B978]/20 font-medium border border-[#D9B978]/20"
                         >
                           {name}
                         </button>
@@ -1046,9 +938,8 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
                   )}
                 </div>
 
-                {/* Amount & Currency */}
-                <div className="p-4 bg-slate-950/80 rounded-2xl border border-white/5 space-y-2">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">مبلغ الدين المستحق لك</label>
+                <div className="p-4 bg-[#11161C] rounded-2xl border border-[#D9B978]/20 space-y-2">
+                  <label className="text-[10px] font-bold text-[#F4F1EA]/70 uppercase tracking-wider block">{t.debtAmountOwedToMe}</label>
                   <div className="flex items-center gap-2">
                     <input
                       type="number"
@@ -1057,88 +948,87 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
                       placeholder="0.00"
                       value={amount}
                       onChange={(e) => setAmount(e.target.value)}
-                      className="w-full bg-transparent text-2xl sm:text-3xl font-black text-teal-400 focus:outline-none placeholder-slate-600"
+                      className="w-full bg-transparent text-2xl sm:text-3xl font-black text-[#8EB9A7] focus:outline-none placeholder-[#F4F1EA]/30"
                     />
                     <select
                       value={inputCurrency}
                       onChange={(e) => setInputCurrency(e.target.value)}
-                      className="bg-slate-900 border border-white/10 rounded-xl px-2.5 py-1.5 text-xs text-teal-400 font-bold focus:outline-none shrink-0"
+                      className="bg-[#0A0D10] border border-[#D9B978]/30 rounded-xl px-2.5 py-1.5 text-xs text-[#8EB9A7] font-bold focus:outline-none shrink-0"
                     >
                       {DEFAULT_CURRENCIES.map(c => (
-                        <option key={c.code} value={c.code}>{c.symbol} - {c.name}</option>
+                        <option key={c.code} value={c.code} className="bg-[#0A0D10] text-[#F4F1EA]">{c.symbol} - {c.name}</option>
                       ))}
                     </select>
                   </div>
                 </div>
 
-                {/* Wallet Funding Option */}
-                <div className="p-3 bg-slate-950/60 rounded-2xl border border-white/5 space-y-2">
+                <div className="p-3 bg-[#11161C] rounded-2xl border border-[#D9B978]/20 space-y-2">
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
                       type="checkbox"
                       checked={linkDebtToWallet}
                       onChange={(e) => setLinkDebtToWallet(e.target.checked)}
-                      className="w-4 h-4 rounded text-teal-500 focus:ring-0 bg-slate-900 border-white/20"
+                      className="w-4 h-4 rounded text-[#8EB9A7] focus:ring-0 bg-[#0A0D10] border-[#D9B978]/30"
                     />
-                    <span className="text-xs font-bold text-white">خصم المبلغ من محفظة نقدية الآن</span>
+                    <span className="text-xs font-bold text-[#F4F1EA]">{t.deductWalletNow}</span>
                   </label>
                   {linkDebtToWallet && (
                     <select
                       value={walletId}
                       onChange={(e) => setWalletId(e.target.value)}
-                      className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-xs text-white font-bold focus:outline-none focus:border-teal-500 mt-2"
+                      className="w-full bg-[#0A0D10] border border-[#D9B978]/30 rounded-xl px-3 py-2 text-xs text-[#F4F1EA] font-bold focus:outline-none focus:border-[#8EB9A7] mt-2"
                     >
-                      {wallets.map(w => (
-                        <option key={w.id} value={w.id}>{w.name} ({w.currencyCode})</option>
-                      ))}
+                      {wallets.map(w => {
+                        const wCurrLoc = getLocalizedCurrency(w.currencyCode, undefined, undefined, language);
+                        return (
+                          <option key={w.id} value={w.id} className="bg-[#0A0D10] text-[#F4F1EA]">{w.name} ({wCurrLoc.symbol})</option>
+                        );
+                      })}
                     </select>
                   )}
                 </div>
 
-                {/* Optional Due Date & Phone */}
                 <div className="grid grid-cols-2 gap-2.5">
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-400">تاريخ الاستحقاق (اختياري)</label>
+                    <label className="text-[10px] font-bold text-[#F4F1EA]/70">{t.dueDateOptional}</label>
                     <input
                       type="date"
                       value={debtDueDate}
                       onChange={(e) => setDebtDueDate(e.target.value)}
-                      className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2 text-xs text-white font-bold focus:outline-none"
+                      className="w-full bg-[#11161C] border border-[#D9B978]/30 rounded-xl px-3 py-2 text-xs text-[#F4F1EA] font-bold focus:outline-none"
                     />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-400">رقم الهاتف (اختياري)</label>
+                    <label className="text-[10px] font-bold text-[#F4F1EA]/70">{t.phoneOptional}</label>
                     <input
                       type="tel"
                       placeholder="05XXXXXXXX"
                       value={personPhone}
                       onChange={(e) => setPersonPhone(e.target.value)}
-                      className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2 text-xs text-white font-bold focus:outline-none"
+                      className="w-full bg-[#11161C] border border-[#D9B978]/30 rounded-xl px-3 py-2 text-xs text-[#F4F1EA] font-bold focus:outline-none"
                     />
                   </div>
                 </div>
               </>
             )}
 
-            {/* === 5. DEBT ON ME (دين عليّ) === */}
+            {/* === 5. DEBT ON ME === */}
             {selectedEvent === 'debt_on_me' && (
               <>
-                {/* Person Name */}
                 <div className="space-y-1.5">
-                  <label className="text-[11px] font-bold text-slate-400 flex items-center gap-1.5">
-                    <UserMinus size={14} className="text-amber-400" />
-                    <span>اسم صاحب الدين (الدائن المستحق له):</span>
+                  <label className="text-[11px] font-bold text-[#F4F1EA]/70 flex items-center gap-1.5">
+                    <UserMinus size={14} className="text-[#D9B978]" />
+                    <span>{t.creditorPersonName}</span>
                   </label>
                   <input
                     type="text"
                     required
                     autoFocus
-                    placeholder="مثال: خالد، البنك، مورد البضاعة..."
+                    placeholder="e.g. Bank, Supplier..."
                     value={personName}
                     onChange={(e) => setPersonName(e.target.value)}
-                    className="w-full bg-slate-950 border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white font-bold focus:outline-none focus:border-amber-500"
+                    className="w-full bg-[#11161C] border border-[#D9B978]/30 rounded-xl px-3.5 py-2.5 text-xs text-[#F4F1EA] font-bold focus:outline-none focus:border-[#D9B978]"
                   />
-                  {/* Known Contacts Chips */}
                   {knownContacts.length > 0 && (
                     <div className="flex flex-wrap gap-1 mt-1">
                       {knownContacts.slice(0, 5).map(name => (
@@ -1146,7 +1036,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
                           key={name}
                           type="button"
                           onClick={() => setPersonName(name)}
-                          className="px-2 py-0.5 rounded-lg bg-slate-800 text-[10px] text-slate-300 hover:text-white hover:bg-slate-700 font-medium"
+                          className="px-2 py-0.5 rounded-lg bg-[#11161C] text-[10px] text-[#F4F1EA]/80 hover:text-[#F4F1EA] hover:bg-[#D9B978]/20 font-medium border border-[#D9B978]/20"
                         >
                           {name}
                         </button>
@@ -1155,9 +1045,8 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
                   )}
                 </div>
 
-                {/* Amount & Currency */}
-                <div className="p-4 bg-slate-950/80 rounded-2xl border border-white/5 space-y-2">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">مبلغ الالتزام المالي المستحق عليك</label>
+                <div className="p-4 bg-[#11161C] rounded-2xl border border-[#D9B978]/20 space-y-2">
+                  <label className="text-[10px] font-bold text-[#F4F1EA]/70 uppercase tracking-wider block">{t.debtAmountOwedByMe}</label>
                   <div className="flex items-center gap-2">
                     <input
                       type="number"
@@ -1166,83 +1055,86 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
                       placeholder="0.00"
                       value={amount}
                       onChange={(e) => setAmount(e.target.value)}
-                      className="w-full bg-transparent text-2xl sm:text-3xl font-black text-amber-400 focus:outline-none placeholder-slate-600"
+                      className="w-full bg-transparent text-2xl sm:text-3xl font-black text-[#D9B978] focus:outline-none placeholder-[#F4F1EA]/30"
                     />
                     <select
                       value={inputCurrency}
                       onChange={(e) => setInputCurrency(e.target.value)}
-                      className="bg-slate-900 border border-white/10 rounded-xl px-2.5 py-1.5 text-xs text-amber-400 font-bold focus:outline-none shrink-0"
+                      className="bg-[#0A0D10] border border-[#D9B978]/30 rounded-xl px-2.5 py-1.5 text-xs text-[#D9B978] font-bold focus:outline-none shrink-0"
                     >
-                      {DEFAULT_CURRENCIES.map(c => (
-                        <option key={c.code} value={c.code}>{c.symbol} - {c.name}</option>
-                      ))}
+                      {DEFAULT_CURRENCIES.map(c => {
+                        const cLoc = getLocalizedCurrency(c.code, undefined, undefined, language);
+                        return (
+                          <option key={c.code} value={c.code} className="bg-[#0A0D10] text-[#F4F1EA]">{cLoc.symbol} - {cLoc.name}</option>
+                        );
+                      })}
                     </select>
                   </div>
                 </div>
 
-                {/* Wallet Receiving Option */}
-                <div className="p-3 bg-slate-950/60 rounded-2xl border border-white/5 space-y-2">
+                <div className="p-3 bg-[#11161C] rounded-2xl border border-[#D9B978]/20 space-y-2">
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
                       type="checkbox"
                       checked={linkDebtToWallet}
                       onChange={(e) => setLinkDebtToWallet(e.target.checked)}
-                      className="w-4 h-4 rounded text-amber-500 focus:ring-0 bg-slate-900 border-white/20"
+                      className="w-4 h-4 rounded text-[#D9B978] focus:ring-0 bg-[#0A0D10] border-[#D9B978]/30"
                     />
-                    <span className="text-xs font-bold text-white">إيداع المبلغ المستلف في محفظة الآن</span>
+                    <span className="text-xs font-bold text-[#F4F1EA]">{t.depositWalletNow}</span>
                   </label>
                   {linkDebtToWallet && (
                     <select
                       value={walletId}
                       onChange={(e) => setWalletId(e.target.value)}
-                      className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-xs text-white font-bold focus:outline-none focus:border-amber-500 mt-2"
+                      className="w-full bg-[#0A0D10] border border-[#D9B978]/30 rounded-xl px-3 py-2 text-xs text-[#F4F1EA] font-bold focus:outline-none focus:border-[#D9B978] mt-2"
                     >
-                      {wallets.map(w => (
-                        <option key={w.id} value={w.id}>{w.name} ({w.currencyCode})</option>
-                      ))}
+                      {wallets.map(w => {
+                        const wCurrLoc = getLocalizedCurrency(w.currencyCode, undefined, undefined, language);
+                        return (
+                          <option key={w.id} value={w.id} className="bg-[#0A0D10] text-[#F4F1EA]">{w.name} ({wCurrLoc.symbol})</option>
+                        );
+                      })}
                     </select>
                   )}
                 </div>
 
-                {/* Optional Due Date & Phone */}
                 <div className="grid grid-cols-2 gap-2.5">
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-400">تاريخ السداد المحدد</label>
+                    <label className="text-[10px] font-bold text-[#F4F1EA]/70">{t.dueDateSelected}</label>
                     <input
                       type="date"
                       value={debtDueDate}
                       onChange={(e) => setDebtDueDate(e.target.value)}
-                      className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2 text-xs text-white font-bold focus:outline-none"
+                      className="w-full bg-[#11161C] border border-[#D9B978]/30 rounded-xl px-3 py-2 text-xs text-[#F4F1EA] font-bold focus:outline-none"
                     />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-400">رقم الهاتف (اختياري)</label>
+                    <label className="text-[10px] font-bold text-[#F4F1EA]/70">{t.phoneOptional}</label>
                     <input
                       type="tel"
                       placeholder="05XXXXXXXX"
                       value={personPhone}
                       onChange={(e) => setPersonPhone(e.target.value)}
-                      className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2 text-xs text-white font-bold focus:outline-none"
+                      className="w-full bg-[#11161C] border border-[#D9B978]/30 rounded-xl px-3 py-2 text-xs text-[#F4F1EA] font-bold focus:outline-none"
                     />
                   </div>
                 </div>
               </>
             )}
 
-            {/* === 6. DEBT REPAYMENT (تسديد دين) === */}
+            {/* === 6. DEBT REPAYMENT === */}
             {selectedEvent === 'debt_repayment' && (
               <>
                 {activeDebts.length === 0 ? (
-                  <div className="p-6 bg-slate-950/60 rounded-2xl border border-white/5 text-center space-y-2">
-                    <CheckCircle2 size={32} className="text-emerald-400 mx-auto" />
-                    <h4 className="font-bold text-white text-sm">لا توجد ديون نشطة مستحقة للسداد حالياً</h4>
-                    <p className="text-xs text-slate-400">جميع الديون مسددة بالكامل أو لم يتم تسجيل أي ديون بعد.</p>
+                  <div className="p-6 bg-[#11161C] rounded-2xl border border-[#D9B978]/20 text-center space-y-2">
+                    <CheckCircle2 size={32} className="text-[#8EB9A7] mx-auto" />
+                    <h4 className="font-bold text-[#F4F1EA] text-sm">No active debts requiring settlement</h4>
+                    <p className="text-xs text-[#F4F1EA]/60">All debts are fully settled or no debts registered yet.</p>
                   </div>
                 ) : (
                   <>
-                    {/* Debt Picker */}
                     <div className="space-y-1.5">
-                      <label className="text-[11px] font-bold text-slate-400">اختر الذمة المالية المراد سدادها:</label>
+                      <label className="text-[11px] font-bold text-[#F4F1EA]/70">{t.selectDebtToRepay}</label>
                       <select
                         value={selectedDebtIdForRepayment}
                         onChange={(e) => {
@@ -1253,40 +1145,39 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
                             setAmount(rem.toString());
                           }
                         }}
-                        className="w-full bg-slate-950 border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white font-bold focus:outline-none focus:border-indigo-500"
+                        className="w-full bg-[#11161C] border border-[#D9B978]/30 rounded-xl px-3.5 py-2.5 text-xs text-[#F4F1EA] font-bold focus:outline-none focus:border-[#D9B978]"
                       >
                         {activeDebts.map(d => {
                           const rem = Math.max(0, (d.originalAmount || d.amount) - (d.paidAmount || 0));
+                          const dCurrLoc = getLocalizedCurrency(d.currency || 'SAR', undefined, undefined, language);
                           return (
-                            <option key={d.id} value={d.id}>
-                              {d.type === 'to_me' ? '[دين لي]' : '[دين عليّ]'} {d.personName} — المتبقي: {rem.toLocaleString()} {d.currency || 'SAR'}
+                            <option key={d.id} value={d.id} className="bg-[#0A0D10] text-[#F4F1EA]">
+                              {d.type === 'to_me' ? '[Owed To Me]' : '[Owed By Me]'} {d.personName} — Rem: {rem.toLocaleString()} {dCurrLoc.symbol} ({dCurrLoc.code})
                             </option>
                           );
                         })}
                       </select>
                     </div>
 
-                    {/* Selected Debt Overview */}
                     {currentSelectedDebt && (
-                      <div className="p-3 bg-indigo-500/10 border border-indigo-500/20 rounded-2xl flex items-center justify-between text-xs">
+                      <div className="p-3 bg-[#11161C] border border-[#D9B978]/30 rounded-2xl flex items-center justify-between text-xs">
                         <div>
-                          <span className="text-[10px] font-bold text-slate-400 block">
-                            {currentSelectedDebt.type === 'to_me' ? 'استرداد دفعة من مستحقاتك' : 'سداد دفعة من التزاماتك'}
+                          <span className="text-[10px] font-bold text-[#F4F1EA]/60 block">
+                            {currentSelectedDebt.type === 'to_me' ? 'Collect installment' : 'Pay liability installment'}
                           </span>
-                          <span className="font-black text-white">{currentSelectedDebt.personName}</span>
+                          <span className="font-black text-[#F4F1EA]">{currentSelectedDebt.personName}</span>
                         </div>
-                        <div className="text-left">
-                          <span className="text-[10px] text-slate-400 block">إجمالي المتبقي:</span>
-                          <span className="font-black text-indigo-400 text-sm">
-                            {Math.max(0, (currentSelectedDebt.originalAmount || currentSelectedDebt.amount) - (currentSelectedDebt.paidAmount || 0)).toLocaleString()} {currentSelectedDebt.currency || 'SAR'}
+                        <div className="text-start">
+                          <span className="text-[10px] text-[#F4F1EA]/60 block">{t.remainingBalance}:</span>
+                          <span className="font-black text-[#D9B978] text-sm">
+                            {Math.max(0, (currentSelectedDebt.originalAmount || currentSelectedDebt.amount) - (currentSelectedDebt.paidAmount || 0)).toLocaleString()} {getLocalizedCurrency(currentSelectedDebt.currency || 'SAR', undefined, undefined, language).symbol}
                           </span>
                         </div>
                       </div>
                     )}
 
-                    {/* Payment Amount */}
-                    <div className="p-4 bg-slate-950/80 rounded-2xl border border-white/5 space-y-2">
-                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">مبلغ الدفعة المسددة</label>
+                    <div className="p-4 bg-[#11161C] rounded-2xl border border-[#D9B978]/20 space-y-2">
+                      <label className="text-[10px] font-bold text-[#F4F1EA]/70 uppercase tracking-wider block">{t.repaymentAmount}</label>
                       <input
                         type="number"
                         step="any"
@@ -1294,9 +1185,8 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
                         placeholder="0.00"
                         value={amount}
                         onChange={(e) => setAmount(e.target.value)}
-                        className="w-full bg-transparent text-2xl sm:text-3xl font-black text-indigo-400 focus:outline-none placeholder-slate-600"
+                        className="w-full bg-transparent text-2xl sm:text-3xl font-black text-[#D9B978] focus:outline-none placeholder-[#F4F1EA]/30"
                       />
-                      {/* Quick Shortcuts */}
                       {currentSelectedDebt && (
                         <div className="flex gap-2 pt-1">
                           <button
@@ -1305,9 +1195,9 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
                               const rem = Math.max(0, (currentSelectedDebt.originalAmount || currentSelectedDebt.amount) - (currentSelectedDebt.paidAmount || 0));
                               setAmount(rem.toString());
                             }}
-                            className="px-2.5 py-1 bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 rounded-lg text-[10px] font-bold"
+                            className="px-2.5 py-1 bg-[#D9B978]/20 hover:bg-[#D9B978]/30 text-[#D9B978] rounded-lg text-[10px] font-bold border border-[#D9B978]/30"
                           >
-                            سداد كامل المبلغ
+                            {t.payFullAmount}
                           </button>
                           <button
                             type="button"
@@ -1315,27 +1205,29 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
                               const rem = Math.max(0, (currentSelectedDebt.originalAmount || currentSelectedDebt.amount) - (currentSelectedDebt.paidAmount || 0));
                               setAmount((rem / 2).toString());
                             }}
-                            className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-[10px] font-bold"
+                            className="px-2.5 py-1 bg-[#11161C] hover:bg-[#D9B978]/10 text-[#F4F1EA]/80 rounded-lg text-[10px] font-bold border border-[#D9B978]/20"
                           >
-                            نصف المبلغ (50%)
+                            {t.halfAmount50}
                           </button>
                         </div>
                       )}
                     </div>
 
-                    {/* Target Wallet for Payment */}
                     <div className="space-y-1.5">
-                      <label className="text-[11px] font-bold text-slate-400">
-                        {currentSelectedDebt?.type === 'to_me' ? 'إيداع الدفعة المستردة في محفظة:' : 'الخصم من محفظة للسداد:'}
+                      <label className="text-[11px] font-bold text-[#F4F1EA]/70">
+                        {currentSelectedDebt?.type === 'to_me' ? t.depositToWallet : t.payFromWallet}
                       </label>
                       <select
                         value={walletId}
                         onChange={(e) => setWalletId(e.target.value)}
-                        className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white font-bold focus:outline-none focus:border-indigo-500"
+                        className="w-full bg-[#11161C] border border-[#D9B978]/30 rounded-xl px-3 py-2.5 text-xs text-[#F4F1EA] font-bold focus:outline-none focus:border-[#D9B978]"
                       >
-                        {wallets.map(w => (
-                          <option key={w.id} value={w.id}>{w.name} ({w.currencyCode})</option>
-                        ))}
+                        {wallets.map(w => {
+                          const wCurrLoc = getLocalizedCurrency(w.currencyCode, undefined, undefined, language);
+                          return (
+                            <option key={w.id} value={w.id} className="bg-[#0A0D10] text-[#F4F1EA]">{w.name} ({wCurrLoc.symbol})</option>
+                          );
+                        })}
                       </select>
                     </div>
                   </>
@@ -1343,14 +1235,13 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
               </>
             )}
 
-            {/* === 7. BALANCE ADJUSTMENT (تصحيح الرصيد) === */}
+            {/* === 7. BALANCE ADJUSTMENT === */}
             {selectedEvent === 'balance_adjustment' && (
               <>
-                {/* Wallet Selector */}
                 <div className="space-y-1.5">
-                  <label className="text-[11px] font-bold text-slate-400 flex items-center gap-1.5">
-                    <WalletIcon size={14} className="text-purple-400" />
-                    <span>اختر المحفظة المراد تصحيح رصيدها:</span>
+                  <label className="text-[11px] font-bold text-[#F4F1EA]/70 flex items-center gap-1.5">
+                    <WalletIcon size={14} className="text-[#D9B978]" />
+                    <span>{t.selectWalletToCorrect}</span>
                   </label>
                   <select
                     value={walletId}
@@ -1362,48 +1253,49 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
                         setActualRealBalance(cur.toString());
                       }
                     }}
-                    className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white font-bold focus:outline-none focus:border-purple-500"
+                    className="w-full bg-[#11161C] border border-[#D9B978]/30 rounded-xl px-3 py-2.5 text-xs text-[#F4F1EA] font-bold focus:outline-none focus:border-[#D9B978]"
                   >
-                    {wallets.map(w => (
-                      <option key={w.id} value={w.id}>
-                        {w.name} ({w.currencyCode}) — الدفتري: {(w.currentBalance ?? w.openingBalance ?? 0).toLocaleString()} {w.currencyCode}
-                      </option>
-                    ))}
+                    {wallets.map(w => {
+                      const wCurrLoc = getLocalizedCurrency(w.currencyCode, undefined, undefined, language);
+                      return (
+                        <option key={w.id} value={w.id} className="bg-[#0A0D10] text-[#F4F1EA]">
+                          {w.name} ({wCurrLoc.symbol}) — {t.totalBalance}: {(w.currentBalance ?? w.openingBalance ?? 0).toLocaleString()} {wCurrLoc.symbol}
+                        </option>
+                      );
+                    })}
                   </select>
                 </div>
 
-                {/* Ledger vs Real Comparison */}
                 {adjustmentCalc && (
-                  <div className="p-4 bg-slate-950/80 rounded-2xl border border-white/5 space-y-3">
-                    <div className="flex justify-between items-center text-xs pb-2 border-b border-white/5">
-                      <span className="text-slate-400 font-bold">الرصيد الدفتري المسجل في التطبيق:</span>
-                      <span className="text-white font-black text-sm">{adjustmentCalc.current.toLocaleString()} {selectedSourceWallet?.currencyCode}</span>
+                  <div className="p-4 bg-[#11161C] rounded-2xl border border-[#D9B978]/20 space-y-3">
+                    <div className="flex justify-between items-center text-xs pb-2 border-b border-[#D9B978]/10">
+                      <span className="text-[#F4F1EA]/70 font-bold">{t.ledgerBalanceApp}</span>
+                      <span className="text-[#F4F1EA] font-black text-sm">{adjustmentCalc.current.toLocaleString()} {getLocalizedCurrency(selectedSourceWallet?.currencyCode || 'SAR', undefined, undefined, language).symbol}</span>
                     </div>
 
                     <div className="space-y-1.5">
-                      <label className="text-[11px] font-bold text-purple-400 block">أدخل الرصيد الفعلي الموجود لديك الآن:</label>
+                      <label className="text-[11px] font-bold text-[#D9B978] block">{t.enterActualBalanceNow}</label>
                       <input
                         type="number"
                         step="any"
                         required
                         autoFocus
-                        placeholder="الرصيد الفعلي الحقيقي..."
+                        placeholder="0.00"
                         value={actualRealBalance}
                         onChange={(e) => setActualRealBalance(e.target.value)}
-                        className="w-full bg-slate-900 border border-purple-500/40 rounded-xl px-3.5 py-2.5 text-xl font-black text-white focus:outline-none focus:border-purple-400"
+                        className="w-full bg-[#0A0D10] border border-[#D9B978]/40 rounded-xl px-3.5 py-2.5 text-xl font-black text-[#F4F1EA] focus:outline-none focus:border-[#D9B978]"
                       />
                     </div>
 
-                    {/* Discrepancy indicator */}
                     {adjustmentCalc.actual !== null && Math.abs(adjustmentCalc.diff) > 0.001 && (
                       <div className={`p-2.5 rounded-xl border text-xs font-bold flex items-center justify-between ${
                         adjustmentCalc.isIncrease 
-                          ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' 
-                          : 'bg-rose-500/10 border-rose-500/20 text-rose-400'
+                          ? 'bg-[#8EB9A7]/15 border-[#8EB9A7]/30 text-[#8EB9A7]' 
+                          : 'bg-[#C98387]/15 border-[#C98387]/30 text-[#C98387]'
                       }`}>
-                        <span>فارق التسوية والتصحيح:</span>
+                        <span>{t.discrepancyDiff}</span>
                         <span className="font-black text-sm">
-                          {adjustmentCalc.isIncrease ? '+' : '-'}{adjustmentCalc.absDiff?.toLocaleString()} {selectedSourceWallet?.currencyCode} ({adjustmentCalc.isIncrease ? 'زيادة' : 'عجز/نقص'})
+                          {adjustmentCalc.isIncrease ? '+' : '-'}{adjustmentCalc.absDiff?.toLocaleString()} {getLocalizedCurrency(selectedSourceWallet?.currencyCode || 'SAR', undefined, undefined, language).symbol} ({adjustmentCalc.isIncrease ? t.increaseWord : t.decreaseWord})
                         </span>
                       </div>
                     )}
@@ -1415,50 +1307,48 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
             {/* COMMON FIELDS: DATE & TIME & NOTES */}
             <div className="grid grid-cols-2 gap-2.5 pt-1">
               <div className="space-y-1">
-                <label className="text-[10px] font-bold text-slate-400 flex items-center gap-1">
-                  <Calendar size={12} />
-                  <span>التاريخ</span>
+                <label className="text-[10px] font-bold text-[#F4F1EA]/70 flex items-center gap-1">
+                  <Calendar size={12} className="text-[#D9B978]" />
+                  <span>{t.dateWord}</span>
                 </label>
                 <input
                   type="date"
                   required
                   value={date}
                   onChange={(e) => setDate(e.target.value)}
-                  className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2 text-xs text-white font-bold focus:outline-none"
+                  className="w-full bg-[#11161C] border border-[#D9B978]/30 rounded-xl px-3 py-2 text-xs text-[#F4F1EA] font-bold focus:outline-none"
                 />
               </div>
 
               <div className="space-y-1">
-                <label className="text-[10px] font-bold text-slate-400 flex items-center gap-1">
-                  <Clock size={12} />
-                  <span>الوقت</span>
+                <label className="text-[10px] font-bold text-[#F4F1EA]/70 flex items-center gap-1">
+                  <Clock size={12} className="text-[#D9B978]" />
+                  <span>{t.timeWord}</span>
                 </label>
                 <input
                   type="time"
                   required
                   value={time}
                   onChange={(e) => setTime(e.target.value)}
-                  className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2 text-xs text-white font-bold focus:outline-none"
+                  className="w-full bg-[#11161C] border border-[#D9B978]/30 rounded-xl px-3 py-2 text-xs text-[#F4F1EA] font-bold focus:outline-none"
                 />
               </div>
             </div>
 
-            {/* Note Field */}
             <div className="space-y-1">
-              <label className="text-[10px] font-bold text-slate-400 flex items-center gap-1">
-                <StickyNote size={12} />
-                <span>ملاحظات أو بيان الحدث (اختياري)</span>
+              <label className="text-[10px] font-bold text-[#F4F1EA]/70 flex items-center gap-1">
+                <StickyNote size={12} className="text-[#D9B978]" />
+                <span>{t.noteOrEventDesc}</span>
               </label>
               <input
                 type="text"
-                placeholder="بيان تفصيلي للعملية..."
+                placeholder={t.notePlaceholderDetail}
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
-                className="w-full bg-slate-950 border border-white/10 rounded-xl px-3.5 py-2 text-xs text-white font-medium focus:outline-none focus:border-amber-500"
+                className="w-full bg-[#11161C] border border-[#D9B978]/30 rounded-xl px-3.5 py-2 text-xs text-[#F4F1EA] font-medium focus:outline-none focus:border-[#D9B978]"
               />
             </div>
 
-            {/* Receipt attachment for expenses */}
             {selectedEvent === 'expense' && (
               <div className="space-y-1.5 pt-1">
                 <input
@@ -1472,29 +1362,29 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
                   <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
-                    className="w-full py-2.5 px-3 rounded-xl border border-dashed border-white/10 hover:border-amber-500/40 text-slate-400 hover:text-white text-xs font-bold flex items-center justify-center gap-2 transition-colors bg-slate-950/40"
+                    className="w-full py-2.5 px-3 rounded-xl border border-dashed border-[#D9B978]/30 hover:border-[#D9B978] text-[#F4F1EA]/70 hover:text-[#F4F1EA] text-xs font-bold flex items-center justify-center gap-2 transition-colors bg-[#11161C]"
                   >
-                    <Camera size={15} />
-                    <span>إرفاق صورة الفاتورة أو الإيصال (اختياري)</span>
+                    <Camera size={15} className="text-[#D9B978]" />
+                    <span>{t.attachReceiptBtn}</span>
                   </button>
                 ) : (
-                  <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-950 border border-white/10">
+                  <div className="flex items-center justify-between p-2.5 rounded-xl bg-[#11161C] border border-[#D9B978]/30">
                     <div className="flex items-center gap-2">
-                      <ImageIcon size={16} className="text-amber-400" />
-                      <span className="text-xs text-white font-bold truncate max-w-[180px]">{receipt.fileName || 'صورة الفاتورة'}</span>
+                      <ImageIcon size={16} className="text-[#D9B978]" />
+                      <span className="text-xs text-[#F4F1EA] font-bold truncate max-w-[180px]">{receipt.fileName || 'Receipt'}</span>
                     </div>
                     <div className="flex items-center gap-1.5">
                       <button
                         type="button"
                         onClick={() => setShowReceiptPreview(true)}
-                        className="px-2 py-1 bg-slate-800 text-[10px] font-bold text-slate-300 rounded-lg"
+                        className="px-2 py-1 bg-[#0A0D10] text-[10px] font-bold text-[#F4F1EA] rounded-lg border border-[#D9B978]/30"
                       >
-                        معاينة
+                        {t.viewAll}
                       </button>
                       <button
                         type="button"
                         onClick={() => setReceipt(undefined)}
-                        className="p-1 text-rose-400 hover:text-rose-300"
+                        className="p-1 text-[#C98387] hover:text-[#C98387]/80"
                       >
                         <Trash2 size={15} />
                       </button>
@@ -1504,31 +1394,22 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
               </div>
             )}
 
-            {/* SUBMIT BUTTON */}
             <div className="pt-2">
               <button
                 type="submit"
                 disabled={isSubmitting || (selectedEvent === 'debt_repayment' && activeDebts.length === 0)}
-                className={`w-full py-3.5 px-4 rounded-2xl font-black text-xs sm:text-sm transition-all shadow-lg active:scale-98 flex items-center justify-center gap-2 ${
-                  selectedEvent === 'expense' ? 'bg-rose-500 hover:bg-rose-400 text-white shadow-rose-500/20'
-                  : selectedEvent === 'income' ? 'bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-emerald-500/20'
-                  : selectedEvent === 'transfer' ? 'bg-blue-500 hover:bg-blue-400 text-white shadow-blue-500/20'
-                  : selectedEvent === 'debt_to_me' ? 'bg-teal-500 hover:bg-teal-400 text-slate-950 shadow-teal-500/20'
-                  : selectedEvent === 'debt_on_me' ? 'bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-amber-500/20'
-                  : selectedEvent === 'debt_repayment' ? 'bg-indigo-500 hover:bg-indigo-400 text-white shadow-indigo-500/20'
-                  : 'bg-purple-500 hover:bg-purple-400 text-white shadow-purple-500/20'
-                }`}
+                className="w-full py-3.5 px-4 rounded-2xl font-black text-xs sm:text-sm transition-all shadow-lg active:scale-98 flex items-center justify-center gap-2 bg-[#D9B978] hover:bg-[#D9B978]/90 text-[#0A0D10] shadow-[#D9B978]/20"
               >
                 <Check size={18} strokeWidth={3} />
                 <span>
-                  {initialData ? 'حفظ التعديلات في القيود' 
-                    : selectedEvent === 'expense' ? 'تسجيل المصروف في القيود'
-                    : selectedEvent === 'income' ? 'إيداع الدخل في القيود'
-                    : selectedEvent === 'transfer' ? 'تنفيذ التحويل المالي'
-                    : selectedEvent === 'debt_to_me' ? 'قيد الدين والمستحق الدفتري'
-                    : selectedEvent === 'debt_on_me' ? 'قيد الالتزام المالي'
-                    : selectedEvent === 'debt_repayment' ? 'تسجيل دفعة السداد'
-                    : 'تأكيد تصحيح وتسوية الرصيد'
+                  {initialData ? t.saveChangesInLedger 
+                    : selectedEvent === 'expense' ? t.recordExpenseLedger
+                    : selectedEvent === 'income' ? t.recordIncomeLedger
+                    : selectedEvent === 'transfer' ? t.executeTransferLedger
+                    : selectedEvent === 'debt_to_me' ? t.recordDebtLedger
+                    : selectedEvent === 'debt_on_me' ? t.recordLiabilityLedger
+                    : selectedEvent === 'debt_repayment' ? t.recordRepaymentLedger
+                    : t.confirmBalanceAdjustmentLedger
                   }
                 </span>
               </button>
@@ -1536,14 +1417,13 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
           </form>
         )}
 
-        {/* RECEIPT PREVIEW MODAL */}
         {showReceiptPreview && receipt && (
           <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/90">
-            <div className="relative max-w-lg w-full bg-slate-900 rounded-2xl p-4 border border-white/10">
+            <div className="relative max-w-lg w-full bg-[#0A0D10] rounded-2xl p-4 border border-[#D9B978]/30">
               <button
                 type="button"
                 onClick={() => setShowReceiptPreview(false)}
-                className="absolute top-3 left-3 p-2 rounded-xl bg-slate-800 text-white hover:bg-slate-700"
+                className="absolute top-3 left-3 p-2 rounded-xl bg-[#11161C] text-[#F4F1EA] hover:bg-[#D9B978]/20 border border-[#D9B978]/30"
               >
                 <X size={18} />
               </button>

@@ -1,8 +1,9 @@
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { CreditCard, Plus, X, Calendar, RefreshCw, Trash2, Zap, Clock } from 'lucide-react';
 import { Subscription, Category } from '../types';
 import { getIcon } from '../constants';
+import { getLocalizedCurrency, getTranslation, LanguageKey } from '../utils/translations';
 
 interface SubscriptionManagerProps {
   subscriptions: Subscription[];
@@ -10,9 +11,21 @@ interface SubscriptionManagerProps {
   onAdd: (sub: Omit<Subscription, 'id'>) => void;
   onRemove: (id: string) => void;
   currencySymbol: string;
+  currencyCode?: string;
+  language?: LanguageKey;
 }
 
-const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ subscriptions, categories, onAdd, onRemove, currencySymbol }) => {
+const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ 
+  subscriptions, 
+  categories, 
+  onAdd, 
+  onRemove, 
+  currencySymbol,
+  currencyCode = 'SAR',
+  language = 'ar'
+}) => {
+  const t = getTranslation(language);
+  const isRtl = language === 'ar';
   const [showAdd, setShowAdd] = useState(false);
   const [name, setName] = useState('');
   const [amount, setAmount] = useState('');
@@ -20,18 +33,23 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ subscriptions
   const [categoryId, setCategoryId] = useState('');
   const [nextBilling, setNextBilling] = useState('');
 
+  const locCurr = useMemo(() => {
+    return getLocalizedCurrency(currencyCode, undefined, currencySymbol, language);
+  }, [currencyCode, currencySymbol, language]);
+  const resolvedSymbol = locCurr.symbol;
+
   const totalMonthly = subscriptions.reduce((sum, sub) => {
     return sum + (sub.period === 'monthly' ? sub.amount : sub.amount / 12);
   }, 0);
 
   return (
-    <div className="space-y-6 pb-24 animate-fade">
+    <div className="space-y-6 pb-24 animate-fade" dir={isRtl ? 'rtl' : 'ltr'}>
       <div className="bg-gradient-to-br from-indigo-600 to-blue-700 p-8 rounded-[3rem] text-white shadow-2xl relative overflow-hidden group">
         <Zap className="absolute -right-4 -top-4 text-white/10 group-hover:scale-150 transition-transform duration-1000" size={120} />
         <div className="relative z-10">
-          <p className="text-[10px] font-black uppercase tracking-[0.3em] opacity-60 mb-2">إجمالي الالتزام الشهري</p>
-          <h2 className="text-4xl font-black mb-1">{totalMonthly.toLocaleString()} <span className="text-xl opacity-50">{currencySymbol}</span></h2>
-          <p className="text-[10px] font-bold opacity-60 italic">شامل الاشتراكات السنوية والمقسطة</p>
+          <p className="text-[10px] font-black uppercase tracking-[0.3em] opacity-60 mb-2">{isRtl ? 'إجمالي الالتزام الشهري' : 'Total Monthly Commitment'}</p>
+          <h2 className="text-4xl font-black mb-1">{totalMonthly.toLocaleString(isRtl ? 'ar-SA' : 'en-US')} <span className="text-xl opacity-50">{resolvedSymbol}</span></h2>
+          <p className="text-[10px] font-bold opacity-60 italic">{isRtl ? 'شامل الاشتراكات السنوية والمقسطة' : 'Including annual and prorated subscriptions'}</p>
         </div>
       </div>
 
@@ -39,7 +57,7 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ subscriptions
         onClick={() => setShowAdd(true)}
         className="w-full py-5 bg-slate-900 border border-slate-800 rounded-[2rem] flex items-center justify-center gap-3 font-black text-amber-500 active:scale-95 transition-all shadow-lg"
       >
-        <Plus size={20} /> إضافة اشتراك جديد
+        <Plus size={20} /> {isRtl ? 'إضافة اشتراك جديد' : 'Add New Subscription'}
       </button>
 
       <div className="space-y-4">
@@ -55,7 +73,7 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ subscriptions
                   <h4 className="font-black text-white">{sub.name}</h4>
                   <div className="flex flex-col gap-1">
                      <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-1">
-                        <RefreshCw size={10} /> {sub.period === 'monthly' ? 'شهري' : 'سنوي'}
+                        <RefreshCw size={10} /> {sub.period === 'monthly' ? (isRtl ? 'شهري' : 'Monthly') : (isRtl ? 'سنوي' : 'Yearly')}
                      </p>
                      {sub.nextBillingDate && (
                          <p className="text-[10px] font-bold text-indigo-400 flex items-center gap-1">
@@ -66,8 +84,8 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ subscriptions
                 </div>
               </div>
               <div className="flex items-center gap-4">
-                <div className="text-left">
-                  <p className="text-lg font-black text-white">{sub.amount.toLocaleString()} <span className="text-[10px] opacity-30">{currencySymbol}</span></p>
+                <div className="text-start sm:text-end">
+                  <p className="text-lg font-black text-white">{sub.amount.toLocaleString(isRtl ? 'ar-SA' : 'en-US')} <span className="text-[10px] opacity-30">{resolvedSymbol}</span></p>
                 </div>
                 <button onClick={() => onRemove(sub.id)} className="p-3 text-slate-700 hover:text-rose-500 transition-colors">
                   <Trash2 size={18} />
@@ -80,30 +98,33 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ subscriptions
 
       {showAdd && (
         <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-[200] flex items-center justify-center p-3 sm:p-4 animate-fade no-print overflow-hidden">
-          <div className="bg-slate-900 w-full max-w-lg mx-auto rounded-3xl p-5 sm:p-7 shadow-2xl border border-white/10 animate-slide-up max-h-[85vh] sm:max-h-[88vh] flex flex-col min-h-0 overflow-hidden">
+          <div className="bg-slate-900 w-full max-w-lg mx-auto rounded-3xl p-5 sm:p-7 shadow-2xl border border-white/10 animate-slide-up max-h-[85vh] sm:max-h-[88vh] flex flex-col min-h-0 overflow-hidden" dir={isRtl ? 'rtl' : 'ltr'}>
              <div className="flex justify-between items-center mb-4 shrink-0 pb-2 border-b border-white/5">
-                <h3 className="text-lg sm:text-xl font-bold text-white">إضافة إشتراك جديد</h3>
+                <h3 className="text-lg sm:text-xl font-bold text-white">{isRtl ? 'إضافة إشتراك جديد' : 'Add New Subscription'}</h3>
                 <button onClick={() => setShowAdd(false)} className="p-2 bg-slate-800 rounded-xl text-slate-400 hover:text-white active:scale-90 transition-all"><X size={18} /></button>
              </div>
              <div className="flex-1 overflow-y-auto custom-scrollbar space-y-4 min-h-0 pr-1 pl-1 pb-1">
                 <div className="space-y-1">
-                   <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="اسم الاشتراك (مثلاً: Netflix)" className="w-full p-4 sm:p-5 rounded-2xl bg-slate-950 border border-slate-800 text-white font-bold" />
+                   <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder={isRtl ? 'اسم الاشتراك (مثلاً: Netflix)' : 'Subscription Name (e.g. Netflix)'} className="w-full p-4 sm:p-5 rounded-2xl bg-slate-950 border border-slate-800 text-white font-bold text-sm" />
                 </div>
                 <div className="flex gap-3 sm:gap-4">
-                   <input type="number" inputMode="decimal" value={amount} onChange={e => setAmount(e.target.value)} placeholder="المبلغ" className="flex-1 p-4 sm:p-5 rounded-2xl bg-slate-950 border border-slate-800 text-white font-bold" />
+                   <div className="relative flex-1">
+                     <input type="number" inputMode="decimal" value={amount} onChange={e => setAmount(e.target.value)} placeholder="0.00" className="w-full p-4 sm:p-5 rounded-2xl bg-slate-950 border border-slate-800 text-white font-bold text-sm" />
+                     <span className={`absolute ${isRtl ? 'left-4' : 'right-4'} top-1/2 -translate-y-1/2 text-xs font-bold text-slate-500`}>{resolvedSymbol}</span>
+                   </div>
                    <select value={period} onChange={e => setPeriod(e.target.value as any)} className="bg-slate-950 border border-slate-800 text-white p-4 sm:p-5 rounded-2xl font-bold outline-none text-sm">
-                     <option value="monthly">شهري</option>
-                     <option value="yearly">سنوي</option>
+                     <option value="monthly">{isRtl ? 'شهري' : 'Monthly'}</option>
+                     <option value="yearly">{isRtl ? 'سنوي' : 'Yearly'}</option>
                    </select>
                 </div>
                 <div className="flex gap-4">
                     <div className="flex-1 space-y-2">
-                        <label className="text-[10px] font-black text-slate-500 px-2 uppercase tracking-widest">تاريخ التجديد القادم</label>
-                        <input type="date" value={nextBilling} onChange={e => setNextBilling(e.target.value)} className="w-full p-4 sm:p-5 rounded-2xl bg-slate-950 border border-slate-800 text-slate-400 font-bold outline-none" />
+                        <label className="text-[10px] font-black text-slate-500 px-2 uppercase tracking-widest">{isRtl ? 'تاريخ التجديد القادم' : 'Next Renewal Date'}</label>
+                        <input type="date" value={nextBilling} onChange={e => setNextBilling(e.target.value)} className="w-full p-4 sm:p-5 rounded-2xl bg-slate-950 border border-slate-800 text-slate-400 font-bold outline-none text-sm" />
                     </div>
                 </div>
                 <select value={categoryId} onChange={e => setCategoryId(e.target.value)} className="w-full p-4 sm:p-5 rounded-2xl bg-slate-950 border border-slate-800 text-white font-bold outline-none text-sm">
-                   <option value="">اختر التصنيف</option>
+                   <option value="">{isRtl ? 'اختر التصنيف' : 'Select Category'}</option>
                    {categories.filter(c => c.type === 'expense').map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
                 <button onClick={() => {
@@ -112,7 +133,7 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ subscriptions
                     setShowAdd(false);
                     setName(''); setAmount(''); setNextBilling('');
                   }
-                }} className="w-full mt-4 py-4 sm:py-5 bg-amber-500 text-slate-950 font-black rounded-[2rem] text-lg shadow-[0_15px_30px_rgba(245,158,11,0.3)] active:scale-95 transition-all">حفظ الاشتراك</button>
+                }} className="w-full mt-4 py-4 sm:py-5 bg-amber-500 text-slate-950 font-black rounded-[2rem] text-sm sm:text-base shadow-[0_15px_30px_rgba(245,158,11,0.3)] active:scale-95 transition-all">{isRtl ? 'حفظ الاشتراك' : 'Save Subscription'}</button>
              </div>
           </div>
         </div>
