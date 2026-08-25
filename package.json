@@ -13,7 +13,8 @@
     "build:ios": "vite build && cap sync ios",
     "cap:sync": "cap sync",
     "cap:android": "cap open android",
-    "cap:ios": "cap open ios"
+    "cap:ios": "cap open ios",
+    "prepare:native:secure": "node ./scripts/prepare_native_secure.js || echo 'prepare script not available'"
   },
   "dependencies": {
     "@aparajita/capacitor-biometric-auth": "6.0.1",

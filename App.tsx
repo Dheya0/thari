@@ -5,9 +5,10 @@ import { Plus, LayoutDashboard, History, Settings as SettingsIcon, Briefcase, Ha
 import { AppState, Transaction, Category, Debt, DebtPayment, Account, RecurringRule } from './types';
 import { INITIAL_CATEGORIES, DEFAULT_CURRENCIES, DEFAULT_EXCHANGE_RATES, convertCurrency } from './constants';
 import { buildExecutiveCSVContent, exportAndShareExecutiveCSV } from './utils/exportHelper';
-import { saveSecureState, saveSecureStateSync, loadSecureState } from './utils/secureStorage';
+import { saveSecureState, saveSecureStateSync, loadSecureStateAsync } from './utils/secureStorage';
 import { calculateConsolidatedPosition } from './services/balanceEngine';
 import { processDueRecurringRules } from './services/recurringService';
+import { isNativeCapacitorEnvironment } from './services/biometricService';
 import { WidgetService } from './services/widgetService';
 import { getTranslation, getLocalizedCurrency } from './utils/translations';
 import { Capacitor } from '@capacitor/core';
@@ -92,70 +93,87 @@ const INITIAL_STATE: AppState = {
   language: 'ar',
 };
 
+function normalizeStoredState(parsed: any): AppState {
+  if (!parsed || typeof parsed !== 'object') {
+    return INITIAL_STATE;
+  }
+
+  let activeCurrency = parsed.currency;
+  if (typeof activeCurrency === 'string') {
+    activeCurrency = DEFAULT_CURRENCIES.find(c => c.code === activeCurrency) || DEFAULT_CURRENCIES[0];
+  } else if (!activeCurrency || !activeCurrency.code) {
+    activeCurrency = DEFAULT_CURRENCIES[0];
+  }
+
+  const currencies = (parsed.currencies && Array.isArray(parsed.currencies) && parsed.currencies.length > 0)
+    ? parsed.currencies
+    : DEFAULT_CURRENCIES;
+
+  const categories = (parsed.categories && Array.isArray(parsed.categories) && parsed.categories.length > 0)
+    ? parsed.categories
+    : INITIAL_CATEGORIES;
+
+  const wallets = (parsed.wallets && Array.isArray(parsed.wallets) && parsed.wallets.length > 0)
+    ? parsed.wallets
+    : INITIAL_STATE.wallets;
+
+  const accounts = (parsed.accounts && Array.isArray(parsed.accounts) && parsed.accounts.length > 0)
+    ? parsed.accounts
+    : DEFAULT_ACCOUNTS;
+
+  const exchangeRates = (parsed.exchangeRates && typeof parsed.exchangeRates === 'object')
+    ? { ...DEFAULT_EXCHANGE_RATES, ...parsed.exchangeRates }
+    : DEFAULT_EXCHANGE_RATES;
+
+  const isSecurityProtected = !!parsed.pin || parsed.isBiometricEnabled === true;
+  const shouldLockOnOpen = isSecurityProtected && parsed.requireBiometricOnOpen !== false && parsed.autoLockTime !== 'never';
+
+  return {
+    ...INITIAL_STATE,
+    ...parsed,
+    accounts,
+    activeAccountId: parsed.activeAccountId || accounts[0]?.id || 'acc-main',
+    currency: activeCurrency,
+    currencies,
+    categories,
+    wallets,
+    transactions: Array.isArray(parsed.transactions) ? parsed.transactions : [],
+    trashTransactions: Array.isArray(parsed.trashTransactions) ? parsed.trashTransactions : [],
+    recurringRules: Array.isArray(parsed.recurringRules) ? parsed.recurringRules : [],
+    subscriptions: Array.isArray(parsed.subscriptions) ? parsed.subscriptions : [],
+    debts: Array.isArray(parsed.debts) ? parsed.debts : [],
+    goals: Array.isArray(parsed.goals) ? parsed.goals : [],
+    budgets: Array.isArray(parsed.budgets) ? parsed.budgets : [],
+    auditLogs: Array.isArray(parsed.auditLogs) ? parsed.auditLogs : [],
+    exchangeRates,
+    userEmail: parsed.userEmail || '',
+    userName: parsed.userName || 'مستخدم ثري',
+    isLocked: shouldLockOnOpen,
+  };
+}
+
 const App: React.FC = () => {
-  const [state, setState] = useState<AppState>(() => {
-    try {
-      const parsed = loadSecureState(STORAGE_KEY);
-      if (parsed && typeof parsed === 'object') {
-          // Migration: if currency is a string, convert it to an object
-          let activeCurrency = parsed.currency;
-          if (typeof activeCurrency === 'string') {
-              activeCurrency = DEFAULT_CURRENCIES.find(c => c.code === activeCurrency) || DEFAULT_CURRENCIES[0];
-          } else if (!activeCurrency || !activeCurrency.code) {
-              activeCurrency = DEFAULT_CURRENCIES[0];
-          }
-          
-          const currencies = (parsed.currencies && Array.isArray(parsed.currencies) && parsed.currencies.length > 0)
-              ? parsed.currencies
-              : DEFAULT_CURRENCIES;
+  const [state, setState] = useState<AppState>(INITIAL_STATE);
 
-          const categories = (parsed.categories && Array.isArray(parsed.categories) && parsed.categories.length > 0)
-              ? parsed.categories
-              : INITIAL_CATEGORIES;
+  useEffect(() => {
+    let cancelled = false;
 
-          const wallets = (parsed.wallets && Array.isArray(parsed.wallets) && parsed.wallets.length > 0)
-              ? parsed.wallets
-              : INITIAL_STATE.wallets;
-
-          const accounts = (parsed.accounts && Array.isArray(parsed.accounts) && parsed.accounts.length > 0)
-              ? parsed.accounts
-              : DEFAULT_ACCOUNTS;
-
-          const exchangeRates = (parsed.exchangeRates && typeof parsed.exchangeRates === 'object')
-              ? { ...DEFAULT_EXCHANGE_RATES, ...parsed.exchangeRates }
-              : DEFAULT_EXCHANGE_RATES;
-
-          const isSecurityProtected = !!parsed.pin || parsed.isBiometricEnabled === true;
-          const shouldLockOnOpen = isSecurityProtected && parsed.requireBiometricOnOpen !== false && parsed.autoLockTime !== 'never';
-          
-          return {
-            ...INITIAL_STATE,
-            ...parsed,
-            accounts: accounts,
-            activeAccountId: parsed.activeAccountId || accounts[0]?.id || 'acc-main',
-            currency: activeCurrency,
-            currencies: currencies,
-            categories: categories,
-            wallets: wallets,
-            transactions: Array.isArray(parsed.transactions) ? parsed.transactions : [],
-            trashTransactions: Array.isArray(parsed.trashTransactions) ? parsed.trashTransactions : [],
-            recurringRules: Array.isArray(parsed.recurringRules) ? parsed.recurringRules : [],
-            subscriptions: Array.isArray(parsed.subscriptions) ? parsed.subscriptions : [],
-            debts: Array.isArray(parsed.debts) ? parsed.debts : [],
-            goals: Array.isArray(parsed.goals) ? parsed.goals : [],
-            budgets: Array.isArray(parsed.budgets) ? parsed.budgets : [],
-            auditLogs: Array.isArray(parsed.auditLogs) ? parsed.auditLogs : [],
-            exchangeRates: exchangeRates,
-            userEmail: parsed.userEmail || '',
-            userName: parsed.userName || 'مستخدم ثري',
-            isLocked: shouldLockOnOpen
-          };
+    const hydrateState = async () => {
+      try {
+        const parsed = await loadSecureStateAsync(STORAGE_KEY);
+        if (!cancelled && parsed && typeof parsed === 'object') {
+          setState(normalizeStoredState(parsed));
+        }
+      } catch (error) {
+        console.warn('App hydrate error:', error);
       }
-      return INITIAL_STATE;
-    } catch { 
-      return INITIAL_STATE; 
-    }
-  });
+    };
+
+    void hydrateState();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const [activeTab, setActiveTab] = useState<'dashboard' | 'transactions' | 'debts' | 'chat' | 'subscriptions' | 'settings' | 'budgets' | 'goals' | 'zakat'>('dashboard');
   const [showAddForm, setShowAddForm] = useState(false);
@@ -277,7 +295,7 @@ const App: React.FC = () => {
   // Android Hardware Back Button Handler for Native Capacitor App
   useEffect(() => {
     let backButtonListener: any = null;
-    if (Capacitor.isNativePlatform()) {
+    if (isNativeCapacitorEnvironment()) {
       CapApp.addListener('backButton', ({ canGoBack }) => {
         if (showAddForm) {
           setShowAddForm(false);

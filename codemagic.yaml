@@ -398,6 +398,30 @@ workflows:
 
           # تجهيز مصفوفة AppIcon نظيفة وصالحة
           mkdir -p AppIcon.appiconset
+
+      - name: Archive unsigned and produce unsigned IPA (for Sideloadly)
+        script: |
+          set -e
+          echo "Creating unsigned archive (signing disabled)"
+          cd ios/App
+          mkdir -p build
+          # Archive without code signing so we can create an unsigned .ipa for sideloading
+          xcodebuild -workspace App.xcworkspace -scheme App -configuration Release clean archive -archivePath build/App.xcarchive CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO || true
+
+          APP_PATH="build/App.xcarchive/Products/Applications/App.app"
+          if [ -d "$APP_PATH" ]; then
+            echo "Found App.app, packaging unsigned .ipa"
+            rm -rf Payload
+            mkdir -p Payload
+            cp -R "$APP_PATH" Payload/
+            mkdir -p ../../build/ipa
+            (cd .. && zip -r build/ipa/Thari-unsigned.ipa Payload) || true
+            rm -rf Payload
+            echo "Unsigned IPA created at ios/App/build/ipa/Thari-unsigned.ipa"
+          else
+            echo "Warning: App.app not found after archive. Archive may have failed or xcodebuild removed unsigned product."
+          fi
+
           cat <<EOF > AppIcon.appiconset/Contents.json
           {
             "images" : [

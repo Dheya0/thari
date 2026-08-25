@@ -1,5 +1,29 @@
 import { BiometricAuth, BiometryType, CheckBiometryResult } from '@aparajita/capacitor-biometric-auth';
-import { Capacitor } from '@capacitor/core';
+
+export function isNativeCapacitorEnvironment(): boolean {
+  if (typeof window === 'undefined') return false;
+
+  const nativeCheck = (window as any)?.Capacitor?.isNativePlatform?.();
+  const protocol = window.location?.protocol || '';
+  const userAgent = navigator?.userAgent || '';
+
+  return Boolean(
+    nativeCheck ||
+    protocol === 'capacitor:' ||
+    protocol === 'file:' && !!(window as any)?.Capacitor ||
+    userAgent.includes('Capacitor')
+  );
+}
+
+export function isStandalonePwaMode(): boolean {
+  if (typeof window === 'undefined') return false;
+  const nav = window.navigator as Navigator & { standalone?: boolean };
+  return Boolean(
+    nav?.standalone === true ||
+    window.matchMedia('(display-mode: standalone)').matches ||
+    (window.location.hostname === 'localhost' && window.location.port !== '')
+  );
+}
 
 export interface BiometricAvailability {
   isAvailable: boolean;
@@ -41,7 +65,7 @@ function base64ToUint8Array(base64: string): Uint8Array {
  * Checks if Biometric authentication (Face ID / Touch ID / Fingerprint) is supported on iPhone / Android / Web.
  */
 export async function checkBiometricAvailable(): Promise<BiometricAvailability> {
-  const isNative = Capacitor.isNativePlatform();
+  const isNative = isNativeCapacitorEnvironment();
 
   // 1. Native Capacitor Check via @aparajita/capacitor-biometric-auth (iOS & Android)
   if (isNative) {
@@ -165,7 +189,7 @@ export async function registerWebBiometrics(): Promise<BiometricAuthResult> {
 export async function authenticateBiometrics(
   reason = 'تأكيد الهوية لفتح تطبيق ثري'
 ): Promise<BiometricAuthResult> {
-  const isNative = Capacitor.isNativePlatform();
+  const isNative = isNativeCapacitorEnvironment();
 
   // 1. Native Capacitor Biometric Auth (@aparajita/capacitor-biometric-auth)
   if (isNative) {

@@ -1,5 +1,4 @@
 import React, { useState, useRef } from 'react';
-import { Capacitor } from '@capacitor/core';
 import { 
   Trash2, User, Wallet as WalletIcon, Lock, Upload, Edit2, Plus, Tag, Coins, X, Check, Printer, FileDown, ChevronDown, AlertCircle, AlertTriangle, FileSpreadsheet, Code, ChevronLeft, Palette, Type,
   ChevronRight, TrendingUp, ShieldCheck, ShieldAlert, Key, Unlock, Smartphone, RefreshCw, Plane, Sparkles, FileText, Bell, Star, Fingerprint, MessageSquare, Heart, Send, HelpCircle, CheckCircle2,
@@ -8,7 +7,7 @@ import {
 import { Currency, Wallet, Category, Transaction } from '../types';
 import { getTranslation, getLocalizedCurrency } from '../utils/translations';
 import { encryptData, decryptData } from '../services/encryptionService';
-import { authenticateBiometrics, checkBiometricAvailable } from '../services/biometricService';
+import { authenticateBiometrics, checkBiometricAvailable, isNativeCapacitorEnvironment, isStandalonePwaMode } from '../services/biometricService';
 import { getIcon, DEFAULT_EXCHANGE_RATES } from '../constants';
 import { buildExecutiveCSVContent, exportAndShareExecutiveCSV } from '../utils/exportHelper';
 
@@ -178,7 +177,8 @@ export default function Settings({
   const safeCategories = categories || [];
 
   const isIOS = typeof window !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
-  const isStandalone = typeof window !== 'undefined' && ((window.navigator as any).standalone || window.matchMedia('(display-mode: standalone)').matches);
+  const isNativeApp = isNativeCapacitorEnvironment();
+  const isStandalone = isStandalonePwaMode();
 
   const t = getTranslation(appState?.language || 'ar');
 
@@ -961,7 +961,7 @@ export default function Settings({
                         <span>{t.deviceWebCompatibilityCheck}</span>
                       </div>
                       <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                        {Capacitor.isNativePlatform() ? t.nativeApp : t.webCompatibleApp}
+                        {isNativeApp ? t.nativeApp : t.webCompatibleApp}
                       </span>
                     </div>
 

@@ -2,26 +2,39 @@ const fs = require('fs');
 const path = require('path');
 const sharp = require('sharp');
 
+async function generatePngFromSvg(svgPath, outputPath, size, background) {
+  const transformer = sharp(svgPath).resize(size, size, {
+    fit: 'cover',
+    position: 'centre',
+    background: background ?? { r: 10, g: 13, b: 16, alpha: 1 }
+  });
+
+  await transformer.png({ compressionLevel: 6 }).toFile(outputPath);
+}
+
 async function generateAllAssets() {
   console.log('🚀 بدء توليد الأصول والصور لكافة المنصات...');
 
-  // التأكد من وجود ملفات SVG المصدرية
-  const iconSvgPath = path.join(__dirname, 'assets', 'icon.svg');
   const splashSvgPath = path.join(__dirname, 'assets', 'splash.svg');
+  const iosIconSvgPath = path.join(__dirname, 'assets', 'icon-ios.svg');
+  const androidIconSvgPath = path.join(__dirname, 'assets', 'icon-android.svg');
+  const webIconSvgPath = path.join(__dirname, 'assets', 'icon-web.svg');
 
-  if (!fs.existsSync(iconSvgPath) || !fs.existsSync(splashSvgPath)) {
-    console.error('❌ لم يتم العثور على assets/icon.svg أو assets/splash.svg');
-    process.exit(1);
+  for (const [label, target] of Object.entries({
+    iOS: iosIconSvgPath,
+    Android: androidIconSvgPath,
+    Web: webIconSvgPath,
+    splash: splashSvgPath
+  })) {
+    if (!fs.existsSync(target)) {
+      throw new Error(`❌ لم يتم العثور على ملف ${label}: ${target}`);
+    }
   }
 
-  const iconSvg = fs.readFileSync(iconSvgPath);
   const splashSvg = fs.readFileSync(splashSvgPath);
 
-  // ----------------------------------------------------
-  // 1. أصول منصة iOS (AppIcon.appiconset)
-  // ----------------------------------------------------
   console.log('📱 جارٍ إنشاء أيقونات iOS...');
-  const iosAppIconDir = path.join(__dirname, 'ios/App/App/Assets.xcassets/AppIcon.appiconset');
+  const iosAppIconDir = path.join(__dirname, 'ios', 'App', 'App', 'Assets.xcassets', 'AppIcon.appiconset');
   fs.mkdirSync(iosAppIconDir, { recursive: true });
 
   const iosSizes = [
@@ -44,13 +57,9 @@ async function generateAllAssets() {
   ];
 
   for (const item of iosSizes) {
-    await sharp(iconSvg)
-      .resize(item.size, item.size)
-      .png({ compressionLevel: 6 })
-      .toFile(path.join(iosAppIconDir, item.name));
+    await generatePngFromSvg(iosIconSvgPath, path.join(iosAppIconDir, item.name), item.size, { r: 10, g: 13, b: 16, alpha: 1 });
   }
 
-  // ملف الفهرس المعياري لـ Xcode
   const iosContents = {
     images: [
       { size: '20x20', idiom: 'iphone', filename: 'AppIcon-20x20@2x.png', scale: '2x' },
@@ -75,63 +84,105 @@ async function generateAllAssets() {
     ],
     info: { version: 1, author: 'xcode' }
   };
+
   fs.writeFileSync(path.join(iosAppIconDir, 'Contents.json'), JSON.stringify(iosContents, null, 2));
 
-  // شاشات البدء لـ iOS
-  const iosSplashDir = path.join(__dirname, 'ios/App/App/Assets.xcassets/Splash.imageset');
+  const iosSplashDir = path.join(__dirname, 'ios', 'App', 'App', 'Assets.xcassets', 'Splash.imageset');
   fs.mkdirSync(iosSplashDir, { recursive: true });
   await sharp(splashSvg).resize(2732, 2732).png().toFile(path.join(iosSplashDir, 'splash-2732x2732.png'));
   await sharp(splashSvg).resize(1821, 1821).png().toFile(path.join(iosSplashDir, 'splash-2732x2732-1.png'));
   await sharp(splashSvg).resize(910, 910).png().toFile(path.join(iosSplashDir, 'splash-2732x2732-2.png'));
 
-  // ----------------------------------------------------
-  // 2. أصول منصة Android (Mipmaps & Drawables)
-  // ----------------------------------------------------
   console.log('🤖 جارٍ إنشاء أيقونات وشاشات Android...');
   const androidMipmaps = [
-    { dir: 'mipmap-mdpi', l: 48, a: 108 },
-    { dir: 'mipmap-hdpi', l: 72, a: 162 },
-    { dir: 'mipmap-xhdpi', l: 96, a: 216 },
-    { dir: 'mipmap-xxhdpi', l: 144, a: 324 },
-    { dir: 'mipmap-xxxhdpi', l: 192, a: 432 }
+    { dir: 'mipmap-mdpi', size: 48, background: 108 },
+    { dir: 'mipmap-hdpi', size: 72, background: 162 },
+    { dir: 'mipmap-xhdpi', size: 96, background: 216 },
+    { dir: 'mipmap-xxhdpi', size: 144, background: 324 },
+    { dir: 'mipmap-xxxhdpi', size: 192, background: 432 }
   ];
 
   for (const m of androidMipmaps) {
-    const d = path.join(__dirname, 'android/app/src/main/res', m.dir);
-    fs.mkdirSync(d, { recursive: true });
-    await sharp(iconSvg).resize(m.l, m.l).png().toFile(path.join(d, 'ic_launcher.png'));
-    await sharp(iconSvg).resize(m.l, m.l).png().toFile(path.join(d, 'ic_launcher_round.png'));
-    await sharp(iconSvg).resize(m.a, m.a).png().toFile(path.join(d, 'ic_launcher_foreground.png'));
+    const dir = path.join(__dirname, 'android', 'app', 'src', 'main', 'res', m.dir);
+    fs.mkdirSync(dir, { recursive: true });
+    await generatePngFromSvg(androidIconSvgPath, path.join(dir, 'ic_launcher.png'), m.size);
+    await generatePngFromSvg(androidIconSvgPath, path.join(dir, 'ic_launcher_round.png'), m.size);
+    await generatePngFromSvg(androidIconSvgPath, path.join(dir, 'ic_launcher_foreground.png'), m.background);
     await sharp({
-      create: { width: m.a, height: m.a, channels: 4, background: { r: 10, g: 13, b: 16, alpha: 1 } }
-    }).png().toFile(path.join(d, 'ic_launcher_background.png'));
+      create: { width: m.background, height: m.background, channels: 4, background: { r: 10, g: 13, b: 16, alpha: 1 } }
+    }).png().toFile(path.join(dir, 'ic_launcher_background.png'));
   }
 
-  // ----------------------------------------------------
-  // 3. أصول الويب و PWA (public & public/icons)
-  // ----------------------------------------------------
   console.log('🌐 جارٍ إنشاء أيقونات الويب و PWA...');
-  const publicIconsDir = path.join(__dirname, 'public/icons');
+  const publicDir = path.join(__dirname, 'public');
+  const publicIconsDir = path.join(publicDir, 'icons');
   fs.mkdirSync(publicIconsDir, { recursive: true });
 
-  const webIcons = [
-    { f: 'public/icons/icon-192.png', s: 192 },
-    { f: 'public/icons/icon-512.png', s: 512 },
-    { f: 'public/icon-192.png', s: 192 },
-    { f: 'public/icon-512.png', s: 512 },
-    { f: 'public/icon.png', s: 512 },
-    { f: 'public/favicon.png', s: 64 },
-    { f: 'public/favicon-32x32.png', s: 32 },
-    { f: 'public/favicon-16x16.png', s: 16 },
-    { f: 'public/apple-touch-icon.png', s: 180 },
-    { f: 'public/apple-touch-icon-180x180.png', s: 180 }
-  ];
+  const iconSizes = [16, 32, 48, 72, 96, 120, 128, 152, 167, 180, 192, 256, 512];
 
-  for (const item of webIcons) {
-    await sharp(iconSvg).resize(item.s, item.s).png().toFile(path.join(__dirname, item.f));
+  for (const size of iconSizes) {
+    const rootPath = path.join(publicDir, `icon-${size}.png`);
+    const groupedPath = path.join(publicIconsDir, `icon-${size}.png`);
+    await generatePngFromSvg(webIconSvgPath, rootPath, size);
+    await generatePngFromSvg(webIconSvgPath, groupedPath, size);
   }
 
-  console.log('✅ تم توليد كافة الصور بصيغة PNG ثنائية نقية بنجاح!');
+  const appleTouchSizes = [120, 152, 167, 180];
+  for (const size of appleTouchSizes) {
+    await generatePngFromSvg(webIconSvgPath, path.join(publicDir, `apple-touch-icon-${size}x${size}.png`), size);
+  }
+
+  await generatePngFromSvg(webIconSvgPath, path.join(publicDir, 'apple-touch-icon.png'), 180);
+  await generatePngFromSvg(webIconSvgPath, path.join(publicDir, 'favicon.png'), 64);
+  await generatePngFromSvg(webIconSvgPath, path.join(publicDir, 'favicon-32x32.png'), 32);
+  await generatePngFromSvg(webIconSvgPath, path.join(publicDir, 'favicon-16x16.png'), 16);
+  await generatePngFromSvg(webIconSvgPath, path.join(publicDir, 'icon.png'), 512);
+
+  const manifest = {
+    name: 'ثري — THARI',
+    short_name: 'ثري',
+    description: 'نظامك المالي الهادئ للثروة والمحافظ — الفخامة الهادئة لإدارة الأصول والمصروفات.',
+    start_url: '/',
+    scope: '/',
+    id: 'thari-wealth-app',
+    display: 'standalone',
+    display_override: ['window-controls-overlay', 'standalone', 'minimal-ui'],
+    background_color: '#0A0D10',
+    theme_color: '#0A0D10',
+    icons: [
+      { src: '/icon-48.png', type: 'image/png', sizes: '48x48', purpose: 'any' },
+      { src: '/icon-192.png', type: 'image/png', sizes: '192x192', purpose: 'any maskable' },
+      { src: '/icon-512.png', type: 'image/png', sizes: '512x512', purpose: 'any maskable' }
+    ],
+    orientation: 'portrait',
+    categories: ['finance', 'productivity', 'business'],
+    prefer_related_applications: false
+  };
+
+  fs.writeFileSync(path.join(publicDir, 'manifest.json'), JSON.stringify(manifest, null, 2));
+
+  const androidPublicDir = path.join(__dirname, 'android', 'app', 'src', 'main', 'assets', 'public');
+  fs.mkdirSync(androidPublicDir, { recursive: true });
+  fs.writeFileSync(path.join(androidPublicDir, 'manifest.json'), JSON.stringify(manifest, null, 2));
+
+  for (const size of iconSizes) {
+    const src = path.join(publicDir, `icon-${size}.png`);
+    const destination = path.join(androidPublicDir, `icon-${size}.png`);
+    if (fs.existsSync(src)) {
+      fs.copyFileSync(src, destination);
+    }
+  }
+
+  const androidCopyPaths = ['apple-touch-icon.png', 'apple-touch-icon-120x120.png', 'apple-touch-icon-152x152.png', 'apple-touch-icon-167x167.png', 'apple-touch-icon-180x180.png', 'favicon.png', 'favicon-32x32.png', 'favicon-16x16.png'];
+  for (const name of androidCopyPaths) {
+    const src = path.join(publicDir, name);
+    const dest = path.join(androidPublicDir, name);
+    if (fs.existsSync(src)) {
+      fs.copyFileSync(src, dest);
+    }
+  }
+
+  console.log('✅ تم توليد كافة الصور بصيغة PNG بنجاح، مع تحديث Manifest لأيقونات منصة iOS/Android/Web بشكل صحيح.');
 }
 
 generateAllAssets().catch(err => {

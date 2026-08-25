@@ -43,22 +43,27 @@ interface ElegantDashboardProps {
 
 export const formatFinancialNumber = (num: number | string | undefined | null, useCompact: boolean = false): string => {
   const parsed = typeof num === 'number' ? num : parseFloat(String(num ?? 0));
-  const safeNum = isNaN(parsed) ? 0 : Math.abs(parsed);
+  if (isNaN(parsed)) return '0';
+
+  const sign = parsed < 0 ? '-' : '';
+  const safeNum = Math.abs(parsed);
+
   if (useCompact) {
     if (safeNum >= 1_000_000_000) {
       const val = safeNum / 1_000_000_000;
-      return (val % 1 === 0 ? val.toFixed(0) : val.toFixed(1)) + 'B';
+      return sign + (val % 1 === 0 ? val.toFixed(0) : val.toFixed(1)) + 'B';
     }
     if (safeNum >= 1_000_000) {
       const val = safeNum / 1_000_000;
-      return (val % 1 === 0 ? val.toFixed(0) : val.toFixed(1)) + 'M';
+      return sign + (val % 1 === 0 ? val.toFixed(0) : val.toFixed(1)) + 'M';
     }
     if (safeNum >= 10_000) {
       const val = safeNum / 1_000;
-      return (val % 1 === 0 ? val.toFixed(0) : val.toFixed(0)) + 'K';
+      return sign + (val % 1 === 0 ? val.toFixed(0) : val.toFixed(0)) + 'K';
     }
   }
-  return Math.round(safeNum).toLocaleString('en-US');
+
+  return sign + Math.round(safeNum).toLocaleString('en-US');
 };
 
 export const getGreeting = (lang: 'ar' | 'en' = 'ar'): { text: string; sub: string } => {
@@ -366,14 +371,14 @@ export const ElegantDashboard: React.FC<ElegantDashboardProps> = ({
                 </div>
 
                 <div className="text-end">
-                  <div className="text-sm sm:text-base font-medium text-[#F4F1EA] font-numeric tracking-tight">
+                  <div className={`text-sm sm:text-base font-medium font-numeric tracking-tight ${w.nativeBalance < 0 ? 'text-[#C98387]' : 'text-[#8EB9A7]'}`}>
                     {formatFinancialNumber(w.nativeBalance, true)}
                     <span className="text-xs text-slate-400 ms-1.5 font-normal">
                       {w.currencyObj.symbol}
                     </span>
                   </div>
                   {w.currencyCode !== currency.code && (
-                    <span className="text-[10px] text-slate-400 block font-numeric">
+                    <span className={`text-[10px] block font-numeric ${w.balanceInBase < 0 ? 'text-[#C98387]' : 'text-slate-400'}`}>
                       ≈ {formatFinancialNumber(w.balanceInBase, true)} {currency.symbol}
                     </span>
                   )}
