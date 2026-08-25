@@ -1085,39 +1085,87 @@ export default function Settings({
          </AccordionItem>
 
          <AccordionItem 
-            id="store" 
-            title={t.storeRatingTitle} 
-            icon={Star}
-            isOpen={openAccordion === 'store'}
-            onToggle={() => setOpenAccordion(openAccordion === 'store' ? null : 'store')}
+            id="about" 
+            title={t.aboutApp || "عن التطبيق والخصوصية"} 
+            icon={Sparkles}
+            isOpen={openAccordion === 'about'}
+            onToggle={() => setOpenAccordion(openAccordion === 'about' ? null : 'about')}
          >
-            <div className="space-y-3.5">
-                <div className="bg-gradient-to-br from-[#D9B978]/10 to-orange-500/10 p-4 rounded-2xl border border-[#D9B978]/20 flex items-center justify-between">
+            <div className="space-y-4">
+                {/* Brand & Mission Banner */}
+                <div className="bg-gradient-to-b from-[#171D24] to-[#11161C] p-4 sm:p-5 rounded-2xl border border-[#D9B978]/20 space-y-3">
                     <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-[#D9B978] text-[#0A0D10] flex items-center justify-center font-black shadow-md">
-                            <Star size={20} className="fill-[#0A0D10]" />
+                        <div className="w-11 h-11 rounded-xl bg-[#D9B978]/15 border border-[#D9B978]/30 text-[#D9B978] flex items-center justify-center font-black shadow-md shrink-0">
+                            <Sparkles size={22} />
                         </div>
                         <div>
-                            <p className="text-xs font-black text-white">{t.likeThariExperience}</p>
-                            <p className="text-[10px] text-slate-400 font-bold">{t.rateUsStore}</p>
+                            <h4 className="text-sm font-bold text-[#F4F1EA]">ثري | THARI — Living Wealth</h4>
+                            <p className="text-[11px] text-[#D9B978] font-medium">الفخامة الهادئة • تشفير محلي 100% (Local-First)</p>
                         </div>
                     </div>
-                    <button type="button" onClick={handleDirectStoreRating} className="px-3.5 py-2 bg-[#D9B978] text-[#0A0D10] font-black text-xs rounded-xl active:scale-95 shadow-md shrink-0 flex items-center gap-1.5">
+                    <p className="text-xs text-slate-300 leading-relaxed font-normal">
+                        نظام مالي متكامل لإدارة الأصول والمحافظ المتعددة وحساب الزكاة الشرعية مع سيادة وأمان محلي كامل دون خوادم سحابية.
+                    </p>
+                </div>
+
+                {/* Primary Action Buttons */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    <button 
+                      type="button" 
+                      onClick={onShowPrivacyPolicy} 
+                      className="flex items-center justify-between p-3.5 bg-[#0A0D10] hover:bg-white/5 rounded-2xl active:scale-[0.98] text-[#F4F1EA] border border-white/10 text-xs font-bold transition-all min-h-[50px]"
+                    >
+                        <div className="flex items-center gap-2.5">
+                            <div className="w-8 h-8 rounded-xl bg-[#D9B978]/10 text-[#D9B978] flex items-center justify-center">
+                                <Sparkles size={16} />
+                            </div>
+                            <div className="text-start">
+                                <p className="text-xs font-bold text-[#F4F1EA]">عن التطبيق والفلسفة</p>
+                                <p className="text-[10px] text-slate-400">مميزات وأركان منظومة ثري</p>
+                            </div>
+                        </div>
+                        <ChevronLeft size={16} className="text-slate-400" />
+                    </button>
+
+                    <button 
+                      type="button" 
+                      onClick={onShowPrivacyPolicy} 
+                      className="flex items-center justify-between p-3.5 bg-[#0A0D10] hover:bg-white/5 rounded-2xl active:scale-[0.98] text-[#F4F1EA] border border-white/10 text-xs font-bold transition-all min-h-[50px]"
+                    >
+                        <div className="flex items-center gap-2.5">
+                            <div className="w-8 h-8 rounded-xl bg-[#8EB9A7]/10 text-[#8EB9A7] flex items-center justify-center">
+                                <ShieldCheck size={16} />
+                            </div>
+                            <div className="text-start">
+                                <p className="text-xs font-bold text-[#F4F1EA]">سياسة الخصوصية والأمان</p>
+                                <p className="text-[10px] text-slate-400">التشفير وانعدام السحابة</p>
+                            </div>
+                        </div>
+                        <ChevronLeft size={16} className="text-slate-400" />
+                    </button>
+                </div>
+
+                {/* Rating and Support */}
+                <div className="bg-[#0A0D10] p-4 rounded-2xl border border-white/5 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-xl bg-[#D9B978]/10 text-[#D9B978] flex items-center justify-center font-bold">
+                            <Star size={18} className="fill-[#D9B978]" />
+                        </div>
+                        <div>
+                            <p className="text-xs font-bold text-white">{t.likeThariExperience}</p>
+                            <p className="text-[10px] text-slate-400">{t.rateUsStore}</p>
+                        </div>
+                    </div>
+                    <button type="button" onClick={handleDirectStoreRating} className="px-3.5 py-2 bg-[#D9B978] text-[#0A0D10] font-bold text-xs rounded-xl active:scale-95 shadow-md shrink-0 flex items-center gap-1.5 min-h-[40px]">
                         <Star size={14} className="fill-[#0A0D10]" />
                         <span>{t.rate}</span>
                     </button>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2.5">
-                    <button type="button" onClick={handleSupportClick} className="flex items-center justify-center gap-2 p-3 bg-[#0A0D10] rounded-xl active:scale-95 text-slate-200 border border-white/10 text-xs font-bold">
-                        <MessageSquare size={16} className="text-[#D9B978]" />
-                        <span>{t.techSupport}</span>
-                    </button>
-                    <button type="button" onClick={onShowPrivacyPolicy} className="flex items-center justify-center gap-2 p-3 bg-[#0A0D10] rounded-xl active:scale-95 text-slate-200 border border-white/10 text-xs font-bold">
-                        <ShieldCheck size={16} className="text-blue-400" />
-                        <span>{t.privacyPolicy}</span>
-                    </button>
-                </div>
+                <button type="button" onClick={handleSupportClick} className="w-full flex items-center justify-center gap-2 p-3.5 bg-[#0A0D10] hover:bg-white/5 rounded-2xl active:scale-95 text-slate-200 border border-white/10 text-xs font-bold transition-all min-h-[44px]">
+                    <MessageSquare size={16} className="text-[#D9B978]" />
+                    <span>{t.techSupport} • thari-app@inbox.ru</span>
+                </button>
             </div>
          </AccordionItem>
 

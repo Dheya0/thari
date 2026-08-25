@@ -1,12 +1,13 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import tailwindcss from '@tailwindcss/vite';
 
 export default defineConfig(({ mode }) => {
   const isProd = mode === 'production';
 
   return {
     base: '/',
-    plugins: [react()],
+    plugins: [react(), tailwindcss()],
     resolve: {
       dedupe: ['react', 'react-dom']
     },

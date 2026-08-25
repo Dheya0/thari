@@ -213,8 +213,9 @@ const App: React.FC = () => {
     });
   }, [state.currencies, activeLanguage]);
 
-  const [isOnline, setIsOnline] = useState<boolean>(typeof navigator !== 'undefined' ? navigator.onLine : true);
-  const [showNetworkToast, setShowNetworkToast] = useState(false);
+  // 100% Offline-First Sovereignty: Ignore network state changes and connection warnings
+  const isOnline = true;
+  const showNetworkToast = false;
 
   // PWA states
   const [isUpdateAvailable, setIsUpdateAvailable] = useState(false);
@@ -241,20 +242,6 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    const handleOnline = () => {
-      setIsOnline(true);
-      setShowNetworkToast(true);
-      setTimeout(() => setShowNetworkToast(false), 3500);
-    };
-    const handleOffline = () => {
-      setIsOnline(false);
-      setShowNetworkToast(true);
-      setTimeout(() => setShowNetworkToast(false), 4500);
-    };
-
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-
     const handleUpdate = (e: Event) => {
       console.log("Thari App: PWA update detected on client!");
       setIsUpdateAvailable(true);
@@ -273,8 +260,6 @@ const App: React.FC = () => {
     window.addEventListener('beforeinstallprompt', handleInstallPrompt);
 
     return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
       window.removeEventListener('pwa-update-available', handleUpdate);
       window.removeEventListener('beforeinstallprompt', handleInstallPrompt);
     };
@@ -971,17 +956,13 @@ const App: React.FC = () => {
           <div className="flex justify-between items-center max-w-6xl mx-auto w-full">
             <div className="flex items-center gap-3">
               <Logo size={28} showText />
-              {/* Online/Offline status pill - Thari is offline-first */}
+              {/* Offline-First Sovereignty Badge - 100% Local */}
               <div
-                className={`hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold border transition-colors ${
-                  isOnline
-                    ? 'bg-[#8EB9A7]/15 border-[#8EB9A7]/40 text-[#8EB9A7]'
-                    : 'bg-[#D9B978]/15 border-[#D9B978]/40 text-[#D9B978]'
-                }`}
-                title={isOnline ? 'بياناتك محفوظة محلياً والتطبيق متصل' : 'التطبيق يعمل بكفاءة كاملة أوفلاين 100%'}
+                className="hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold border transition-colors bg-[#D9B978]/15 border-[#D9B978]/40 text-[#D9B978]"
+                title="تطبيق ثري يعمل بالكامل محلياً دون الحاجة لأي إنترنت (0 نت)"
               >
-                {isOnline ? <Wifi size={11} /> : <WifiOff size={11} />}
-                <span>{isOnline ? 'متصل' : 'محلي 100% (أوفلاين)'}</span>
+                <WifiOff size={11} />
+                <span>أوفلاين 100% (بدون نت)</span>
               </div>
             </div>
 
