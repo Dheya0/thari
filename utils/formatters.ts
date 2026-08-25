@@ -153,3 +153,30 @@ export function formatAppDate(dateString: string, includeTime = false): string {
     return dateString;
   }
 }
+
+/**
+ * Parses numbers containing Eastern Arabic numerals (٠-٩) or Persian numerals (۰-۹)
+ * as well as Arabic decimal separators (٫) and converts them to standard numbers.
+ */
+export function parseArabicNumber(input: string | number | null | undefined): number {
+  if (input === null || input === undefined || input === '') return 0;
+  if (typeof input === 'number') return isNaN(input) ? 0 : input;
+
+  let str = String(input).trim();
+  if (!str) return 0;
+
+  // Replace Eastern Arabic numerals (٠-٩)
+  str = str.replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 1632));
+  // Replace Persian numerals (۰-۹)
+  str = str.replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 1776));
+
+  // Replace Arabic decimal separator (٫) or comma with dot (.)
+  str = str.replace(/٫/g, '.').replace(/,/g, '.');
+
+  // Keep only digits, minus, and dot
+  str = str.replace(/[^0-9.-]/g, '');
+
+  const num = parseFloat(str);
+  return isNaN(num) ? 0 : num;
+}
+

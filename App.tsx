@@ -8,6 +8,7 @@ import { buildExecutiveCSVContent, exportAndShareExecutiveCSV } from './utils/ex
 import { saveSecureState, saveSecureStateSync, loadSecureState } from './utils/secureStorage';
 import { calculateConsolidatedPosition } from './services/balanceEngine';
 import { processDueRecurringRules } from './services/recurringService';
+import { WidgetService } from './services/widgetService';
 import { getTranslation, getLocalizedCurrency } from './utils/translations';
 import { Capacitor } from '@capacitor/core';
 import { App as CapApp } from '@capacitor/app';
@@ -160,6 +161,14 @@ const App: React.FC = () => {
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [showPrivacyPolicy, setShowPrivacyPolicy] = useState(false);
+  const [isLoadingSplash, setIsLoadingSplash] = useState(true);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsLoadingSplash(false);
+    }, 1600);
+    return () => clearTimeout(timer);
+  }, []);
   const [printType, setPrintType] = useState<'summary' | 'detailed'>('summary');
   const [printWalletFilter, setPrintWalletFilter] = useState<string | null>(null);
   const [printCurrencyFilter, setPrintCurrencyFilter] = useState<string | null>(null);
@@ -471,6 +480,18 @@ const App: React.FC = () => {
       state.debts
     );
   }, [filteredTransactions, state.transactions, state.wallets, state.currency.code, state.exchangeRates, selectedWalletId, state.debts]);
+
+  // Synchronize with native home screen widgets (iOS WidgetKit / Android AppWidget)
+  useEffect(() => {
+    WidgetService.updateWidgetData({
+      totalBalance: totals.netWorthInBase,
+      availableBalance: totals.availableLiquidityInBase,
+      currency: totals.activeCurrencyCode,
+      currencySymbol: localizedCurrency.symbol || totals.activeCurrencyCode,
+      lastUpdated: new Date().toLocaleTimeString(activeLanguage === 'ar' ? 'ar-SA' : 'en-US', { hour: '2-digit', minute: '2-digit' }),
+      activeWalletsCount: state.wallets.filter(w => !w.status || w.status === 'active').length,
+    });
+  }, [totals, state.wallets, localizedCurrency.symbol, activeLanguage]);
 
   // Specific calculation for current month's Cashflow (Income, Expense, Net) in current base currency
   const monthlyMetrics = useMemo(() => {
@@ -912,6 +933,32 @@ const App: React.FC = () => {
     const remaining = Math.max(0, original - (debt.paidAmount || 0));
     handlePayDebt(id, remaining, walletId, "سداد كامل");
   };
+
+  if (isLoadingSplash) {
+    return (
+      <div className="fixed inset-0 bg-[#0A0D10] text-[#F4F1EA] z-[9999] flex flex-col items-center justify-center p-6 select-none">
+        <div className="absolute top-0 right-1/4 w-80 h-80 bg-[#D9B978]/10 blur-[140px] rounded-full pointer-events-none" />
+        <div className="absolute bottom-0 left-1/4 w-80 h-80 bg-[#759BC8]/10 blur-[140px] rounded-full pointer-events-none" />
+        
+        <div className="flex flex-col items-center space-y-4 relative z-10">
+          <div className="p-3 rounded-3xl bg-white/[0.03] border border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.8)] backdrop-blur-2xl">
+            <Logo size={80} />
+          </div>
+          <div className="text-center space-y-1">
+            <h1 className="text-2xl font-bold tracking-tight text-[#F4F1EA]">ثري <span className="text-[#D9B978] font-light">— THARI</span></h1>
+            <p className="text-xs text-slate-400 font-medium">نظامك المالي الهادئ للثروة والمحافظ</p>
+          </div>
+          <div className="w-32 h-1 bg-white/10 rounded-full overflow-hidden mt-6">
+            <div className="w-full h-full bg-[#D9B978] rounded-full animate-pulse" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (showPrivacyPolicy) {
+    return <PrivacyPolicy onBack={() => setShowPrivacyPolicy(false)} language={state.language || 'ar'} />;
+  }
 
   if (!state.hasAcceptedTerms) return <WelcomeScreen onAccept={() => setState(p => ({ ...p, hasAcceptedTerms: true }))} onShowPrivacy={() => setShowPrivacyPolicy(true)} />;
   if (state.isLocked && (!!state.pin || state.isBiometricEnabled === true)) {

@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Target, Plus, TrendingUp, Wallet as WalletIcon, Star, CheckCircle2, ChevronRight, Compass, Loader2, X } from 'lucide-react';
 import { Goal, Wallet, Transaction } from '../types';
 import { getGoalAdvice } from '../services/geminiService';
+import { parseArabicNumber } from '../utils/formatters';
 
 interface GoalTrackerProps {
   goals: Goal[];
@@ -137,7 +138,7 @@ const GoalTracker: React.FC<GoalTrackerProps> = ({ goals, wallets, transactions,
 
                <button onClick={() => {
                  if (name && target) {
-                   onAddGoal({ name, targetAmount: parseFloat(target), currentAmount: 0, color: '#f59e0b', icon: 'Star', walletId: selectedWallet });
+                   onAddGoal({ name, targetAmount: parseArabicNumber(target), currentAmount: 0, color: '#f59e0b', icon: 'Star', walletId: selectedWallet });
                    setShowAdd(false); setName(''); setTarget('');
                  }
                }} className="w-full mt-4 py-5 bg-amber-500 text-slate-950 font-black rounded-[2rem] text-lg shadow-[0_15px_30px_rgba(245,158,11,0.3)] active:scale-95 transition-all">

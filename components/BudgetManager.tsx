@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { Target, TriangleAlert, Award, TrendingUp, Sparkles, AlertCircle, Coins, ShieldCheck, Play } from 'lucide-react';
 import { Budget, Category, Transaction } from '../types';
 import { getLocalizedCurrency, getTranslation, LanguageKey } from '../utils/translations';
+import { parseArabicNumber } from '../utils/formatters';
 
 interface BudgetManagerProps {
   budgets: Budget[];
@@ -182,7 +183,7 @@ const BudgetManager: React.FC<BudgetManagerProps> = ({
             <button 
               onClick={() => {
                 if (selectedCat && amount) {
-                  onSetBudget(selectedCat, parseFloat(amount));
+                  onSetBudget(selectedCat, parseArabicNumber(amount));
                   setAmount('');
                   setSelectedCat('');
                 }

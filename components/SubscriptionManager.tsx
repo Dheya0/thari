@@ -4,6 +4,7 @@ import { CreditCard, Plus, X, Calendar, RefreshCw, Trash2, Zap, Clock } from 'lu
 import { Subscription, Category } from '../types';
 import { getIcon } from '../constants';
 import { getLocalizedCurrency, getTranslation, LanguageKey } from '../utils/translations';
+import { parseArabicNumber } from '../utils/formatters';
 
 interface SubscriptionManagerProps {
   subscriptions: Subscription[];
@@ -129,7 +130,7 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({
                 </select>
                 <button onClick={() => {
                   if (name && amount && categoryId) {
-                    onAdd({ name, amount: parseFloat(amount), period, categoryId, nextBillingDate: nextBilling, isActive: true });
+                    onAdd({ name, amount: parseArabicNumber(amount), period, categoryId, nextBillingDate: nextBilling, isActive: true });
                     setShowAdd(false);
                     setName(''); setAmount(''); setNextBilling('');
                   }

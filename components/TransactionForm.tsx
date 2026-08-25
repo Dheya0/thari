@@ -18,7 +18,7 @@ import {
 } from '../types';
 import { getIcon, DEFAULT_CURRENCIES, convertCurrency } from '../constants';
 import { getLocalizedCurrency, LanguageKey } from '../utils/translations';
-import { getCurrencySymbol } from '../utils/formatters';
+import { getCurrencySymbol, parseArabicNumber } from '../utils/formatters';
 
 interface TransactionFormProps {
   categories: Category[];
@@ -197,7 +197,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
   const adjustmentCalc = useMemo(() => {
     if (selectedEvent !== 'balance_adjustment') return null;
     const current = selectedSourceWallet ? (selectedSourceWallet.currentBalance ?? selectedSourceWallet.openingBalance ?? 0) : 0;
-    const actual = actualRealBalance === '' ? null : parseFloat(actualRealBalance);
+    const actual = actualRealBalance === '' ? null : parseArabicNumber(actualRealBalance);
     if (actual === null || isNaN(actual)) return { current, actual: null, diff: 0, isIncrease: true, absDiff: 0 };
     const diff = actual - current;
     return {
@@ -213,7 +213,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
     e.preventDefault();
     setErrorMessage('');
 
-    const numAmount = parseFloat(amount);
+    const numAmount = parseArabicNumber(amount);
     if (isNaN(numAmount) || numAmount <= 0) {
       setErrorMessage('الرجاء إدخال مبلغ صحيح أكبر من الصفر');
       return;
@@ -264,7 +264,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
           return;
         }
         const destWallet = wallets.find(w => w.id === destinationWalletId);
-        let finalDestAmount = destinationAmount ? parseFloat(destinationAmount) : numAmount;
+        let finalDestAmount = destinationAmount ? parseArabicNumber(destinationAmount) : numAmount;
         if (selectedSourceWallet?.currencyCode !== destWallet?.currencyCode && !destinationAmount && exchangeRates) {
           finalDestAmount = convertCurrency(numAmount, selectedSourceWallet.currencyCode, destWallet?.currencyCode || 'SAR', exchangeRates);
         }
