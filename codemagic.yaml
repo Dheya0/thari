@@ -415,7 +415,8 @@ workflows:
             mkdir -p Payload
             cp -R "$APP_PATH" Payload/
             mkdir -p ../../build/ipa
-            (cd .. && zip -r build/ipa/Thari-unsigned.ipa Payload) || true
+            # Zip from current directory (ios/App) so Payload path matches what was created
+            zip -r ../../build/ipa/Thari-unsigned.ipa Payload || true
             rm -rf Payload
             echo "Unsigned IPA created at ios/App/build/ipa/Thari-unsigned.ipa"
           else
