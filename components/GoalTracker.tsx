@@ -1,9 +1,9 @@
-
-import React, { useState, useEffect } from 'react';
-import { Target, Plus, TrendingUp, Wallet as WalletIcon, Star, CheckCircle2, ChevronRight, Compass, Loader2, X } from 'lucide-react';
+import React, { useState } from 'react';
+import { Target, Plus, Star, Compass, Loader2, X } from 'lucide-react';
 import { Goal, Wallet, Transaction } from '../types';
 import { getGoalAdvice } from '../services/geminiService';
 import { parseArabicNumber } from '../utils/formatters';
+import { getTranslation, LanguageKey } from '../utils/translations';
 
 interface GoalTrackerProps {
   goals: Goal[];
@@ -13,9 +13,20 @@ interface GoalTrackerProps {
   onUpdateGoalAmount: (id: string, amount: number) => void;
   currencySymbol: string;
   apiKey?: string;
+  language?: LanguageKey;
 }
 
-const GoalTracker: React.FC<GoalTrackerProps> = ({ goals, wallets, transactions, onAddGoal, onUpdateGoalAmount, currencySymbol, apiKey }) => {
+const GoalTracker: React.FC<GoalTrackerProps> = ({ 
+  goals, 
+  wallets, 
+  transactions, 
+  onAddGoal, 
+  currencySymbol, 
+  apiKey,
+  language = 'ar' 
+}) => {
+  const t = getTranslation(language);
+  const isRtl = language === 'ar';
   const [showAdd, setShowAdd] = useState(false);
   const [name, setName] = useState('');
   const [target, setTarget] = useState('');
@@ -30,10 +41,10 @@ const GoalTracker: React.FC<GoalTrackerProps> = ({ goals, wallets, transactions,
   };
 
   return (
-    <div className="space-y-6 pb-24 animate-fade">
+    <div className="space-y-6 pb-24 animate-fade text-start" dir={isRtl ? 'rtl' : 'ltr'}>
       <div className="flex justify-between items-center px-2">
         <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
-          <Target size={14} /> أهداف الادخار والوفرة
+          <Target size={14} /> {t.goalsTitle}
         </h3>
         <button onClick={() => setShowAdd(true)} className="p-2 bg-amber-500/10 text-amber-500 rounded-xl active:scale-90 transition-all">
           <Plus size={18} />
@@ -46,7 +57,7 @@ const GoalTracker: React.FC<GoalTrackerProps> = ({ goals, wallets, transactions,
             <div className="w-16 h-16 bg-slate-800 rounded-3xl flex items-center justify-center mx-auto text-slate-600">
                <Star size={32} />
             </div>
-            <p className="text-[11px] font-black text-slate-500 uppercase tracking-widest">لم تحدد أي أهداف مالية بعد</p>
+            <p className="text-[11px] font-black text-slate-500 uppercase tracking-widest">{t.noGoalsYet}</p>
           </div>
         )}
 
@@ -67,19 +78,19 @@ const GoalTracker: React.FC<GoalTrackerProps> = ({ goals, wallets, transactions,
                     <h4 className="font-black text-white text-lg">{goal.name}</h4>
                     <div className="flex items-center gap-2">
                         {linkedWallet && <div className="w-2 h-2 rounded-full" style={{backgroundColor: linkedWallet.color}} />}
-                        <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{linkedWallet?.name || 'محفظة عامة'}</p>
+                        <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{linkedWallet?.name || t.generalWallet}</p>
                     </div>
                   </div>
                 </div>
-                <div className="text-left">
+                <div className="text-start sm:text-end">
                   <span className={`text-xl font-black ${isCompleted ? 'text-emerald-500' : 'text-white'}`}>{Math.round(progress)}%</span>
                 </div>
               </div>
 
               <div className="space-y-2">
                 <div className="flex justify-between text-[9px] font-black text-slate-500 uppercase tracking-widest">
-                  <span>المحقق: {goal.currentAmount.toLocaleString()} {currencySymbol}</span>
-                  <span>الهدف: {goal.targetAmount.toLocaleString()} {currencySymbol}</span>
+                  <span>{t.achieved}: {goal.currentAmount.toLocaleString(isRtl ? 'ar-SA' : 'en-US')} {currencySymbol}</span>
+                  <span>{t.targetAmount}: {goal.targetAmount.toLocaleString(isRtl ? 'ar-SA' : 'en-US')} {currencySymbol}</span>
                 </div>
                 <div className="h-3 bg-slate-950 rounded-full overflow-hidden p-[2px]">
                    <div className={`h-full rounded-full transition-all duration-1000 ${isCompleted ? 'bg-emerald-500' : 'bg-amber-500'}`} style={{ width: `${progress}%` }} />
@@ -90,18 +101,18 @@ const GoalTracker: React.FC<GoalTrackerProps> = ({ goals, wallets, transactions,
                 <div className="bg-[#D9B978]/5 rounded-2xl p-4 border border-[#D9B978]/15 relative group">
                   <div className="flex items-center justify-between mb-2">
                      <span className="text-[9px] font-black text-[#D9B978] uppercase tracking-widest flex items-center gap-1.5">
-                        <Compass size={13} /> التوجيه المالي لتحقيق الهدف
+                        <Compass size={13} /> {t.goalAdviceTitle}
                      </span>
                      <button 
                         onClick={() => fetchAdvice(goal)} 
                         className="text-[8px] font-black text-slate-500 hover:text-[#D9B978] transition-colors"
                         disabled={advice?.loading}
                     >
-                        {advice?.loading ? <Loader2 size={10} className="animate-spin" /> : 'تحديث التوجيه'}
+                        {advice?.loading ? <Loader2 size={10} className="animate-spin" /> : t.updateAdvice}
                      </button>
                   </div>
                   <p className="text-[11px] font-medium text-slate-300 leading-relaxed min-h-[1.5em]">
-                    {advice?.text || "المستشار المالي جاهز لدراسة هدفك واقتراح خطة تسريع إنجازه."}
+                    {advice?.text || t.goalAdvisorDefault}
                   </p>
                 </div>
               )}
@@ -112,24 +123,24 @@ const GoalTracker: React.FC<GoalTrackerProps> = ({ goals, wallets, transactions,
 
       {showAdd && (
         <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-[150] flex items-center justify-center p-3 sm:p-4 animate-fade no-print overflow-hidden">
-          <div className="bg-slate-900 w-full max-w-md mx-auto rounded-3xl p-5 sm:p-7 shadow-2xl relative max-h-[85vh] sm:max-h-[88vh] flex flex-col min-h-0 border border-white/10 animate-slide-up overflow-hidden">
+          <div className="bg-slate-900 w-full max-w-md mx-auto rounded-3xl p-5 sm:p-7 shadow-2xl relative max-h-[85vh] sm:max-h-[88vh] flex flex-col min-h-0 border border-white/10 animate-slide-up overflow-hidden" dir={isRtl ? 'rtl' : 'ltr'}>
             <div className="flex justify-between items-center mb-4 shrink-0 pb-2 border-b border-white/5">
-              <h3 className="text-lg sm:text-xl font-bold text-white">هدف مالي جديد</h3>
+              <h3 className="text-lg sm:text-xl font-bold text-white">{t.newGoal}</h3>
               <button onClick={() => setShowAdd(false)} className="p-2 bg-slate-800 rounded-xl text-slate-400 hover:text-white transition-all"><X size={18} /></button>
             </div>
             <div className="flex-1 overflow-y-auto custom-scrollbar space-y-4 min-h-0 pr-1 pl-1 pb-1">
                <div className="space-y-2">
-                 <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2">ما هو حلمك القادم؟</label>
-                 <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="مثلاً: رحلة الأحلام، سيارة جديدة" className="w-full p-4 sm:p-5 rounded-2xl bg-slate-950 text-white font-bold border-none outline-none focus:ring-1 focus:ring-amber-500 shadow-inner" />
+                 <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2">{t.goalDreamPrompt}</label>
+                 <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder={t.goalDreamPlaceholder} className="w-full p-4 sm:p-5 rounded-2xl bg-slate-950 text-white font-bold border-none outline-none focus:ring-1 focus:ring-amber-500 shadow-inner" />
                </div>
                
                <div className="grid grid-cols-2 gap-3 sm:gap-4">
                    <div className="space-y-2">
-                     <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2 text-center block">المبلغ المستهدف</label>
+                     <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2 text-center block">{t.targetAmount}</label>
                      <input type="number" inputMode="decimal" value={target} onChange={e => setTarget(e.target.value)} placeholder="0.00" className="w-full p-4 sm:p-5 rounded-2xl bg-slate-950 text-white font-black border-none outline-none focus:ring-1 focus:ring-amber-500 text-center" />
                    </div>
                    <div className="space-y-2">
-                     <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2 text-center block">ربط بمحفظة</label>
+                     <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2 text-center block">{t.linkToWallet}</label>
                      <select value={selectedWallet} onChange={e => setSelectedWallet(e.target.value)} className="w-full p-4 sm:p-5 rounded-2xl bg-slate-950 text-sm text-white font-bold border-none outline-none focus:ring-1 focus:ring-amber-500">
                         {wallets.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
                      </select>
@@ -142,7 +153,7 @@ const GoalTracker: React.FC<GoalTrackerProps> = ({ goals, wallets, transactions,
                    setShowAdd(false); setName(''); setTarget('');
                  }
                }} className="w-full mt-4 py-5 bg-amber-500 text-slate-950 font-black rounded-[2rem] text-lg shadow-[0_15px_30px_rgba(245,158,11,0.3)] active:scale-95 transition-all">
-                 إنشاء الهدف الآن
+                 {t.createGoalNow}
                </button>
             </div>
           </div>
@@ -153,4 +164,3 @@ const GoalTracker: React.FC<GoalTrackerProps> = ({ goals, wallets, transactions,
 };
 
 export default GoalTracker;
-    

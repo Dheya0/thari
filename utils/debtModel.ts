@@ -57,7 +57,7 @@ export const getDebtRemaining = (debt: Debt): number => {
 /**
  * Returns full calculations and interpreted financial state for a single debt
  */
-export const getDebtCalculations = (debt: Debt): DebtCalculation => {
+export const getDebtCalculations = (debt: Debt, language: 'ar' | 'en' = 'ar'): DebtCalculation => {
   const originalAmount = debt.originalAmount || debt.amount || 0;
   const paidAmount = debt.paidAmount || 0;
   const remainingAmount = Math.max(0, originalAmount - paidAmount);
@@ -75,7 +75,7 @@ export const getDebtCalculations = (debt: Debt): DebtCalculation => {
       remainingAmount: 0,
       progressPercent: 100,
       status: 'settled',
-      statusLabel: 'مسدد بالكامل',
+      statusLabel: language === 'en' ? 'Fully Settled' : 'مسدد بالكامل',
       statusColor: 'emerald',
       isOverdue: false,
       paymentsCount,
@@ -96,7 +96,7 @@ export const getDebtCalculations = (debt: Debt): DebtCalculation => {
       remainingAmount,
       progressPercent,
       status: 'overdue',
-      statusLabel: `متأخر (${daysDiff} يوم)`,
+      statusLabel: language === 'en' ? `Overdue (${daysDiff} d)` : `متأخر (${daysDiff} يوم)`,
       statusColor: 'rose',
       isOverdue: true,
       daysDiff,
@@ -112,7 +112,7 @@ export const getDebtCalculations = (debt: Debt): DebtCalculation => {
       remainingAmount,
       progressPercent,
       status: 'partial',
-      statusLabel: 'مسدد جزئياً',
+      statusLabel: language === 'en' ? 'Partially Paid' : 'مسدد جزئياً',
       statusColor: 'amber',
       isOverdue: false,
       paymentsCount,
@@ -125,7 +125,7 @@ export const getDebtCalculations = (debt: Debt): DebtCalculation => {
     remainingAmount,
     progressPercent: 0,
     status: 'active',
-    statusLabel: 'قائم ومستحق',
+    statusLabel: language === 'en' ? 'Active & Due' : 'قائم ومستحق',
     statusColor: 'blue',
     isOverdue: false,
     paymentsCount,

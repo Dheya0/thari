@@ -180,6 +180,8 @@ export default function Settings({
   const isIOS = typeof window !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
   const isStandalone = typeof window !== 'undefined' && ((window.navigator as any).standalone || window.matchMedia('(display-mode: standalone)').matches);
 
+  const t = getTranslation(appState?.language || 'ar');
+
   const [localUserName, setLocalUserName] = useState(userName || '');
   const [localUserEmail, setLocalUserEmail] = useState(appState?.userEmail || '');
   const [localPin, setLocalPin] = useState(pin || '');
@@ -276,7 +278,7 @@ export default function Settings({
 
   const handleDirectStoreRating = () => {
     const isIOSPlatform = typeof window !== 'undefined' && (/iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
-    showToast('جاري التحويل لصفحة تقييم التطبيق في المتجر...');
+    showToast(t.rateSuccessToast);
     if (isIOSPlatform) {
       window.open('https://apps.apple.com/app/id64762459927?action=write-review', '_blank');
     } else {
@@ -285,7 +287,7 @@ export default function Settings({
   };
 
   const handleSupportClick = () => {
-    window.location.href = 'mailto:thari-app@inbox.ru?subject=استفسار%20تطبيق%20ثري%20-%20دعم%20المستخدمين';
+    window.location.href = 'mailto:thari-app@inbox.ru?subject=' + encodeURIComponent(appState?.language === 'en' ? 'THARI App Inquiry - User Support' : 'استفسار تطبيق ثري - دعم المستخدمين');
   };
 
   const [toast, setToast] = useState<{message: string, type: 'success' | 'error'} | null>(null);
@@ -307,12 +309,12 @@ export default function Settings({
       apiKey: localApiKey,
       language: localLanguage 
     });
-    showToast('تم حفظ الملف الشخصي والتفضيلات بنجاح');
+    showToast(t.saveProfileSuccess);
   };
 
   const handleSaveSecurity = (shouldLock = false) => {
     if (isSecurityEnabled && localPin && localPin.length > 0 && localPin.length < 4) {
-      showToast('يرجى إدخال رمز PIN مكون من 4 أرقام بالضبط', 'error');
+      showToast(t.enterPinError, 'error');
       return;
     }
 
@@ -327,9 +329,9 @@ export default function Settings({
     });
 
     if (shouldLock) {
-      showToast('تم قفل التطبيق بنجاح!');
+      showToast(t.appLockedSuccess);
     } else {
-      showToast('تم تحديث إعدادات الأمان بنجاح');
+      showToast(t.securitySettingsUpdated);
     }
   };
 
@@ -339,14 +341,14 @@ export default function Settings({
       const res = await authenticateBiometrics();
       if (res.success) {
         setBioTestStatus('success');
-        setBioTestFeedback('تم التحقق بنجاح! المستشعر والبيومترية تعمل بكفاءة تامة.');
+        setBioTestFeedback(t.bioTestSuccess);
       } else {
         setBioTestStatus('failed');
-        setBioTestFeedback(res.error || 'فشل التحقق الحيوي.');
+        setBioTestFeedback(res.error || t.bioTestFail);
       }
     } catch (e: any) {
       setBioTestStatus('failed');
-      setBioTestFeedback(e.message || 'خطأ في تشغيل المستشعر.');
+      setBioTestFeedback(e.message || t.bioTestError);
     }
   };
 
@@ -355,17 +357,17 @@ export default function Settings({
       if ('Notification' in window) {
         const perm = await Notification.requestPermission();
         if (perm === 'granted') {
-          new Notification('تطبيق ثري - تنبيه تجريبي', {
-            body: 'تم تفعيل التنبيهات المباشرة بنجاح!',
+          new Notification(t.testNotificationTitle, {
+            body: t.testNotificationBody,
             icon: '/icon.png'
           });
-          showToast('تم إرسال إشعار تجريبي بنجاح!');
+          showToast(t.testNotificationSent);
           return;
         }
       }
-      showToast('تم تفعيل التنبيهات بنجاح!');
+      showToast(t.testNotificationSent);
     } catch (e) {
-      showToast('تم تفعيل التنبيهات بنجاح!');
+      showToast(t.testNotificationSent);
     }
   };
 
@@ -393,9 +395,9 @@ export default function Settings({
       URL.revokeObjectURL(url);
       setShowBackupModal(false);
       setBackupPassword('');
-      showToast('تم تصدير النسخة الاحتياطية بنجاح');
+      showToast(t.backupExportSuccess);
     } catch (e) {
-      showToast('فشل تصدير النسخة الاحتياطية', 'error');
+      showToast(t.backupExportFail, 'error');
     } finally {
       setIsExporting(false);
     }
@@ -412,9 +414,9 @@ export default function Settings({
         try {
           const parsed = JSON.parse(content);
           onRestore(parsed.state);
-          showToast('تمت استعادة النسخة الاحتياطية بنجاح');
+          showToast(t.backupRestoreSuccess);
         } catch (err) {
-          showToast('ملف التصدير غير صالح', 'error');
+          showToast(t.backupInvalidFile, 'error');
         }
       } else {
         setPendingRestoreContent(content);
@@ -430,7 +432,7 @@ export default function Settings({
     try {
       const decrypted = await decryptData(pendingRestoreContent, password);
       if (!decrypted) {
-        showToast('كلمة المرور غير صحيحة أو الملف تالف', 'error');
+        showToast(t.backupWrongPass, 'error');
         return;
       }
       const parsed = JSON.parse(decrypted);
@@ -438,9 +440,9 @@ export default function Settings({
       setShowRestoreModal(false);
       setRestorePassword('');
       setPendingRestoreContent(null);
-      showToast('تمت استعادة البيانات المشفرة بنجاح');
+      showToast(t.backupDecryptSuccess);
     } catch (e) {
-      showToast('فشل فك تشفير النسخة الاحتياطية', 'error');
+      showToast(t.backupDecryptFail, 'error');
     }
   };
 
@@ -450,7 +452,7 @@ export default function Settings({
         transactions: appState.transactions || [],
         categories: appState.categories || categories || [],
         wallets: appState.wallets || wallets || [],
-        userName: appState.userName || userName || 'مستخدم ثري',
+        userName: appState.userName || userName || (appState?.language === 'en' ? 'Thari User' : 'مستخدم ثري'),
         currency: currency || appState.currency,
         exchangeRates: appState.exchangeRates || exchangeRates || {},
         type,
@@ -463,23 +465,23 @@ export default function Settings({
       a.download = `thari_financial_report_${new Date().toISOString().slice(0, 10)}.csv`;
       a.click();
       URL.revokeObjectURL(url);
-      showToast('تم تصدير تقرير Excel (CSV) بنجاح');
+      showToast(t.excelExportSuccess);
     } catch (e) {
-      showToast('فشل تصدير التقرير', 'error');
+      showToast(t.excelExportFail, 'error');
     }
   };
 
   const saveWallet = () => {
     if (!walletData.name.trim()) {
-      showToast('يرجى إدخال اسم المحفظة', 'error');
+      showToast(t.walletNameRequired, 'error');
       return;
     }
     if (editingWallet) {
       onUpdateWallet(editingWallet.id, walletData);
-      showToast('تم تحديث المحفظة بنجاح');
+      showToast(t.walletUpdatedSuccess);
     } else {
       onAddWallet({ ...walletData, openingBalance: 0, currentBalance: 0 });
-      showToast('تم إضافة المحفظة بنجاح');
+      showToast(t.walletAddedSuccess);
     }
     setShowWalletForm(false);
     setEditingWallet(null);
@@ -487,21 +489,19 @@ export default function Settings({
 
   const saveCategory = () => {
     if (!categoryData.name.trim()) {
-      showToast('يرجى إدخال اسم التصنيف', 'error');
+      showToast(t.categoryNameRequired, 'error');
       return;
     }
     if (editingCategory) {
       onUpdateCategory(editingCategory.id, categoryData);
-      showToast('تم تحديث التصنيف بنجاح');
+      showToast(t.categoryUpdatedSuccess);
     } else {
       onAddCategory(categoryData);
-      showToast('تم إضافة التصنيف بنجاح');
+      showToast(t.categoryAddedSuccess);
     }
     setShowCategoryForm(false);
     setEditingCategory(null);
   };
-
-  const t = getTranslation(appState?.language || 'ar');
 
   if (activeSection === 'wallets') {
     return (
@@ -898,7 +898,7 @@ export default function Settings({
                       <button type="button" onClick={() => { setLocalAutoLockTime('instant'); onUpdateSettings({ autoLockTime: 'instant' }); }} className={`py-2 rounded-xl text-xs font-bold transition-all ${localAutoLockTime === 'instant' ? 'bg-[#D9B978] text-[#0A0D10] font-black shadow-md' : 'text-slate-400 hover:text-white'}`}>{t.instant}</button>
                       <button type="button" onClick={() => { setLocalAutoLockTime('1min'); onUpdateSettings({ autoLockTime: '1min' }); }} className={`py-2 rounded-xl text-xs font-bold transition-all ${localAutoLockTime === '1min' ? 'bg-[#D9B978] text-[#0A0D10] font-black shadow-md' : 'text-slate-400 hover:text-white'}`}>{t.minute}</button>
                       <button type="button" onClick={() => { setLocalAutoLockTime('5min'); onUpdateSettings({ autoLockTime: '5min' }); }} className={`py-2 rounded-xl text-xs font-bold transition-all ${localAutoLockTime === '5min' ? 'bg-[#D9B978] text-[#0A0D10] font-black shadow-md' : 'text-slate-400 hover:text-white'}`}>{t.fiveMinutes}</button>
-                      <button type="button" onClick={() => { setLocalAutoLockTime('never'); onUpdateSettings({ autoLockTime: 'never' }); }} className={`py-2 rounded-xl text-xs font-bold transition-all ${localAutoLockTime === 'never' ? 'bg-[#D9B978] text-[#0A0D10] font-black shadow-md' : 'text-slate-400 hover:text-white'}`}>تعطيل</button>
+                      <button type="button" onClick={() => { setLocalAutoLockTime('never'); onUpdateSettings({ autoLockTime: 'never' }); }} className={`py-2 rounded-xl text-xs font-bold transition-all ${localAutoLockTime === 'never' ? 'bg-[#D9B978] text-[#0A0D10] font-black shadow-md' : 'text-slate-400 hover:text-white'}`}>{t.disabled}</button>
                     </div>
                 </div>
 
@@ -927,14 +927,14 @@ export default function Settings({
                                 setLocalPin(val);
                                 if (val.length === 4) {
                                   onUpdateSettings({ pin: val });
-                                  showToast('تم حفظ الرمز السري بنجاح');
+                                  showToast(t.pinSavedSuccess);
                                 }
                               }} 
                               className="w-full p-4 rounded-xl bg-[#0A0D10] text-[#F4F1EA] font-black text-center text-2xl tracking-[0.5em] border border-white/10 focus:border-[#D9B978] focus:outline-none" 
                               placeholder="****" 
                               maxLength={4}
                           />
-                          <p className="text-[10px] text-slate-400 text-center font-bold">أدخل 4 أرقام لتأمين الدخول واستعادة الحساب</p>
+                          <p className="text-[10px] text-slate-400 text-center font-bold">{t.enterPinHint}</p>
                         </div>
                     )}
                 </div>
@@ -1001,7 +1001,7 @@ export default function Settings({
                       className="py-3.5 bg-[#141B24] hover:bg-[#1C2633] text-[#F4F1EA] border border-white/10 rounded-xl font-bold text-xs active:scale-95 transition-all flex items-center justify-center gap-2"
                     >
                       <Lock size={15} className="text-[#D9B978]" />
-                      <span>قفل التطبيق الآن</span>
+                      <span>{t.lockAppNow}</span>
                     </button>
                   </div>
                 )}
@@ -1024,10 +1024,10 @@ export default function Settings({
                      </div>
                    </div>
                    <div className="grid grid-cols-4 gap-1.5 bg-[#11161C] p-1.5 rounded-xl border border-white/5">
-                     <button type="button" onClick={() => { setLocalAutoBackupFreq('on_open'); onUpdateSettings({ autoBackupFrequency: 'on_open' }); showToast(t.autoBackupConfigured); }} className={`py-2 rounded-lg text-[11px] font-bold transition-all ${localAutoBackupFreq === 'on_open' ? 'bg-[#D9B978] text-[#0A0D10] font-black shadow-md' : 'text-slate-400 hover:text-white'}`}>عند الفتح</button>
-                     <button type="button" onClick={() => { setLocalAutoBackupFreq('daily'); onUpdateSettings({ autoBackupFrequency: 'daily' }); showToast(t.autoBackupConfigured); }} className={`py-2 rounded-lg text-[11px] font-bold transition-all ${localAutoBackupFreq === 'daily' ? 'bg-[#D9B978] text-[#0A0D10] font-black shadow-md' : 'text-slate-400 hover:text-white'}`}>يومي</button>
-                     <button type="button" onClick={() => { setLocalAutoBackupFreq('weekly'); onUpdateSettings({ autoBackupFrequency: 'weekly' }); showToast(t.autoBackupConfigured); }} className={`py-2 rounded-lg text-[11px] font-bold transition-all ${localAutoBackupFreq === 'weekly' ? 'bg-[#D9B978] text-[#0A0D10] font-black shadow-md' : 'text-slate-400 hover:text-white'}`}>أسبوعي</button>
-                     <button type="button" onClick={() => { setLocalAutoBackupFreq('disabled'); onUpdateSettings({ autoBackupFrequency: 'disabled' }); showToast(t.autoBackupDisabled); }} className={`py-2 rounded-lg text-[11px] font-bold transition-all ${localAutoBackupFreq === 'disabled' ? 'bg-[#D9B978] text-[#0A0D10] font-black shadow-md' : 'text-slate-400 hover:text-white'}`}>تعطيل</button>
+                     <button type="button" onClick={() => { setLocalAutoBackupFreq('on_open'); onUpdateSettings({ autoBackupFrequency: 'on_open' }); showToast(t.autoBackupConfigured); }} className={`py-2 rounded-lg text-[11px] font-bold transition-all ${localAutoBackupFreq === 'on_open' ? 'bg-[#D9B978] text-[#0A0D10] font-black shadow-md' : 'text-slate-400 hover:text-white'}`}>{t.onOpen}</button>
+                     <button type="button" onClick={() => { setLocalAutoBackupFreq('daily'); onUpdateSettings({ autoBackupFrequency: 'daily' }); showToast(t.autoBackupConfigured); }} className={`py-2 rounded-lg text-[11px] font-bold transition-all ${localAutoBackupFreq === 'daily' ? 'bg-[#D9B978] text-[#0A0D10] font-black shadow-md' : 'text-slate-400 hover:text-white'}`}>{t.daily}</button>
+                     <button type="button" onClick={() => { setLocalAutoBackupFreq('weekly'); onUpdateSettings({ autoBackupFrequency: 'weekly' }); showToast(t.autoBackupConfigured); }} className={`py-2 rounded-lg text-[11px] font-bold transition-all ${localAutoBackupFreq === 'weekly' ? 'bg-[#D9B978] text-[#0A0D10] font-black shadow-md' : 'text-slate-400 hover:text-white'}`}>{t.weekly}</button>
+                     <button type="button" onClick={() => { setLocalAutoBackupFreq('disabled'); onUpdateSettings({ autoBackupFrequency: 'disabled' }); showToast(t.autoBackupDisabled); }} className={`py-2 rounded-lg text-[11px] font-bold transition-all ${localAutoBackupFreq === 'disabled' ? 'bg-[#D9B978] text-[#0A0D10] font-black shadow-md' : 'text-slate-400 hover:text-white'}`}>{t.disabled}</button>
                    </div>
                  </div>
 
@@ -1100,11 +1100,11 @@ export default function Settings({
                         </div>
                         <div>
                             <h4 className="text-sm font-bold text-[#F4F1EA]">ثري | THARI — Living Wealth</h4>
-                            <p className="text-[11px] text-[#D9B978] font-medium">الفخامة الهادئة • تشفير محلي 100% (Local-First)</p>
+                            <p className="text-[11px] text-[#D9B978] font-medium">{t.quietLuxuryLocal}</p>
                         </div>
                     </div>
                     <p className="text-xs text-slate-300 leading-relaxed font-normal">
-                        نظام مالي متكامل لإدارة الأصول والمحافظ المتعددة وحساب الزكاة الشرعية مع سيادة وأمان محلي كامل دون خوادم سحابية.
+                        {t.aboutAppDesc}
                     </p>
                 </div>
 
@@ -1120,8 +1120,8 @@ export default function Settings({
                                 <Sparkles size={16} />
                             </div>
                             <div className="text-start">
-                                <p className="text-xs font-bold text-[#F4F1EA]">عن التطبيق والفلسفة</p>
-                                <p className="text-[10px] text-slate-400">مميزات وأركان منظومة ثري</p>
+                                <p className="text-xs font-bold text-[#F4F1EA]">{t.aboutPhilosophy}</p>
+                                <p className="text-[10px] text-slate-400">{t.thariPillars}</p>
                             </div>
                         </div>
                         <ChevronLeft size={16} className="text-slate-400" />
@@ -1137,8 +1137,8 @@ export default function Settings({
                                 <ShieldCheck size={16} />
                             </div>
                             <div className="text-start">
-                                <p className="text-xs font-bold text-[#F4F1EA]">سياسة الخصوصية والأمان</p>
-                                <p className="text-[10px] text-slate-400">التشفير وانعدام السحابة</p>
+                                <p className="text-xs font-bold text-[#F4F1EA]">{t.privacyPolicyAndSecurity}</p>
+                                <p className="text-[10px] text-slate-400">{t.encryptionLocalFirst}</p>
                             </div>
                         </div>
                         <ChevronLeft size={16} className="text-slate-400" />
