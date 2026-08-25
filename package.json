@@ -5,12 +5,13 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "generate-assets": "capacitor-assets generate --assetPath assets",
     "build": "vite build",
     "preview": "vite preview",
     "lint": "tsc --noEmit",
-    "build:all": "vite build && cap sync",
-    "build:android": "vite build && cap sync android",
-    "build:ios": "vite build && cap sync ios",
+    "build:all": "npm run generate-assets && vite build && cap sync",
+    "build:android": "npm run generate-assets && vite build && cap sync android",
+    "build:ios": "npm run generate-assets && vite build && cap sync ios",
     "cap:sync": "cap sync",
     "cap:android": "cap open android",
     "cap:ios": "cap open ios"
@@ -37,6 +38,7 @@
   },
   "devDependencies": {
     "@capacitor/android": "^6.0.0",
+    "@capacitor/assets": "^3.0.5",
     "@capacitor/cli": "^6.0.0",
     "@capacitor/ios": "^6.0.0",
     "@types/react": "^19.2.18",
