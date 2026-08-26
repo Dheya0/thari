@@ -200,11 +200,11 @@ workflows:
           fi
 
           if [ -f "ios/App/Podfile" ]; then
-            perl -0pi -e "s/platform :ios, '.*?'/platform :ios, '14.0'/" ios/App/Podfile
+            perl -0pi -e "s/platform :ios, '.*?'/platform :ios, '15.0'/" ios/App/Podfile
           fi
 
           if [ -f "ios/App/App.xcodeproj/project.pbxproj" ]; then
-            perl -0pi -e "s/IPHONEOS_DEPLOYMENT_TARGET = [0-9]+\.[0-9]+;/IPHONEOS_DEPLOYMENT_TARGET = 14.0;/g" ios/App/App.xcodeproj/project.pbxproj
+            perl -0pi -e "s/IPHONEOS_DEPLOYMENT_TARGET = [0-9]+\.[0-9]+;/IPHONEOS_DEPLOYMENT_TARGET = 15.0;/g" ios/App/App.xcodeproj/project.pbxproj
           fi
 
           npx cap sync ios
@@ -317,11 +317,11 @@ workflows:
           fi
 
           if [ -f "ios/App/Podfile" ]; then
-            perl -0pi -e "s/platform :ios, '.*?'/platform :ios, '14.0'/" ios/App/Podfile
+            perl -0pi -e "s/platform :ios, '.*?'/platform :ios, '15.0'/" ios/App/Podfile
           fi
 
           if [ -f "ios/App/App.xcodeproj/project.pbxproj" ]; then
-            perl -0pi -e "s/IPHONEOS_DEPLOYMENT_TARGET = [0-9]+\.[0-9]+;/IPHONEOS_DEPLOYMENT_TARGET = 14.0;/g" ios/App/App.xcodeproj/project.pbxproj
+            perl -0pi -e "s/IPHONEOS_DEPLOYMENT_TARGET = [0-9]+\.[0-9]+;/IPHONEOS_DEPLOYMENT_TARGET = 15.0;/g" ios/App/App.xcodeproj/project.pbxproj
           fi
 
           npx cap sync ios
@@ -451,4 +451,5 @@ workflows:
         notify:
           success: true
           failure: true
+
 
