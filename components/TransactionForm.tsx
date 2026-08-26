@@ -223,15 +223,20 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
 
     try {
       if (selectedEvent === 'expense') {
-        let finalAmount = numAmount;
-        if (inputCurrency !== selectedSourceWallet?.currencyCode && exchangeRates) {
-          finalAmount = convertCurrency(numAmount, inputCurrency, selectedSourceWallet.currencyCode, exchangeRates);
-        }
+        const sourceCurrency = inputCurrency || selectedSourceWallet?.currencyCode || 'SAR';
+        const walletCurrency = selectedSourceWallet?.currencyCode || sourceCurrency;
+        const convertedValue = sourceCurrency !== walletCurrency && exchangeRates
+          ? convertCurrency(numAmount, sourceCurrency, walletCurrency, exchangeRates)
+          : numAmount;
+
         onSubmit({
           id: initialData?.id,
           type: 'expense',
-          amount: finalAmount,
-          currency: selectedSourceWallet?.currencyCode || 'SAR',
+          amount: numAmount,
+          currency: sourceCurrency,
+          walletCurrency,
+          convertedAmountInWalletCurrency: convertedValue,
+          exchangeRateUsed: sourceCurrency !== walletCurrency && exchangeRates ? (convertCurrency(1, sourceCurrency, walletCurrency, exchangeRates)) : 1,
           walletId,
           categoryId: categoryId || categories.find(c => c.type === 'expense')?.id || 'general',
           note,
@@ -241,15 +246,20 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
           receipt
         });
       } else if (selectedEvent === 'income') {
-        let finalAmount = numAmount;
-        if (inputCurrency !== selectedSourceWallet?.currencyCode && exchangeRates) {
-          finalAmount = convertCurrency(numAmount, inputCurrency, selectedSourceWallet.currencyCode, exchangeRates);
-        }
+        const sourceCurrency = inputCurrency || selectedSourceWallet?.currencyCode || 'SAR';
+        const walletCurrency = selectedSourceWallet?.currencyCode || sourceCurrency;
+        const convertedValue = sourceCurrency !== walletCurrency && exchangeRates
+          ? convertCurrency(numAmount, sourceCurrency, walletCurrency, exchangeRates)
+          : numAmount;
+
         onSubmit({
           id: initialData?.id,
           type: 'income',
-          amount: finalAmount,
-          currency: selectedSourceWallet?.currencyCode || 'SAR',
+          amount: numAmount,
+          currency: sourceCurrency,
+          walletCurrency,
+          convertedAmountInWalletCurrency: convertedValue,
+          exchangeRateUsed: sourceCurrency !== walletCurrency && exchangeRates ? (convertCurrency(1, sourceCurrency, walletCurrency, exchangeRates)) : 1,
           walletId,
           categoryId: categoryId || categories.find(c => c.type === 'income')?.id || 'general',
           note,
@@ -264,17 +274,23 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
           return;
         }
         const destWallet = wallets.find(w => w.id === destinationWalletId);
+        const sourceCurrency = selectedSourceWallet?.currencyCode || 'SAR';
+        const destinationCurrency = destWallet?.currencyCode || 'SAR';
         let finalDestAmount = destinationAmount ? parseArabicNumber(destinationAmount) : numAmount;
-        if (selectedSourceWallet?.currencyCode !== destWallet?.currencyCode && !destinationAmount && exchangeRates) {
-          finalDestAmount = convertCurrency(numAmount, selectedSourceWallet.currencyCode, destWallet?.currencyCode || 'SAR', exchangeRates);
+        if (sourceCurrency !== destinationCurrency && !destinationAmount && exchangeRates) {
+          finalDestAmount = convertCurrency(numAmount, sourceCurrency, destinationCurrency, exchangeRates);
         }
         onSubmit({
           id: initialData?.id,
           type: 'transfer',
           amount: numAmount,
-          currency: selectedSourceWallet?.currencyCode || 'SAR',
+          currency: sourceCurrency,
+          walletCurrency: sourceCurrency,
+          convertedAmountInWalletCurrency: numAmount,
+          exchangeRateUsed: sourceCurrency !== destinationCurrency && exchangeRates ? convertCurrency(1, sourceCurrency, destinationCurrency, exchangeRates) : 1,
           walletId,
           destinationWalletId,
+          destinationCurrency,
           destinationAmount: finalDestAmount,
           categoryId: categoryId || categories[0]?.id || 'general',
           note,
