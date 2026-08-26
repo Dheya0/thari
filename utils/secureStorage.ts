@@ -11,6 +11,15 @@ const SNAPSHOT_KEYS = ['thari_vault_snap_a', 'thari_vault_snap_b', 'thari_vault_
 const V2_PREFIX = 'THARI_AES_GCM_V2:';
 let cachedDeviceSecret: string | null = null;
 
+function isNativePlatformSafe(): boolean {
+  try {
+    // Capacitor may not be available in web runtimes
+    return !!(Capacitor && typeof (Capacitor as any).isNativePlatform === 'function' && (Capacitor as any).isNativePlatform());
+  } catch {
+    return false;
+  }
+}
+
 function getCrypto(): Crypto | null {
   if (typeof window !== 'undefined' && window.crypto && window.crypto.subtle) {
     return window.crypto;
@@ -257,17 +266,28 @@ export function deobfuscateData(encodedString: string): string | null {
 }
 
 export async function writeEncryptedValue(primaryKey: string, value: string): Promise<void> {
-  if (!Capacitor.isNativePlatform()) {
-    throw new Error('Secure persistence is unavailable in a non-native runtime. Refusing to store financial state insecurely.');
+  // Do not throw synchronously in non-native runtimes — fail gracefully
+  if (!isNativePlatformSafe()) {
+    console.warn('SecureStorage: Secure persistence unavailable in this environment; skipping write to persistent storage.');
+    return;
   }
 
-  const encryptedData = await encryptWithAesGcm(value);
-  localStorage.setItem(primaryKey, encryptedData);
-
-  const snapIndex = Math.floor(Date.now() / (1000 * 60 * 60)) % SNAPSHOT_KEYS.length;
-  const targetSnapKey = SNAPSHOT_KEYS[snapIndex];
-  localStorage.setItem(targetSnapKey, encryptedData);
-  localStorage.setItem('thari_last_save_ts', Date.now().toString());
+  try {
+    const encryptedData = await encryptWithAesGcm(value);
+    try {
+      localStorage.setItem(primaryKey, encryptedData);
+      const snapIndex = Math.floor(Date.now() / (1000 * 60 * 60)) % SNAPSHOT_KEYS.length;
+      const targetSnapKey = SNAPSHOT_KEYS[snapIndex];
+      localStorage.setItem(targetSnapKey, encryptedData);
+      localStorage.setItem('thari_last_save_ts', Date.now().toString());
+    } catch (storageErr) {
+      // localStorage might be full or not available — log and continue
+      console.warn('SecureStorage: localStorage write failed, skipping persistent snapshot.', storageErr);
+    }
+  } catch (err) {
+    // Encryption failed — do not throw to avoid crashing the app; log for diagnostics
+    console.warn('SecureStorage: Encryption failed; skipping secure write.', err);
+  }
 }
 
 export function saveSecureStateSync(primaryKey: string, stateObj: any): void {
@@ -292,6 +312,7 @@ export async function saveSecureState(primaryKey: string, stateObj: any): Promis
     if (!stateObj) return;
     const jsonStr = JSON.stringify(stateObj);
 
+    // Attempt to write to the secure persistent layer (may be no-op on web)
     try {
       await writeEncryptedValue(primaryKey, jsonStr);
     } catch (quotaErr) {
@@ -306,11 +327,12 @@ export async function saveSecureState(primaryKey: string, stateObj: any): Promis
       }
     }
 
-    if (Capacitor.isNativePlatform()) {
+    if (isNativePlatformSafe()) {
       try {
+        const encrypted = await encryptWithAesGcm(jsonStr);
         await Filesystem.writeFile({
           path: 'thari_data_vault.enc',
-          data: await encryptWithAesGcm(jsonStr),
+          data: encrypted,
           directory: Directory.Data,
           encoding: Encoding.UTF8,
         });
@@ -327,14 +349,26 @@ export async function loadSecureStateAsync(primaryKey: string): Promise<any | nu
   try {
     const keysToCheck = [primaryKey, ...SNAPSHOT_KEYS, 'thari_app_v4', 'thari_backup_snapshot', 'thari_app_state'];
     for (const key of keysToCheck) {
-      const raw = localStorage.getItem(key);
+      let raw: string | null = null;
+      try {
+        raw = localStorage.getItem(key);
+      } catch (e) {
+        // localStorage may be disabled — skip
+        continue;
+      }
       if (!raw) continue;
 
       if (raw.startsWith(V2_PREFIX)) {
         try {
           const decrypted = await decryptWithAesGcm(raw);
-          return JSON.parse(decrypted);
-        } catch {
+          try {
+            return JSON.parse(decrypted);
+          } catch (e) {
+            // corrupted JSON
+            continue;
+          }
+        } catch (e) {
+          // Decryption failed for this key — continue to next
           continue;
         }
       }
