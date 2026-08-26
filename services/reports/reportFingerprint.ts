@@ -1,4 +1,3 @@
-import QRCode from 'qrcode';
 
 /**
  * Generate a unique Report ID: THR-RPT-YYYYMMDD-XXXXXX
@@ -62,6 +61,7 @@ export function buildQRPayload(options: QRCodePayloadOptions): string {
  */
 export async function generateQRCodeDataUrl(payload: string): Promise<string> {
   try {
+    const QRCode = (await import('qrcode')).default;
     return await QRCode.toDataURL(payload, {
       errorCorrectionLevel: 'M',
       margin: 2,

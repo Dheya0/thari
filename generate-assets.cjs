@@ -116,18 +116,24 @@ async function generateAllAssets() {
   console.log('🌐 جارٍ إنشاء أيقونات الويب و PWA...');
   const publicDir = path.join(__dirname, 'public');
   const publicIconsDir = path.join(publicDir, 'icons');
-  fs.mkdirSync(publicIconsDir, { recursive: true });
 
-  const iconSizes = [16, 32, 48, 72, 96, 120, 128, 152, 167, 180, 192, 256, 512];
-
-  for (const size of iconSizes) {
-    const rootPath = path.join(publicDir, `icon-${size}.png`);
-    const groupedPath = path.join(publicIconsDir, `icon-${size}.png`);
-    await generatePngFromSvg(webIconSvgPath, rootPath, size);
-    await generatePngFromSvg(webIconSvgPath, groupedPath, size);
+  if (fs.existsSync(publicIconsDir)) {
+    fs.rmSync(publicIconsDir, { recursive: true, force: true });
   }
 
-  const appleTouchSizes = [120, 152, 167, 180];
+  for (const file of fs.readdirSync(publicDir)) {
+    const lower = file.toLowerCase();
+    if (lower.startsWith('icon-') || lower.startsWith('apple-touch-icon') || lower.startsWith('favicon') || lower === 'thari_icon.jpg' || lower === 'icon.png') {
+      fs.rmSync(path.join(publicDir, file), { force: true });
+    }
+  }
+
+  const iconSizes = [48, 192, 512];
+  for (const size of iconSizes) {
+    await generatePngFromSvg(webIconSvgPath, path.join(publicDir, `icon-${size}.png`), size);
+  }
+
+  const appleTouchSizes = [180];
   for (const size of appleTouchSizes) {
     await generatePngFromSvg(webIconSvgPath, path.join(publicDir, `apple-touch-icon-${size}x${size}.png`), size);
   }
@@ -173,7 +179,7 @@ async function generateAllAssets() {
     }
   }
 
-  const androidCopyPaths = ['apple-touch-icon.png', 'apple-touch-icon-120x120.png', 'apple-touch-icon-152x152.png', 'apple-touch-icon-167x167.png', 'apple-touch-icon-180x180.png', 'favicon.png', 'favicon-32x32.png', 'favicon-16x16.png'];
+  const androidCopyPaths = ['apple-touch-icon.png', 'favicon.png', 'favicon-32x32.png', 'favicon-16x16.png'];
   for (const name of androidCopyPaths) {
     const src = path.join(publicDir, name);
     const dest = path.join(androidPublicDir, name);

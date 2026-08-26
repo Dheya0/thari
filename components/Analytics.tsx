@@ -1,6 +1,5 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Download, Printer, FileText, TrendingUp, TrendingDown, Minus, Filter, Sparkles, PieChart as PieChartIcon, BarChart3, Wallet as WalletIcon, Layers, Coins, Merge, Split } from 'lucide-react';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { Transaction, Category, Wallet, Currency } from '../types';
 import { convertCurrency, DEFAULT_CURRENCIES } from '../constants';
 import { buildExecutiveCSVContent, exportAndShareExecutiveCSV } from '../utils/exportHelper';
@@ -33,6 +32,17 @@ const Analytics: React.FC<AnalyticsProps> = ({
   currencies = DEFAULT_CURRENCIES
 }) => {
   const [chartView, setChartView] = useState<'donut' | 'bar'>('donut');
+  const [chartLib, setChartLib] = useState<any>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    import('recharts').then((mod) => {
+      if (mounted) setChartLib(mod);
+    });
+    return () => {
+      mounted = false;
+    };
+  }, []);
   
   // Reporting scope state: 'merged' (all wallets & currencies), 'by-wallet', 'by-currency'
   const [reportMode, setReportMode] = useState<'merged' | 'by-wallet' | 'by-currency'>('merged');
@@ -161,6 +171,9 @@ const Analytics: React.FC<AnalyticsProps> = ({
       </div>
     );
   }
+
+  const { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } = chartLib || {};
+  const chartsReady = !!PieChart && !!Pie && !!ResponsiveContainer && !!BarChart && !!Bar;
 
   return (
     <div className="space-y-6 pb-8 animate-fade">
@@ -386,7 +399,11 @@ const Analytics: React.FC<AnalyticsProps> = ({
         </div>
 
         {/* Chart View */}
-        {chartView === 'donut' ? (
+        {!chartsReady ? (
+          <div className="h-60 rounded-2xl bg-slate-950/60 border border-white/5 flex items-center justify-center text-[11px] font-bold text-slate-400">
+            جاري تحميل التحليلات...
+          </div>
+        ) : chartView === 'donut' ? (
           <div className="h-60 relative">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
