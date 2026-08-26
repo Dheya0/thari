@@ -20,6 +20,15 @@ function isNativePlatformSafe(): boolean {
   }
 }
 
+// In-memory web passphrase (user-provided) for encrypted fallback on the web
+let cachedWebPassphrase: string | null = null;
+export function setWebPassphrase(passphrase: string) {
+  cachedWebPassphrase = passphrase;
+}
+export function clearWebPassphrase() {
+  cachedWebPassphrase = null;
+}
+
 function getCrypto(): Crypto | null {
   if (typeof window !== 'undefined' && window.crypto && window.crypto.subtle) {
     return window.crypto;
@@ -192,8 +201,18 @@ async function encryptWithAesGcm(dataString: string): Promise<string> {
 
   const salt = cryptoImpl.getRandomValues(new Uint8Array(16));
   const iv = cryptoImpl.getRandomValues(new Uint8Array(12));
-  const deviceSecret = await getDeviceSecret();
-  const key = await deriveKey(deviceSecret, salt);
+
+  // Prefer native device secret; otherwise use in-memory web passphrase
+  let key: CryptoKey | null = null;
+  const nativeSecret = await tryLoadNativeSecureSecret();
+  if (nativeSecret) {
+    key = await deriveKey(nativeSecret, salt);
+  } else if (cachedWebPassphrase) {
+    key = await deriveKey(cachedWebPassphrase, salt);
+  } else {
+    throw new Error('No encryption key available (native keystore or web passphrase)');
+  }
+
   const encoded = new TextEncoder().encode(dataString);
   const encrypted = await cryptoImpl.subtle.encrypt({ name: 'AES-GCM', iv }, key, encoded);
 
@@ -219,10 +238,22 @@ async function decryptWithAesGcm(encodedString: string): Promise<string> {
   const salt = blob.slice(0, 16);
   const iv = blob.slice(16, 28);
   const cipherText = blob.slice(28);
-  const deviceSecret = await getDeviceSecret();
-  const key = await deriveKey(deviceSecret, salt);
-  const decrypted = await cryptoImpl.subtle.decrypt({ name: 'AES-GCM', iv }, key, cipherText);
-  return new TextDecoder().decode(decrypted);
+
+  // Try native secret first, then web passphrase
+  const nativeSecret = await tryLoadNativeSecureSecret();
+  if (nativeSecret) {
+    const key = await deriveKey(nativeSecret, salt);
+    const decrypted = await cryptoImpl.subtle.decrypt({ name: 'AES-GCM', iv }, key, cipherText);
+    return new TextDecoder().decode(decrypted);
+  }
+
+  if (cachedWebPassphrase) {
+    const key = await deriveKey(cachedWebPassphrase, salt);
+    const decrypted = await cryptoImpl.subtle.decrypt({ name: 'AES-GCM', iv }, key, cipherText);
+    return new TextDecoder().decode(decrypted);
+  }
+
+  throw new Error('No decryption key available (native keystore or web passphrase)');
 }
 
 export function obfuscateData(dataString: string): string {
