@@ -54,7 +54,7 @@ workflows:
       - name: Build Web production distribution (Vite)
         script: |
           set -e
-          node scripts/generate_icons.cjs || true
+          node generate-assets.cjs || true
           npm run build
           test -f dist/index.html
 
@@ -185,7 +185,7 @@ workflows:
       - name: Build Web production distribution (Vite)
         script: |
           set -e
-          node scripts/generate_icons.cjs || true
+          node generate-assets.cjs || true
           npm run build
           test -f dist/index.html
 
@@ -343,7 +343,7 @@ workflows:
       - name: Build Web production distribution (Vite)
         script: |
           set -e
-          node scripts/generate_icons.cjs || true
+          node generate-assets.cjs || true
           npm run build
           test -f dist/index.html
 
@@ -423,7 +423,7 @@ workflows:
             echo "Warning: App.app not found after archive. Archive may have failed or xcodebuild removed unsigned product."
           fi
 
-          ASSET_DIR="ios/App/App/Assets.xcassets"
+          ASSET_DIR="App/Assets.xcassets"
           mkdir -p "$ASSET_DIR/AppIcon.appiconset"
           cat <<EOF > "$ASSET_DIR/AppIcon.appiconset/Contents.json"
           {
