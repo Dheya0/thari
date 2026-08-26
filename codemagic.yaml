@@ -54,7 +54,7 @@ workflows:
       - name: Build Web production distribution (Vite)
         script: |
           set -e
-          node generate-assets.cjs || true
+          node generate-assets.cjs
           npm run build
           test -f dist/index.html
 
@@ -185,7 +185,7 @@ workflows:
       - name: Build Web production distribution (Vite)
         script: |
           set -e
-          node generate-assets.cjs || true
+          node generate-assets.cjs
           npm run build
           test -f dist/index.html
 
@@ -276,55 +276,7 @@ workflows:
           failure: true
 
   # ----------------------------------------------------------------------------
-  # 3. مسار التحقق من حزمة الويب السريعة (Web PWA Pipeline)
-  # ----------------------------------------------------------------------------
-  web-verification:
-    name: Web PWA Verification Pipeline
-    max_build_duration: 20
-    instance_type: mac_mini_m2
-    environment:
-      node: 20
-    triggering:
-      events:
-        - pull_request
-        - push
-      branch_patterns:
-        - pattern: '*'
-          include: true
-    scripts:
-      - name: Install dependencies
-        script: |
-          set -e
-          npm ci --prefer-offline || npm install
-
-      - name: TypeScript typecheck & linting
-        script: |
-          set -e
-          npm run lint
-
-      - name: Production Web Build
-        script: |
-          set -e
-          npm run build
-          test -f dist/index.html
-
-      - name: Verify Capacitor Config & Integrity
-        script: |
-          set -e
-          npx cap sync --dry-run || true
-    artifacts:
-      - "dist/**"
-    publishing:
-      email:
-        recipients:
-          - thari-app@inbox.ru
-          - Dia840990@gmail.com
-        notify:
-          success: false
-          failure: true
-
-  # ----------------------------------------------------------------------------
-  # 4. مسار بناء آبل iOS غير الموقع (للتجربة يدوياً مجاناً عبر Sideloadly)
+  # 3. مسار بناء آبل iOS غير الموقع (للتجربة يدوياً مجاناً عبر Sideloadly)
   # ----------------------------------------------------------------------------
   ios-unsigned-workflow:
     name: iOS Unsigned Build (Sideloading)
@@ -343,7 +295,7 @@ workflows:
       - name: Build Web production distribution (Vite)
         script: |
           set -e
-          node generate-assets.cjs || true
+          node generate-assets.cjs
           npm run build
           test -f dist/index.html
 
@@ -356,7 +308,7 @@ workflows:
             npx cap add ios
           fi
           npx cap sync ios
-          
+
           # تطبيق ملف Info.plist المعتمد
           if [ -f "release/ios/Info.plist" ]; then
             cp -f release/ios/Info.plist ios/App/App/Info.plist
@@ -406,22 +358,22 @@ workflows:
           cd ios/App
           mkdir -p build
           # Archive without code signing so we can create an unsigned .ipa for sideloading
-          xcodebuild -workspace App.xcworkspace -scheme App -configuration Release clean archive -archivePath build/App.xcarchive CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO || true
+          xcodebuild -workspace App.xcworkspace -scheme App -configuration Release clean archive -archivePath build/App.xcarchive CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO
 
           APP_PATH="build/App.xcarchive/Products/Applications/App.app"
-          if [ -d "$APP_PATH" ]; then
-            echo "Found App.app, packaging unsigned .ipa"
-            rm -rf Payload
-            mkdir -p Payload
-            cp -R "$APP_PATH" Payload/
-            mkdir -p ../../build/ipa
-            # Zip from current directory (ios/App) so Payload path matches what was created
-            zip -r ../../build/ipa/Thari-unsigned.ipa Payload || true
-            rm -rf Payload
-            echo "Unsigned IPA created at ios/App/build/ipa/Thari-unsigned.ipa"
-          else
-            echo "Warning: App.app not found after archive. Archive may have failed or xcodebuild removed unsigned product."
+          if [ ! -d "$APP_PATH" ]; then
+            echo "Error: App.app not found after archive. The unsigned package could not be generated."
+            exit 1
           fi
+
+          echo "Found App.app, packaging unsigned .ipa"
+          rm -rf Payload
+          mkdir -p Payload
+          cp -R "$APP_PATH" Payload/
+          mkdir -p ../../build/ipa
+          zip -r ../../build/ipa/Thari-unsigned.ipa Payload
+          rm -rf Payload
+          echo "Unsigned IPA created at ios/App/build/ipa/Thari-unsigned.ipa"
 
           ASSET_DIR="App/Assets.xcassets"
           mkdir -p "$ASSET_DIR/AppIcon.appiconset"
