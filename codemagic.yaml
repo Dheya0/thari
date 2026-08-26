@@ -423,7 +423,9 @@ workflows:
             echo "Warning: App.app not found after archive. Archive may have failed or xcodebuild removed unsigned product."
           fi
 
-          cat <<EOF > AppIcon.appiconset/Contents.json
+          ASSET_DIR="ios/App/App/Assets.xcassets"
+          mkdir -p "$ASSET_DIR/AppIcon.appiconset"
+          cat <<EOF > "$ASSET_DIR/AppIcon.appiconset/Contents.json"
           {
             "images" : [
               {
