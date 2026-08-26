@@ -161,11 +161,18 @@ const App: React.FC = () => {
     const hydrateState = async () => {
       try {
         const parsed = await loadSecureStateAsync(STORAGE_KEY);
-        if (!cancelled && parsed && typeof parsed === 'object') {
+        if (cancelled) return;
+
+        if (parsed && typeof parsed === 'object') {
           setState(normalizeStoredState(parsed));
         }
+
+        isHydratedRef.current = true;
       } catch (error) {
         console.warn('App hydrate error:', error);
+        if (!cancelled) {
+          isHydratedRef.current = true;
+        }
       }
     };
 
@@ -180,6 +187,7 @@ const App: React.FC = () => {
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [showPrivacyPolicy, setShowPrivacyPolicy] = useState(false);
   const [isLoadingSplash, setIsLoadingSplash] = useState(true);
+  const isHydratedRef = useRef(false);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -976,6 +984,17 @@ const App: React.FC = () => {
 
   if (showPrivacyPolicy) {
     return <PrivacyPolicy onBack={() => setShowPrivacyPolicy(false)} language={state.language || 'ar'} />;
+  }
+
+  if (!isHydratedRef.current && !state.hasAcceptedTerms) {
+    return (
+      <div className="fixed inset-0 bg-[#0A0D10] text-[#F4F1EA] z-[9999] flex items-center justify-center">
+        <div className="text-center">
+          <Logo size={58} />
+          <div className="mt-4 text-xs text-slate-400">جاري إعداد تطبيق ثري…</div>
+        </div>
+      </div>
+    );
   }
 
   if (!state.hasAcceptedTerms) return <WelcomeScreen onAccept={() => setState(p => ({ ...p, hasAcceptedTerms: true }))} onShowPrivacy={() => setShowPrivacyPolicy(true)} />;

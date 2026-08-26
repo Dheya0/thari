@@ -3,15 +3,21 @@ import { BiometricAuth, BiometryType, CheckBiometryResult } from '@aparajita/cap
 export function isNativeCapacitorEnvironment(): boolean {
   if (typeof window === 'undefined') return false;
 
-  const nativeCheck = (window as any)?.Capacitor?.isNativePlatform?.();
+  const capacitorObj = (window as any)?.Capacitor ?? (globalThis as any)?.Capacitor;
+  const nativeCheck = typeof capacitorObj?.isNativePlatform === 'function' ? capacitorObj.isNativePlatform() : false;
+  const platform = typeof capacitorObj?.getPlatform === 'function' ? capacitorObj.getPlatform() : '';
   const protocol = window.location?.protocol || '';
   const userAgent = navigator?.userAgent || '';
+  const isFileProtocol = protocol === 'file:';
+
+  if (nativeCheck || platform === 'ios' || platform === 'android') return true;
 
   return Boolean(
-    nativeCheck ||
     protocol === 'capacitor:' ||
-    protocol === 'file:' && !!(window as any)?.Capacitor ||
-    userAgent.includes('Capacitor')
+    (isFileProtocol && !!capacitorObj) ||
+    userAgent.includes('Capacitor') ||
+    userAgent.includes('Android') && !!capacitorObj ||
+    userAgent.includes('iPhone') && !!capacitorObj
   );
 }
 
