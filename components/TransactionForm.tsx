@@ -18,7 +18,7 @@ import {
 } from '../types';
 import { getIcon, DEFAULT_CURRENCIES, convertCurrency } from '../constants';
 import { getLocalizedCurrency, LanguageKey } from '../utils/translations';
-import { getCurrencySymbol, parseArabicNumber } from '../utils/formatters';
+import { getCurrencySymbol, parseArabicNumber, sanitizeNumericInput } from '../utils/formatters';
 
 interface TransactionFormProps {
   categories: Category[];
@@ -396,7 +396,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md"
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-md"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -405,7 +405,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
         initial={{ scale: 0.95, opacity: 0, y: 15 }}
         animate={{ scale: 1, opacity: 1, y: 0 }}
         exit={{ scale: 0.95, opacity: 0, y: 15 }}
-        className="w-full max-w-lg bg-[#0A0D10] border border-[#D9B978]/20 rounded-3xl shadow-2xl overflow-hidden my-auto"
+        className="w-full max-w-lg bg-[#0A0D10] border border-[#D9B978]/20 rounded-3xl shadow-2xl overflow-hidden my-auto max-h-[calc(100dvh-1rem)]"
       >
         {/* TOP BAR / NAVIGATION */}
         <div className="p-4 sm:p-5 border-b border-[#D9B978]/10 flex items-center justify-between bg-[#11161C]">
@@ -681,7 +681,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
 
         {/* SCREEN 2: DEDICATED EVENT FORM */}
         {selectedEvent && (
-          <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4 max-h-[80vh] overflow-y-auto custom-scrollbar bg-[#0A0D10]">
+          <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4 max-h-[calc(100dvh-9rem)] overflow-y-auto custom-scrollbar bg-[#0A0D10] pb-[calc(env(safe-area-inset-bottom,0px)+1rem)]">
             
             {/* === 1. EXPENSE VIEW === */}
             {selectedEvent === 'expense' && (
@@ -690,13 +690,14 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
                   <label className="text-[10px] font-bold text-[#F4F1EA]/70 uppercase tracking-wider block">{t.expenseAmountAndCurrency}</label>
                   <div className="flex items-center gap-2">
                     <input
-                      type="number"
-                      step="any"
+                      type="text"
+                      inputMode="decimal"
+                      enterKeyHint="done"
                       required
                       autoFocus
                       placeholder="0.00"
                       value={amount}
-                      onChange={(e) => setAmount(e.target.value)}
+                      onChange={(e) => setAmount(sanitizeNumericInput(e.target.value))}
                       className="w-full bg-transparent text-2xl sm:text-3xl font-black text-[#C98387] focus:outline-none placeholder-[#F4F1EA]/30"
                     />
                     <select
@@ -767,13 +768,14 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
                   <label className="text-[10px] font-bold text-[#F4F1EA]/70 uppercase tracking-wider block">{t.incomeAmountAndCurrency}</label>
                   <div className="flex items-center gap-2">
                     <input
-                      type="number"
-                      step="any"
+                      type="text"
+                      inputMode="decimal"
+                      enterKeyHint="done"
                       required
                       autoFocus
                       placeholder="0.00"
                       value={amount}
-                      onChange={(e) => setAmount(e.target.value)}
+                      onChange={(e) => setAmount(sanitizeNumericInput(e.target.value))}
                       className="w-full bg-transparent text-2xl sm:text-3xl font-black text-[#8EB9A7] focus:outline-none placeholder-[#F4F1EA]/30"
                     />
                     <select
@@ -889,13 +891,14 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
                     {t.amountToTransfer} ({getLocalizedCurrency(selectedSourceWallet?.currencyCode || 'SAR', undefined, undefined, language).symbol})
                   </label>
                   <input
-                    type="number"
-                    step="any"
+                    type="text"
+                    inputMode="decimal"
+                    enterKeyHint="done"
                     required
                     autoFocus
                     placeholder="0.00"
                     value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
+                    onChange={(e) => setAmount(sanitizeNumericInput(e.target.value))}
                     className="w-full bg-transparent text-2xl sm:text-3xl font-black text-[#D9B978] focus:outline-none placeholder-[#F4F1EA]/30"
                   />
                 </div>
@@ -909,11 +912,12 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
                       </span>
                     </div>
                     <input
-                      type="number"
-                      step="any"
+                      type="text"
+                      inputMode="decimal"
+                      enterKeyHint="done"
                       placeholder="0.00"
                       value={destinationAmount}
-                      onChange={(e) => setDestinationAmount(e.target.value)}
+                      onChange={(e) => setDestinationAmount(sanitizeNumericInput(e.target.value))}
                       className="w-full bg-[#0A0D10] border border-[#D9B978]/30 rounded-xl px-3 py-2 text-sm text-[#F4F1EA] font-bold focus:outline-none focus:border-[#D9B978]"
                     />
                   </div>
@@ -958,12 +962,13 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
                   <label className="text-[10px] font-bold text-[#F4F1EA]/70 uppercase tracking-wider block">{t.debtAmountOwedToMe}</label>
                   <div className="flex items-center gap-2">
                     <input
-                      type="number"
-                      step="any"
+                      type="text"
+                      inputMode="decimal"
+                      enterKeyHint="done"
                       required
                       placeholder="0.00"
                       value={amount}
-                      onChange={(e) => setAmount(e.target.value)}
+                      onChange={(e) => setAmount(sanitizeNumericInput(e.target.value))}
                       className="w-full bg-transparent text-2xl sm:text-3xl font-black text-[#8EB9A7] focus:outline-none placeholder-[#F4F1EA]/30"
                     />
                     <select
@@ -1065,12 +1070,13 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
                   <label className="text-[10px] font-bold text-[#F4F1EA]/70 uppercase tracking-wider block">{t.debtAmountOwedByMe}</label>
                   <div className="flex items-center gap-2">
                     <input
-                      type="number"
-                      step="any"
+                      type="text"
+                      inputMode="decimal"
+                      enterKeyHint="done"
                       required
                       placeholder="0.00"
                       value={amount}
-                      onChange={(e) => setAmount(e.target.value)}
+                      onChange={(e) => setAmount(sanitizeNumericInput(e.target.value))}
                       className="w-full bg-transparent text-2xl sm:text-3xl font-black text-[#D9B978] focus:outline-none placeholder-[#F4F1EA]/30"
                     />
                     <select
@@ -1195,12 +1201,13 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
                     <div className="p-4 bg-[#11161C] rounded-2xl border border-[#D9B978]/20 space-y-2">
                       <label className="text-[10px] font-bold text-[#F4F1EA]/70 uppercase tracking-wider block">{t.repaymentAmount}</label>
                       <input
-                        type="number"
-                        step="any"
+                        type="text"
+                        inputMode="decimal"
+                        enterKeyHint="done"
                         required
                         placeholder="0.00"
                         value={amount}
-                        onChange={(e) => setAmount(e.target.value)}
+                        onChange={(e) => setAmount(sanitizeNumericInput(e.target.value))}
                         className="w-full bg-transparent text-2xl sm:text-3xl font-black text-[#D9B978] focus:outline-none placeholder-[#F4F1EA]/30"
                       />
                       {currentSelectedDebt && (
@@ -1292,13 +1299,14 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
                     <div className="space-y-1.5">
                       <label className="text-[11px] font-bold text-[#D9B978] block">{t.enterActualBalanceNow}</label>
                       <input
-                        type="number"
-                        step="any"
+                        type="text"
+                        inputMode="decimal"
+                        enterKeyHint="done"
                         required
                         autoFocus
                         placeholder="0.00"
                         value={actualRealBalance}
-                        onChange={(e) => setActualRealBalance(e.target.value)}
+                        onChange={(e) => setActualRealBalance(sanitizeNumericInput(e.target.value))}
                         className="w-full bg-[#0A0D10] border border-[#D9B978]/40 rounded-xl px-3.5 py-2.5 text-xl font-black text-[#F4F1EA] focus:outline-none focus:border-[#D9B978]"
                       />
                     </div>

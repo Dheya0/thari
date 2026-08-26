@@ -157,9 +157,9 @@ interface SettingsProps {
   onRestore: (data: any) => void;
   onClearData: () => void;
   onShowPrivacyPolicy: () => void;
-  onPrint?: (type: 'summary' | 'detailed', currencyFilter?: string | null) => void;
-  onShare?: (type: 'summary' | 'detailed', currencyFilter?: string | null) => void;
-  onExportExcel?: (type: 'summary' | 'detailed', currencyFilter?: string | null) => void;
+  onPrint?: (...args: any[]) => void;
+  onShare?: (...args: any[]) => void;
+  onExportExcel?: (...args: any[]) => void;
   installPrompt?: any;
   isUpdateAvailable?: boolean;
   swRegistration?: ServiceWorkerRegistration | null;
@@ -1049,11 +1049,11 @@ export default function Settings({
                 <div className="grid grid-cols-2 gap-3 pt-2">
                     <button type="button" onClick={() => onPrint?.('detailed', null, null, null, null)} className="flex items-center justify-center gap-2 p-3.5 bg-[#0A0D10] rounded-xl active:scale-95 border border-white/10 text-xs font-bold text-white">
                         <Printer size={14} className="text-[#D9B978]" />
-                        <span>{t.print || 'طباعة'}</span>
+                        <span>{'طباعة'}</span>
                     </button>
                     <button type="button" onClick={() => onShare?.('detailed', null, null, null, null)} className="flex items-center justify-center gap-2 p-3.5 bg-[#0A0D10] rounded-xl active:scale-95 border border-white/10 text-xs font-bold text-white">
                         <Share2 size={14} className="text-sky-400" />
-                        <span>{t.share || 'مشاركة'}</span>
+                        <span>{'مشاركة'}</span>
                     </button>
                 </div>
                 <div className="grid grid-cols-2 gap-3 pt-2">

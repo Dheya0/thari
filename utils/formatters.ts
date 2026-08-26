@@ -155,6 +155,50 @@ export function formatAppDate(dateString: string, includeTime = false): string {
 }
 
 /**
+ * Sanitizes numeric user input across Arabic/English keyboards.
+ * Accepts Arabic digits, Persian digits, Arabic decimal separators, and comma.
+ */
+export function sanitizeNumericInput(raw: string, allowNegative = true): string {
+  if (raw === null || raw === undefined) return '';
+
+  let str = String(raw).trim();
+  if (!str) return '';
+
+  // Normalize Arabic/Persian digits
+  str = str.replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 1632));
+  str = str.replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 1776));
+
+  // Normalize decimal separators and thousands separators used by Arabic keyboards
+  str = str.replace(/٫/g, '.').replace(/٬/g, '').replace(/,/g, '.');
+
+  // Allow only digits, one leading minus, and single dot.
+  let cleaned = str.replace(/[^0-9.\-]/g, '');
+
+  if (allowNegative) {
+    const minusIndex = cleaned.indexOf('-');
+    if (minusIndex > 0) {
+      cleaned = cleaned.replace(/-/g, '');
+      cleaned = '-' + cleaned;
+    }
+    if (cleaned.indexOf('-') > 0) cleaned = cleaned.replace(/-/g, '');
+  } else {
+    cleaned = cleaned.replace(/-/g, '');
+  }
+
+  const firstDot = cleaned.indexOf('.');
+  if (firstDot !== -1) {
+    const before = cleaned.slice(0, firstDot).replace(/\./g, '');
+    const after = cleaned.slice(firstDot + 1).replace(/\./g, '');
+    cleaned = `${before}.${after}`;
+  }
+
+  if (cleaned === '.') return '';
+  if (cleaned === '-.') return '-';
+
+  return cleaned;
+}
+
+/**
  * Parses numbers containing Eastern Arabic numerals (٠-٩) or Persian numerals (۰-۹)
  * as well as Arabic decimal separators (٫) and converts them to standard numbers.
  */
@@ -165,17 +209,8 @@ export function parseArabicNumber(input: string | number | null | undefined): nu
   let str = String(input).trim();
   if (!str) return 0;
 
-  // Replace Eastern Arabic numerals (٠-٩)
-  str = str.replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 1632));
-  // Replace Persian numerals (۰-۹)
-  str = str.replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 1776));
-
-  // Replace Arabic decimal separator (٫) or comma with dot (.)
-  str = str.replace(/٫/g, '.').replace(/,/g, '.');
-
-  // Keep only digits, minus, and dot
-  str = str.replace(/[^0-9.-]/g, '');
-
+  str = sanitizeNumericInput(str, true);
+  str = str.replace(/,/g, '.');
   const num = parseFloat(str);
   return isNaN(num) ? 0 : num;
 }

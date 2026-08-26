@@ -195,6 +195,24 @@ const App: React.FC = () => {
     }, 1600);
     return () => clearTimeout(timer);
   }, []);
+
+  useEffect(() => {
+    const updateViewport = () => {
+      const viewportHeight = window.visualViewport?.height || window.innerHeight;
+      document.documentElement.style.setProperty('--vh', `${viewportHeight}px`);
+    };
+
+    updateViewport();
+    window.addEventListener('resize', updateViewport);
+    window.visualViewport?.addEventListener('resize', updateViewport);
+    window.visualViewport?.addEventListener('scroll', updateViewport);
+
+    return () => {
+      window.removeEventListener('resize', updateViewport);
+      window.visualViewport?.removeEventListener('resize', updateViewport);
+      window.visualViewport?.removeEventListener('scroll', updateViewport);
+    };
+  }, []);
   const [printType, setPrintType] = useState<'summary' | 'detailed'>('summary');
   const [printWalletFilter, setPrintWalletFilter] = useState<string | null>(null);
   const [printCurrencyFilter, setPrintCurrencyFilter] = useState<string | null>(null);
