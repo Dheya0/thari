@@ -521,9 +521,11 @@ const App: React.FC = () => {
       selectedWalletId,
       null,
       state.transactions,
-      state.debts
+      state.debts,
+      state.isTravelMode || state.showSeparateCurrencies,
+      state.showSeparateCurrencies
     );
-  }, [filteredTransactions, state.transactions, state.wallets, state.currency.code, state.exchangeRates, selectedWalletId, state.debts]);
+  }, [filteredTransactions, state.transactions, state.wallets, state.currency.code, state.exchangeRates, selectedWalletId, state.debts, state.isTravelMode, state.showSeparateCurrencies]);
 
   // Synchronize with native home screen widgets (iOS WidgetKit / Android AppWidget)
   useEffect(() => {

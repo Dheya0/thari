@@ -221,8 +221,12 @@ export function calculateConsolidatedPosition(
   filterWalletId?: string | null,
   filterCurrencyCode?: string | null,
   allTransactionsForBalance?: Transaction[],
-  debts: Debt[] = []
+  debts: Debt[] = [],
+  travelMode: boolean = false,
+  showSeparateCurrencies: boolean = false
 ): ConsolidatedFinancialPosition {
+  const isTravelCurrencyMode = Boolean(travelMode || showSeparateCurrencies);
+
   let periodTxs = getActiveTransactions(transactions);
   const lifetimeTxs = getActiveTransactions(allTransactionsForBalance || transactions);
 
@@ -294,7 +298,8 @@ export function calculateConsolidatedPosition(
     availableLiquidityInBase = currencyBalances[filterCurrencyCode] || 0;
   } else {
     availableLiquidityInBase = Object.entries(currencyBalances).reduce((sum, [code, amount]) => {
-      return safeAdd(sum, convertCurrency(amount, code, baseCurrencyCode, exchangeRates));
+      const normalizedAmount = isTravelCurrencyMode && amount === 0 && code !== baseCurrencyCode ? 0 : amount;
+      return safeAdd(sum, convertCurrency(normalizedAmount, code, baseCurrencyCode, exchangeRates));
     }, 0);
   }
 

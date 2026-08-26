@@ -193,7 +193,7 @@ export default function Settings({
   const [showAutoBackupHistoryModal, setShowAutoBackupHistoryModal] = useState(false);
   const [autoBackupHistory, setAutoBackupHistory] = useState<any[]>([]);
   const [isSecurityEnabled, setIsSecurityEnabled] = useState(!!pin);
-  const [isTravelMode, setIsTravelMode] = useState(appState?.showSeparateCurrencies || false);
+  const [isTravelMode, setIsTravelMode] = useState(Boolean(appState?.isTravelMode || appState?.showSeparateCurrencies));
   const [isExporting, setIsExporting] = useState(false);
   const [activeSection, setActiveSection] = useState<'main' | 'wallets' | 'categories' | 'currencies'>('main');
   const [showCurrencyModal, setShowCurrencyModal] = useState(false);
@@ -231,6 +231,11 @@ export default function Settings({
   const [debtAlertsEnabled, setDebtAlertsEnabled] = useState(true);
   const [dailyLoggerEnabled, setDailyLoggerEnabled] = useState(true);
   const [budgetAlertsEnabled, setBudgetAlertsEnabled] = useState(true);
+
+  React.useEffect(() => {
+    const nextValue = Boolean(appState?.isTravelMode || appState?.showSeparateCurrencies);
+    setIsTravelMode(nextValue);
+  }, [appState?.isTravelMode, appState?.showSeparateCurrencies]);
 
   // Wallet Form State
   const [showWalletForm, setShowWalletForm] = useState(false);
@@ -883,7 +888,7 @@ export default function Settings({
                         <div dir="ltr" className={`w-12 h-6 rounded-full p-1 cursor-pointer transition-all ${isTravelMode ? 'bg-[#D9B978]' : 'bg-slate-700'}`} onClick={() => {
                             const newVal = !isTravelMode;
                             setIsTravelMode(newVal);
-                            onUpdateSettings({ showSeparateCurrencies: newVal });
+                          onUpdateSettings({ isTravelMode: newVal, showSeparateCurrencies: newVal });
                         }}>
                             <div className={`w-4 h-4 bg-[#0A0D10] rounded-full shadow-md transition-transform ${isTravelMode ? 'translate-x-6' : 'translate-x-0'}`} />
                         </div>
