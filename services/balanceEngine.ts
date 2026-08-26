@@ -76,8 +76,9 @@ export function calculateDateBasedGrowth(
   activeTxs.forEach(tx => {
     // Financing flows are not operating income/expense
     if (tx.isFinancing) return;
-    const amount = Number(tx.amount) || 0;
-    if (amount <= 0) return;
+    const rawAmount = Number(tx.amount) || 0;
+    if (rawAmount === 0) return;
+    const amount = Math.abs(rawAmount);
     const txCurr = tx.currency || baseCurrencyCode;
     const inBase = convertCurrency(amount, txCurr, baseCurrencyCode, exchangeRates);
     const txDate = new Date(tx.date);
@@ -155,8 +156,9 @@ export function calculateWalletBalances(
   });
 
   activeTxs.forEach(tx => {
-    const amount = Number(tx.amount) || 0;
-    if (amount <= 0) return;
+    const rawAmount = Number(tx.amount) || 0;
+    if (rawAmount === 0) return;
+    const amount = Math.abs(rawAmount);
 
     // 1. Source wallet deduction / credit
     const sourceSummary = result[tx.walletId];
@@ -275,8 +277,9 @@ export function calculateConsolidatedPosition(
   periodTxs.forEach(tx => {
     // Exclude financing movements from operating P&L
     if (tx.isFinancing) return;
-    const amount = Number(tx.amount) || 0;
-    if (amount <= 0) return;
+    const rawAmount = Number(tx.amount) || 0;
+    if (rawAmount === 0) return;
+    const amount = Math.abs(rawAmount);
     const txCurr = tx.currency || baseCurrencyCode;
 
     if (tx.type === 'income') {
