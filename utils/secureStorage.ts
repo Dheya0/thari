@@ -1,6 +1,6 @@
 /**
  * Secure Storage Engine for Thari Financial App
- * Real AES-GCM encryption with PBKDF2 key derivation, plus fallback for legacy obfuscation only.
+ * Uses OS-backed keychain/keystore when available and refuses to store data in unsafe plaintext fallbacks.
  */
 
 import { Capacitor } from '@capacitor/core';
@@ -21,96 +21,72 @@ function getCrypto(): Crypto | null {
   return null;
 }
 
+async function tryLoadNativeSecureSecret(): Promise<string | null> {
+  try {
+    const cap: any = (await import('@capacitor/core')).Capacitor;
+    if (!cap || !(cap.isNativePlatform && cap.isNativePlatform())) {
+      return null;
+    }
+
+    const dynamicImport = (m: string) => (new Function('m', 'return import(m)'))(m);
+
+    const pluginCandidates = [
+      ['@capacitor-community/secure-storage', 'secureStorage'],
+      ['@capacitor/keychain', 'keychain'],
+    ];
+
+    for (const [moduleName, pluginName] of pluginCandidates) {
+      try {
+        const mod = await dynamicImport(moduleName);
+        const plugin: any = mod && (mod[pluginName] || mod.default || mod.SecureStorage || mod.Keychain || mod);
+        if (plugin && typeof plugin.get === 'function') {
+          const result = await plugin.get({ key: 'thari_device_secret' });
+          const value = result && (result.value ?? result.secret ?? result.data ?? result)
+          if (typeof value === 'string' && value.length > 0) {
+            return value;
+          }
+        }
+      } catch {
+        // Plugin is not installed or absent for this platform.
+      }
+    }
+
+    const plugins = (cap as any).Plugins || (cap as any);
+    for (const pluginName of ['SecureStorage', 'Keychain', 'Preferences']) {
+      const plugin: any = plugins && plugins[pluginName];
+      if (plugin && typeof plugin.get === 'function') {
+        try {
+          const result = await plugin.get({ key: 'thari_device_secret' });
+          const value = result && (result.value ?? result.secret ?? result.data ?? result);
+          if (typeof value === 'string' && value.length > 0) {
+            return value;
+          }
+        } catch {
+          // ignore and keep trying
+        }
+      }
+    }
+  } catch {
+    // ignore plugin import errors
+  }
+
+  return null;
+}
+
 /**
- * Try to obtain a device-bound secret from native Keychain/Keystore via a known plugin.
- * Falls back to an on-device Filesystem-stored secret only if no secure plugin is available.
+ * Obtain a device-bound secret from native Keychain/Keystore.
+ * If no secure storage backend exists, we intentionally fail closed instead of storing a plaintext secret on disk.
  */
 async function getDeviceSecret(): Promise<string> {
   if (cachedDeviceSecret) return cachedDeviceSecret;
 
-  // 1) Try Capacitor plugin - common plugin names to support if installed
-  try {
-    const cap: any = (await import('@capacitor/core')).Capacitor;
-    if (cap && cap.isNativePlatform && cap.isNativePlatform()) {
-      // Prefer explicit modern plugins if available
-      const dynamicImport = (m: string) => (new Function('m', 'return import(m)'))(m);
-      try {
-        const ss = await dynamicImport('@capacitor-community/secure-storage');
-        const SecureStoragePlugin: any = ss && (ss.SecureStorage || ss.default || ss.SecureStoragePlugin);
-        if (SecureStoragePlugin && typeof SecureStoragePlugin.get === 'function') {
-          const res = await SecureStoragePlugin.get({ key: 'thari_device_secret' });
-          if (res && (res.value || typeof res === 'string')) {
-            cachedDeviceSecret = res.value || res;
-            return cachedDeviceSecret;
-          }
-        }
-      } catch (e) {
-        // plugin not installed or import failed
-      }
-
-      try {
-        const kc = await dynamicImport('@capacitor/keychain');
-        const KeychainPlugin: any = kc && (kc.Keychain || kc.default || kc);
-        if (KeychainPlugin && typeof KeychainPlugin.get === 'function') {
-          const res = await KeychainPlugin.get({ key: 'thari_device_secret' });
-          if (res && (res.value || typeof res === 'string')) {
-            cachedDeviceSecret = res.value || res;
-            return cachedDeviceSecret;
-          }
-        }
-      } catch (e) {
-        // plugin not installed
-      }
-
-      // Fallback: existing plugin container access (older setups)
-      const plugins = (cap as any).Plugins || (cap as any);
-      if (plugins && plugins.SecureStorage && typeof plugins.SecureStorage.get === 'function') {
-        const res = await plugins.SecureStorage.get({ key: 'thari_device_secret' });
-        if (res && res.value) { cachedDeviceSecret = res.value; return cachedDeviceSecret; }
-      }
-      if (plugins && plugins.Keychain && typeof plugins.Keychain.get === 'function') {
-        const res = await plugins.Keychain.get({ key: 'thari_device_secret' });
-        if (res && res.value) { cachedDeviceSecret = res.value; return cachedDeviceSecret; }
-      }
-      if (plugins && plugins.Preferences && typeof plugins.Preferences.get === 'function') {
-        const { value } = await plugins.Preferences.get({ key: 'thari_device_secret' }) || {};
-        if (value) { cachedDeviceSecret = value; return cachedDeviceSecret; }
-      }
-    }
-  } catch (e) {
-    // ignore plugin import errors
-    console.warn('Device secret plugin check failed:', e);
-  }
-
-  // 2) Fallback: Filesystem (NOT secure but better than hardcoded constant). We'll generate and store a random secret.
-  try {
-    const path = 'thari_device_secret.txt';
-    // Try read
-    const read = await Filesystem.readFile({ path, directory: Directory.Data }).catch(() => null as any);
-    if (read && read.data) {
-      cachedDeviceSecret = read.data;
-      return cachedDeviceSecret;
-    }
-    // generate random secret
-    const cryptoImpl = getCrypto();
-    let rand = '';
-    if (cryptoImpl) {
-      const arr = cryptoImpl.getRandomValues(new Uint8Array(32));
-      rand = uint8ArrayToBase64(arr);
-    } else {
-      rand = Math.random().toString(36).slice(2) + Date.now().toString(36);
-    }
-    await Filesystem.writeFile({ path, data: rand, directory: Directory.Data, encoding: Encoding.UTF8 }).catch(() => null);
-    cachedDeviceSecret = rand;
+  const nativeSecret = await tryLoadNativeSecureSecret();
+  if (nativeSecret) {
+    cachedDeviceSecret = nativeSecret;
     return cachedDeviceSecret;
-  } catch (e) {
-    console.warn('Device secret fallback failed:', e);
   }
 
-  // 3) Final fallback: generate ephemeral secret (will not persist across restarts)
-  const fallback = Math.random().toString(36) + Date.now().toString(36);
-  cachedDeviceSecret = fallback;
-  return cachedDeviceSecret;
+  throw new Error('Secure device keystore unavailable. Refusing to persist financial state without native secure storage.');
 }
 
 function utf8ToBase64(str: string): string {
@@ -281,6 +257,10 @@ export function deobfuscateData(encodedString: string): string | null {
 }
 
 export async function writeEncryptedValue(primaryKey: string, value: string): Promise<void> {
+  if (!Capacitor.isNativePlatform()) {
+    throw new Error('Secure persistence is unavailable in a non-native runtime. Refusing to store financial state insecurely.');
+  }
+
   const encryptedData = await encryptWithAesGcm(value);
   localStorage.setItem(primaryKey, encryptedData);
 
@@ -299,11 +279,7 @@ export function saveSecureStateSync(primaryKey: string, stateObj: any): void {
       try {
         await writeEncryptedValue(primaryKey, jsonStr);
       } catch (err) {
-        console.warn('SecureStorage: async encryption for sync save failed; using legacy fallback', err);
-        const fallback = obfuscateData(jsonStr);
-        localStorage.setItem(primaryKey, fallback);
-        const snapIndex = Math.floor(Date.now() / (1000 * 60 * 60)) % SNAPSHOT_KEYS.length;
-        localStorage.setItem(SNAPSHOT_KEYS[snapIndex], fallback);
+        console.warn('SecureStorage: secure persistence unavailable in this environment; skipping write.', err);
       }
     })();
   } catch (err) {
@@ -319,14 +295,14 @@ export async function saveSecureState(primaryKey: string, stateObj: any): Promis
     try {
       await writeEncryptedValue(primaryKey, jsonStr);
     } catch (quotaErr) {
-      console.warn('SecureStorage: quota exceeded, clearing snapshots and retrying...', quotaErr);
+      console.warn('SecureStorage: secure persistence failed, clearing snapshots and retrying...', quotaErr);
       for (const key of SNAPSHOT_KEYS) {
         try { localStorage.removeItem(key); } catch {}
       }
       try {
         await writeEncryptedValue(primaryKey, jsonStr);
       } catch (retryErr) {
-        console.error('SecureStorage: Critical write failure after pruning', retryErr);
+        console.warn('SecureStorage: secure persistence unavailable; skipping state save.', retryErr);
       }
     }
 
@@ -339,7 +315,7 @@ export async function saveSecureState(primaryKey: string, stateObj: any): Promis
           encoding: Encoding.UTF8,
         });
       } catch (nativeErr) {
-        console.warn('SecureStorage: Native filesystem vault write notice', nativeErr);
+        console.warn('SecureStorage: native vault write unavailable; continuing in memory only.', nativeErr);
       }
     }
   } catch (err) {
@@ -363,16 +339,18 @@ export async function loadSecureStateAsync(primaryKey: string): Promise<any | nu
         }
       }
 
-      const legacyDecoded = deobfuscateData(raw);
-      if (legacyDecoded) {
+      // Ignore legacy-obfuscated or plaintext app state. These formats are considered insecure and are removed on read.
+      if (raw.startsWith('THR4_') || raw.startsWith('RAW_') || raw.startsWith('{') || raw.startsWith('[')) {
         try {
-          return JSON.parse(legacyDecoded);
-        } catch {}
-      }
-
-      if (raw.startsWith('{') || raw.startsWith('[')) {
-        try {
-          return JSON.parse(raw);
+          localStorage.removeItem(key);
+          if (key !== primaryKey) {
+            // Best effort cleanup for stale archive copies
+            for (const candidate of SNAPSHOT_KEYS) {
+              if (candidate !== key) {
+                try { localStorage.removeItem(candidate); } catch {}
+              }
+            }
+          }
         } catch {}
       }
     }
@@ -386,51 +364,17 @@ export async function loadSecureStateAsync(primaryKey: string): Promise<any | nu
 
 export function loadSecureState(primaryKey: string): any | null {
   try {
-    const primaryData = localStorage.getItem(primaryKey);
-    if (primaryData) {
-      if (primaryData.startsWith(V2_PREFIX)) {
+    const keysToCheck = [primaryKey, ...SNAPSHOT_KEYS, 'thari_app_v4', 'thari_backup_snapshot', 'thari_app_state'];
+    for (const key of keysToCheck) {
+      const raw = localStorage.getItem(key);
+      if (!raw) continue;
+      if (raw.startsWith(V2_PREFIX)) {
         return null;
       }
-      const decoded = deobfuscateData(primaryData);
-      if (decoded) {
-        try {
-          return JSON.parse(decoded);
-        } catch {}
+      if (raw.startsWith('THR4_') || raw.startsWith('RAW_') || raw.startsWith('{') || raw.startsWith('[')) {
+        try { localStorage.removeItem(key); } catch {}
       }
     }
-
-    for (const snapKey of SNAPSHOT_KEYS) {
-      const snapData = localStorage.getItem(snapKey);
-      if (snapData) {
-        if (snapData.startsWith(V2_PREFIX)) {
-          return null;
-        }
-        const decoded = deobfuscateData(snapData);
-        if (decoded) {
-          try {
-            return JSON.parse(decoded);
-          } catch {}
-        }
-      }
-    }
-
-    const legacyKeys = ['thari_app_v4', 'thari_backup_snapshot', 'thari_app_state'];
-    for (const lk of legacyKeys) {
-      const legacyData = localStorage.getItem(lk);
-      if (legacyData) {
-        try {
-          return JSON.parse(legacyData);
-        } catch {
-          const decoded = deobfuscateData(legacyData);
-          if (decoded) {
-            try {
-              return JSON.parse(decoded);
-            } catch {}
-          }
-        }
-      }
-    }
-
     return null;
   } catch (err) {
     console.error('SecureStorage: Failed to load state', err);
