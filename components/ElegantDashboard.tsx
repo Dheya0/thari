@@ -113,7 +113,7 @@ export const ElegantDashboard: React.FC<ElegantDashboardProps> = ({
   const isEn = lang === 'en';
   const displayName = userName?.trim() && userName.trim() !== 'مستخدم ثري'
     ? userName.trim()
-    : (isEn ? 'there' : 'صديقي');
+    : (isEn ? '' : 'صديقي');
 
   const growthInfo = useMemo(() => {
     return calculateDateBasedGrowth(transactions, currency.code, exchangeRates);
@@ -197,7 +197,7 @@ export const ElegantDashboard: React.FC<ElegantDashboardProps> = ({
       <section className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 pt-2 border-b border-white/[0.06] pb-5">
         <div className="space-y-2 min-w-0">
           <span className="text-sm font-semibold tracking-wide text-[#D9B978] block">
-            {isEn ? greeting.text + ', ' + displayName : greeting.text + '، ' + displayName}
+            {isEn ? (displayName ? greeting.text + ', ' + displayName : greeting.text) : greeting.text + '، ' + displayName}
           </span>
           <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-[#F4F1EA]">
             {t.comprehensiveFinancialCenter}
