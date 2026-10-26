@@ -185,7 +185,6 @@ export default function Settings({
   const [localUserEmail, setLocalUserEmail] = useState(appState?.userEmail || '');
   const [localPin, setLocalPin] = useState(pin || '');
   const [localAutoLockTime, setLocalAutoLockTime] = useState<'instant' | '1min' | '5min' | 'never'>(appState?.autoLockTime || 'instant');
-  const [localRequireBiometricOnOpen, setLocalRequireBiometricOnOpen] = useState<boolean>(false);
   const [localAutoBackupFreq, setLocalAutoBackupFreq] = useState<'on_open' | 'daily' | 'weekly' | 'disabled'>(appState?.autoBackupFrequency || 'daily');
   const [localLanguage, setLocalLanguage] = useState<'ar' | 'en'>(appState?.language || 'ar');
   const [showAutoBackupHistoryModal, setShowAutoBackupHistoryModal] = useState(false);
