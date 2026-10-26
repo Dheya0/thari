@@ -95,53 +95,56 @@ function normalizeStoredState(parsed: any): AppState {
     return INITIAL_STATE;
   }
 
-  let activeCurrency = parsed.currency;
+  // Strip legacy AI data from older saved versions so it is not carried forward.
+  const { apiKey: _legacyApiKey, chatHistory: _legacyChatHistory, ...storedData } = parsed;
+
+  let activeCurrency = storedData.currency;
   if (typeof activeCurrency === 'string') {
     activeCurrency = DEFAULT_CURRENCIES.find(c => c.code === activeCurrency) || DEFAULT_CURRENCIES[0];
   } else if (!activeCurrency || !activeCurrency.code) {
     activeCurrency = DEFAULT_CURRENCIES[0];
   }
 
-  const currencies = (parsed.currencies && Array.isArray(parsed.currencies) && parsed.currencies.length > 0)
-    ? parsed.currencies
+  const currencies = (storedData.currencies && Array.isArray(storedData.currencies) && storedData.currencies.length > 0)
+    ? storedData.currencies
     : DEFAULT_CURRENCIES;
 
-  const categories = (parsed.categories && Array.isArray(parsed.categories) && parsed.categories.length > 0)
-    ? parsed.categories
+  const categories = (storedData.categories && Array.isArray(storedData.categories) && storedData.categories.length > 0)
+    ? storedData.categories
     : INITIAL_CATEGORIES;
 
-  const wallets = (parsed.wallets && Array.isArray(parsed.wallets) && parsed.wallets.length > 0)
-    ? parsed.wallets
+  const wallets = (storedData.wallets && Array.isArray(storedData.wallets) && storedData.wallets.length > 0)
+    ? storedData.wallets
     : INITIAL_STATE.wallets;
 
-  const accounts = (parsed.accounts && Array.isArray(parsed.accounts) && parsed.accounts.length > 0)
-    ? parsed.accounts
+  const accounts = (storedData.accounts && Array.isArray(storedData.accounts) && storedData.accounts.length > 0)
+    ? storedData.accounts
     : DEFAULT_ACCOUNTS;
 
-  const exchangeRates = (parsed.exchangeRates && typeof parsed.exchangeRates === 'object')
-    ? { ...DEFAULT_EXCHANGE_RATES, ...parsed.exchangeRates }
+  const exchangeRates = (storedData.exchangeRates && typeof storedData.exchangeRates === 'object')
+    ? { ...DEFAULT_EXCHANGE_RATES, ...storedData.exchangeRates }
     : DEFAULT_EXCHANGE_RATES;
 
   return {
     ...INITIAL_STATE,
-    ...parsed,
+    ...storedData,
     accounts,
     activeAccountId: parsed.activeAccountId || accounts[0]?.id || 'acc-main',
     currency: activeCurrency,
     currencies,
     categories,
     wallets,
-    transactions: Array.isArray(parsed.transactions) ? parsed.transactions : [],
-    trashTransactions: Array.isArray(parsed.trashTransactions) ? parsed.trashTransactions : [],
-    recurringRules: Array.isArray(parsed.recurringRules) ? parsed.recurringRules : [],
-    subscriptions: Array.isArray(parsed.subscriptions) ? parsed.subscriptions : [],
-    debts: Array.isArray(parsed.debts) ? parsed.debts : [],
-    goals: Array.isArray(parsed.goals) ? parsed.goals : [],
-    budgets: Array.isArray(parsed.budgets) ? parsed.budgets : [],
-    auditLogs: Array.isArray(parsed.auditLogs) ? parsed.auditLogs : [],
+    transactions: Array.isArray(storedData.transactions) ? storedData.transactions : [],
+    trashTransactions: Array.isArray(storedData.trashTransactions) ? storedData.trashTransactions : [],
+    recurringRules: Array.isArray(storedData.recurringRules) ? storedData.recurringRules : [],
+    subscriptions: Array.isArray(storedData.subscriptions) ? storedData.subscriptions : [],
+    debts: Array.isArray(storedData.debts) ? storedData.debts : [],
+    goals: Array.isArray(storedData.goals) ? storedData.goals : [],
+    budgets: Array.isArray(storedData.budgets) ? storedData.budgets : [],
+    auditLogs: Array.isArray(storedData.auditLogs) ? storedData.auditLogs : [],
     exchangeRates,
-    userEmail: parsed.userEmail || '',
-    userName: parsed.userName || 'مستخدم ثري',
+    userEmail: storedData.userEmail || '',
+    userName: storedData.userName || 'مستخدم ثري',
     requireBiometricOnOpen: false,
     isLocked: false,
   };
@@ -766,45 +769,48 @@ const App: React.FC = () => {
   const handleRestoreState = (rawRestoredData: any) => {
     if (!rawRestoredData || typeof rawRestoredData !== 'object') return;
     
+    // Remove legacy AI chat/key data from imports and old backups.
+    const { apiKey: _legacyApiKey, chatHistory: _legacyChatHistory, ...restoredFields } = rawRestoredData;
+
     // Schema Sanitization and Normalization
-    let restoredCurrency = rawRestoredData.currency;
+    let restoredCurrency = restoredFields.currency;
     if (typeof restoredCurrency === 'string') {
       restoredCurrency = DEFAULT_CURRENCIES.find(c => c.code === restoredCurrency) || DEFAULT_CURRENCIES[0];
     } else if (!restoredCurrency || !restoredCurrency.code) {
       restoredCurrency = DEFAULT_CURRENCIES[0];
     }
 
-    const restoredCurrencies = (rawRestoredData.currencies && Array.isArray(rawRestoredData.currencies) && rawRestoredData.currencies.length > 0)
-      ? rawRestoredData.currencies
+    const restoredCurrencies = (restoredFields.currencies && Array.isArray(restoredFields.currencies) && restoredFields.currencies.length > 0)
+      ? restoredFields.currencies
       : DEFAULT_CURRENCIES;
 
-    const restoredCategories = (rawRestoredData.categories && Array.isArray(rawRestoredData.categories) && rawRestoredData.categories.length > 0)
-      ? rawRestoredData.categories
+    const restoredCategories = (restoredFields.categories && Array.isArray(restoredFields.categories) && restoredFields.categories.length > 0)
+      ? restoredFields.categories
       : INITIAL_CATEGORIES;
 
-    const restoredWallets = (rawRestoredData.wallets && Array.isArray(rawRestoredData.wallets) && rawRestoredData.wallets.length > 0)
-      ? rawRestoredData.wallets
+    const restoredWallets = (restoredFields.wallets && Array.isArray(restoredFields.wallets) && restoredFields.wallets.length > 0)
+      ? restoredFields.wallets
       : INITIAL_STATE.wallets;
 
-    const restoredExchangeRates = (rawRestoredData.exchangeRates && typeof rawRestoredData.exchangeRates === 'object')
-      ? { ...DEFAULT_EXCHANGE_RATES, ...rawRestoredData.exchangeRates }
+    const restoredExchangeRates = (restoredFields.exchangeRates && typeof restoredFields.exchangeRates === 'object')
+      ? { ...DEFAULT_EXCHANGE_RATES, ...restoredFields.exchangeRates }
       : DEFAULT_EXCHANGE_RATES;
 
     const sanitizedState: AppState = {
       ...INITIAL_STATE,
-      ...rawRestoredData,
+      ...restoredFields,
       currency: restoredCurrency,
       currencies: restoredCurrencies,
       categories: restoredCategories,
       wallets: restoredWallets,
       exchangeRates: restoredExchangeRates,
-      transactions: Array.isArray(rawRestoredData.transactions) ? rawRestoredData.transactions : [],
-      trashTransactions: Array.isArray(rawRestoredData.trashTransactions) ? rawRestoredData.trashTransactions : [],
-      debts: Array.isArray(rawRestoredData.debts) ? rawRestoredData.debts : [],
-      budgets: Array.isArray(rawRestoredData.budgets) ? rawRestoredData.budgets : [],
-      goals: Array.isArray(rawRestoredData.goals) ? rawRestoredData.goals : [],
-      subscriptions: Array.isArray(rawRestoredData.subscriptions) ? rawRestoredData.subscriptions : [],
-      recurringRules: Array.isArray(rawRestoredData.recurringRules) ? rawRestoredData.recurringRules : [],
+      transactions: Array.isArray(restoredFields.transactions) ? restoredFields.transactions : [],
+      trashTransactions: Array.isArray(restoredFields.trashTransactions) ? restoredFields.trashTransactions : [],
+      debts: Array.isArray(restoredFields.debts) ? restoredFields.debts : [],
+      budgets: Array.isArray(restoredFields.budgets) ? restoredFields.budgets : [],
+      goals: Array.isArray(restoredFields.goals) ? restoredFields.goals : [],
+      subscriptions: Array.isArray(restoredFields.subscriptions) ? restoredFields.subscriptions : [],
+      recurringRules: Array.isArray(restoredFields.recurringRules) ? restoredFields.recurringRules : [],
       requireBiometricOnOpen: false,
       isLocked: false,
     };
