@@ -26,7 +26,7 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onAccept, onShowPrivacy }
               مرحباً بك في <span className="text-[#D9B978]">ثري</span>
             </h1>
             <p className="text-xs text-slate-400 font-medium max-w-xs leading-relaxed">
-              نظامك المالي الهادئ لإدارة الثروة والمحافظ وتتبع التدفقات النقدية بدقة وهدوء.
+              مكان بسيط ترتّب فيه أموالك، تتابع مصروفاتك، وتعرف أين تذهب نقودك دون تعقيد.
             </p>
           </div>
         </div>
@@ -35,18 +35,18 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onAccept, onShowPrivacy }
         <div className="w-full space-y-2.5 text-right">
           <FeatureItem 
             icon={<ShieldCheck size={18} className="text-[#8EB9A7]" />}
-            title="خصوصية وتشفير محلي"
-            desc="بياناتك المالية محفوظة في جهازك بالكامل ومحمية ببصمتك الخاصة."
+            title="خصوصيتك بيدك"
+            desc="تُحفظ بياناتك محليًا، ويمكنك اختيار طريقة القفل من الإعدادات وقتما يناسبك."
           />
           <FeatureItem 
             icon={<Scale size={18} className="text-[#D9B978]" />}
-            title="انضباط وتدقيق مالي دقيق"
-            desc="تقارير تحليلية وميزانيات وحساب الزكاة على كافة محافظك بسهولة."
+            title="صورة أوضح لأموالك"
+            desc="تابع دخلك ومصروفاتك وميزانياتك وتقاريرك من مكان واحد."
           />
           <FeatureItem 
             icon={<Wallet size={18} className="text-[#759BC8]" />}
-            title="محافظ متعددة وعملات"
-            desc="فصل مالي سلس للراتب، المدخرات، الديون، وأسعار الصرف المتعددة."
+            title="كل محافظك معك"
+            desc="نظّم حساباتك وعملاتك وديونك بالطريقة التي تناسب حياتك."
           />
         </div>
 
@@ -56,12 +56,12 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onAccept, onShowPrivacy }
             onClick={onAccept}
             className="w-full bg-[#D9B978] hover:bg-[#D9B978]/90 text-slate-950 py-3.5 px-6 rounded-2xl font-bold text-sm shadow-[0_10px_25px_rgba(217,185,120,0.3)] active:scale-95 transition-all flex items-center justify-center gap-2 group"
           >
-            <span>البدء واستخدام التطبيق</span>
+            <span>خلّينا نبدأ</span>
             <ChevronLeft size={18} className="group-hover:-translate-x-1 transition-transform" />
           </button>
 
           <p className="text-[11px] text-slate-400 text-center font-normal leading-relaxed">
-            بالبدء، فإنك توافق على 
+            بالمتابعة، أنت توافق على 
             <button 
               type="button" 
               onClick={onShowPrivacy} 
