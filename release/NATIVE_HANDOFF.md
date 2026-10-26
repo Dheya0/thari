@@ -146,7 +146,7 @@ npx cap open ios
 │ 2. Client-Side Threat Model:                                           │
 │    • The application operates in zero-knowledge mode without backdoors. │
 │    • Forgotten master passwords cannot be recovered.                   │
-│    • Optional user-provided AI keys are stored locally encrypted.      │
+│    • AI integrations and AI API-key storage are removed from source.   │
 │                                                                        │
 │ 3. Privacy & Tracking:                                                 │
 │    • Zero analytics, zero ad networks, zero third-party telemetry.     │
