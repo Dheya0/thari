@@ -1,7 +1,7 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
-  X, FileText, Repeat, Trash2, Scale, Briefcase, 
+  X, FileText, Repeat, Trash2, Scale, 
   ArrowLeft, ArrowRight, Sparkles 
 } from 'lucide-react';
 
@@ -14,7 +14,6 @@ interface ToolsHubModalProps {
   onOpenRecurring: () => void;
   onOpenTrash: () => void;
   onOpenDiagnostics: () => void;
-  onOpenAIAdvisor: () => void;
   language?: 'ar' | 'en';
 }
 
@@ -42,10 +41,6 @@ const STRINGS = {
         title: 'فحص تكامل البيانات والتدقيق',
         desc: 'مطابقة ميزان المحافظ والتحقق من العمليات المعزولة والنزاهة'
       },
-      advisor: {
-        title: 'المستشار المالي الخاص',
-        desc: 'تحليل التدفقات النقدية وتقديم الرأي المالي والخطط المخصصة'
-      }
     }
   },
   en: {
@@ -71,10 +66,6 @@ const STRINGS = {
         title: 'System Diagnostics & Audit',
         desc: 'Reconcile wallet balances, verify invariants & inspect ledger integrity'
       },
-      advisor: {
-        title: 'Private Financial Advisor',
-        desc: 'Analyze cash flows, executive insights & personalized financial plans'
-      }
     }
   }
 };
@@ -88,7 +79,6 @@ export const ToolsHubModal: React.FC<ToolsHubModalProps> = ({
   onOpenRecurring,
   onOpenTrash,
   onOpenDiagnostics,
-  onOpenAIAdvisor,
   language = 'ar',
 }) => {
   if (!isOpen) return null;
@@ -226,27 +216,6 @@ export const ToolsHubModal: React.FC<ToolsHubModalProps> = ({
                   </h4>
                   <p className="text-xs text-slate-400 truncate">
                     {t.tools.diagnostics.desc}
-                  </p>
-                </div>
-              </div>
-              <ArrowIcon size={16} className="text-slate-500 group-hover:text-white transition-all shrink-0 group-hover:translate-x-0.5" />
-            </button>
-
-            {/* Tool 5: Private Financial Advisor */}
-            <button
-              onClick={() => { onClose(); onOpenAIAdvisor(); }}
-              className="w-full group p-4 rounded-2xl bg-white/[0.03] hover:bg-white/[0.06] border border-white/5 hover:border-[#D9B978]/30 transition-all text-start flex items-center justify-between gap-4 active:scale-[0.99]"
-            >
-              <div className="flex items-center gap-3.5 min-w-0">
-                <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-[#D9B978]/20 to-[#8EB9A7]/20 text-[#D9B978] flex items-center justify-center shrink-0 border border-white/10 group-hover:scale-105 transition-transform">
-                  <Briefcase size={22} />
-                </div>
-                <div className="truncate">
-                  <h4 className="text-sm font-semibold text-white group-hover:text-[#D9B978] transition-colors">
-                    {t.tools.advisor.title}
-                  </h4>
-                  <p className="text-xs text-slate-400 truncate">
-                    {t.tools.advisor.desc}
                   </p>
                 </div>
               </div>
