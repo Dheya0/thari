@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Plus, LayoutDashboard, History, Settings as SettingsIcon, Briefcase, HandCoins, Repeat, Coins, Sparkles, Scale, Wallet as WalletIcon, Check, Wifi, WifiOff, ChevronDown } from 'lucide-react';
+import { Plus, LayoutDashboard, History, Settings as SettingsIcon, HandCoins, Repeat, Coins, Sparkles, Scale, Wallet as WalletIcon, Check, Wifi, WifiOff, ChevronDown } from 'lucide-react';
 import { AppState, Transaction, Category, Debt, DebtPayment, Account, RecurringRule } from './types';
 import { INITIAL_CATEGORIES, DEFAULT_CURRENCIES, DEFAULT_EXCHANGE_RATES, convertCurrency } from './constants';
 import { buildExecutiveCSVContent, exportAndShareExecutiveCSV } from './utils/exportHelper';
@@ -23,7 +23,6 @@ import DebtManager from './components/DebtManager';
 import SubscriptionManager from './components/SubscriptionManager';
 import BudgetManager from './components/BudgetManager';
 import GoalTracker from './components/GoalTracker';
-import AIChat from './components/AIChat';
 import Settings from './components/Settings';
 import PrivacyPolicy from './components/PrivacyPolicy';
 import WelcomeScreen from './components/WelcomeScreen';
@@ -64,7 +63,6 @@ const INITIAL_STATE: AppState = {
   trashTransactions: [],
   recurringRules: [],
   subscriptions: [],
-  chatHistory: [],
   categories: INITIAL_CATEGORIES,
   wallets: [
     { id: 'w-yer-1', name: 'الراتب', currencyCode: 'YER_SANAA', color: '#f59e0b' },
@@ -85,7 +83,6 @@ const INITIAL_STATE: AppState = {
   isTravelMode: false,
   showSeparateCurrencies: false,
   hasAcceptedTerms: false,
-  apiKey: '', // Initialize empty
   autoLockTime: 'instant',
   autoBackupFrequency: 'daily',
   lastAutoBackupTime: '',
@@ -98,57 +95,58 @@ function normalizeStoredState(parsed: any): AppState {
     return INITIAL_STATE;
   }
 
-  let activeCurrency = parsed.currency;
+  // Strip legacy AI data from older saved versions so it is not carried forward.
+  const { apiKey: _legacyApiKey, chatHistory: _legacyChatHistory, ...storedData } = parsed;
+
+  let activeCurrency = storedData.currency;
   if (typeof activeCurrency === 'string') {
     activeCurrency = DEFAULT_CURRENCIES.find(c => c.code === activeCurrency) || DEFAULT_CURRENCIES[0];
   } else if (!activeCurrency || !activeCurrency.code) {
     activeCurrency = DEFAULT_CURRENCIES[0];
   }
 
-  const currencies = (parsed.currencies && Array.isArray(parsed.currencies) && parsed.currencies.length > 0)
-    ? parsed.currencies
+  const currencies = (storedData.currencies && Array.isArray(storedData.currencies) && storedData.currencies.length > 0)
+    ? storedData.currencies
     : DEFAULT_CURRENCIES;
 
-  const categories = (parsed.categories && Array.isArray(parsed.categories) && parsed.categories.length > 0)
-    ? parsed.categories
+  const categories = (storedData.categories && Array.isArray(storedData.categories) && storedData.categories.length > 0)
+    ? storedData.categories
     : INITIAL_CATEGORIES;
 
-  const wallets = (parsed.wallets && Array.isArray(parsed.wallets) && parsed.wallets.length > 0)
-    ? parsed.wallets
+  const wallets = (storedData.wallets && Array.isArray(storedData.wallets) && storedData.wallets.length > 0)
+    ? storedData.wallets
     : INITIAL_STATE.wallets;
 
-  const accounts = (parsed.accounts && Array.isArray(parsed.accounts) && parsed.accounts.length > 0)
-    ? parsed.accounts
+  const accounts = (storedData.accounts && Array.isArray(storedData.accounts) && storedData.accounts.length > 0)
+    ? storedData.accounts
     : DEFAULT_ACCOUNTS;
 
-  const exchangeRates = (parsed.exchangeRates && typeof parsed.exchangeRates === 'object')
-    ? { ...DEFAULT_EXCHANGE_RATES, ...parsed.exchangeRates }
+  const exchangeRates = (storedData.exchangeRates && typeof storedData.exchangeRates === 'object')
+    ? { ...DEFAULT_EXCHANGE_RATES, ...storedData.exchangeRates }
     : DEFAULT_EXCHANGE_RATES;
-
-  const isSecurityProtected = !!parsed.pin || parsed.isBiometricEnabled === true;
-  const shouldLockOnOpen = isSecurityProtected && parsed.requireBiometricOnOpen !== false && parsed.autoLockTime !== 'never';
 
   return {
     ...INITIAL_STATE,
-    ...parsed,
+    ...storedData,
     accounts,
-    activeAccountId: parsed.activeAccountId || accounts[0]?.id || 'acc-main',
+    activeAccountId: storedData.activeAccountId || accounts[0]?.id || 'acc-main',
     currency: activeCurrency,
     currencies,
     categories,
     wallets,
-    transactions: Array.isArray(parsed.transactions) ? parsed.transactions : [],
-    trashTransactions: Array.isArray(parsed.trashTransactions) ? parsed.trashTransactions : [],
-    recurringRules: Array.isArray(parsed.recurringRules) ? parsed.recurringRules : [],
-    subscriptions: Array.isArray(parsed.subscriptions) ? parsed.subscriptions : [],
-    debts: Array.isArray(parsed.debts) ? parsed.debts : [],
-    goals: Array.isArray(parsed.goals) ? parsed.goals : [],
-    budgets: Array.isArray(parsed.budgets) ? parsed.budgets : [],
-    auditLogs: Array.isArray(parsed.auditLogs) ? parsed.auditLogs : [],
+    transactions: Array.isArray(storedData.transactions) ? storedData.transactions : [],
+    trashTransactions: Array.isArray(storedData.trashTransactions) ? storedData.trashTransactions : [],
+    recurringRules: Array.isArray(storedData.recurringRules) ? storedData.recurringRules : [],
+    subscriptions: Array.isArray(storedData.subscriptions) ? storedData.subscriptions : [],
+    debts: Array.isArray(storedData.debts) ? storedData.debts : [],
+    goals: Array.isArray(storedData.goals) ? storedData.goals : [],
+    budgets: Array.isArray(storedData.budgets) ? storedData.budgets : [],
+    auditLogs: Array.isArray(storedData.auditLogs) ? storedData.auditLogs : [],
     exchangeRates,
-    userEmail: parsed.userEmail || '',
-    userName: parsed.userName || 'مستخدم ثري',
-    isLocked: shouldLockOnOpen,
+    userEmail: storedData.userEmail || '',
+    userName: storedData.userName || 'مستخدم ثري',
+    requireBiometricOnOpen: false,
+    isLocked: false,
   };
 }
 
@@ -182,7 +180,7 @@ const App: React.FC = () => {
     };
   }, []);
 
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'transactions' | 'debts' | 'chat' | 'subscriptions' | 'settings' | 'budgets' | 'goals' | 'zakat'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'transactions' | 'debts' | 'subscriptions' | 'settings' | 'budgets' | 'goals' | 'zakat'>('dashboard');
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [showPrivacyPolicy, setShowPrivacyPolicy] = useState(false);
@@ -771,46 +769,50 @@ const App: React.FC = () => {
   const handleRestoreState = (rawRestoredData: any) => {
     if (!rawRestoredData || typeof rawRestoredData !== 'object') return;
     
+    // Remove legacy AI chat/key data from imports and old backups.
+    const { apiKey: _legacyApiKey, chatHistory: _legacyChatHistory, ...restoredFields } = rawRestoredData;
+
     // Schema Sanitization and Normalization
-    let restoredCurrency = rawRestoredData.currency;
+    let restoredCurrency = restoredFields.currency;
     if (typeof restoredCurrency === 'string') {
       restoredCurrency = DEFAULT_CURRENCIES.find(c => c.code === restoredCurrency) || DEFAULT_CURRENCIES[0];
     } else if (!restoredCurrency || !restoredCurrency.code) {
       restoredCurrency = DEFAULT_CURRENCIES[0];
     }
 
-    const restoredCurrencies = (rawRestoredData.currencies && Array.isArray(rawRestoredData.currencies) && rawRestoredData.currencies.length > 0)
-      ? rawRestoredData.currencies
+    const restoredCurrencies = (restoredFields.currencies && Array.isArray(restoredFields.currencies) && restoredFields.currencies.length > 0)
+      ? restoredFields.currencies
       : DEFAULT_CURRENCIES;
 
-    const restoredCategories = (rawRestoredData.categories && Array.isArray(rawRestoredData.categories) && rawRestoredData.categories.length > 0)
-      ? rawRestoredData.categories
+    const restoredCategories = (restoredFields.categories && Array.isArray(restoredFields.categories) && restoredFields.categories.length > 0)
+      ? restoredFields.categories
       : INITIAL_CATEGORIES;
 
-    const restoredWallets = (rawRestoredData.wallets && Array.isArray(rawRestoredData.wallets) && rawRestoredData.wallets.length > 0)
-      ? rawRestoredData.wallets
+    const restoredWallets = (restoredFields.wallets && Array.isArray(restoredFields.wallets) && restoredFields.wallets.length > 0)
+      ? restoredFields.wallets
       : INITIAL_STATE.wallets;
 
-    const restoredExchangeRates = (rawRestoredData.exchangeRates && typeof rawRestoredData.exchangeRates === 'object')
-      ? { ...DEFAULT_EXCHANGE_RATES, ...rawRestoredData.exchangeRates }
+    const restoredExchangeRates = (restoredFields.exchangeRates && typeof restoredFields.exchangeRates === 'object')
+      ? { ...DEFAULT_EXCHANGE_RATES, ...restoredFields.exchangeRates }
       : DEFAULT_EXCHANGE_RATES;
 
     const sanitizedState: AppState = {
       ...INITIAL_STATE,
-      ...rawRestoredData,
+      ...restoredFields,
       currency: restoredCurrency,
       currencies: restoredCurrencies,
       categories: restoredCategories,
       wallets: restoredWallets,
       exchangeRates: restoredExchangeRates,
-      transactions: Array.isArray(rawRestoredData.transactions) ? rawRestoredData.transactions : [],
-      trashTransactions: Array.isArray(rawRestoredData.trashTransactions) ? rawRestoredData.trashTransactions : [],
-      debts: Array.isArray(rawRestoredData.debts) ? rawRestoredData.debts : [],
-      budgets: Array.isArray(rawRestoredData.budgets) ? rawRestoredData.budgets : [],
-      goals: Array.isArray(rawRestoredData.goals) ? rawRestoredData.goals : [],
-      subscriptions: Array.isArray(rawRestoredData.subscriptions) ? rawRestoredData.subscriptions : [],
-      recurringRules: Array.isArray(rawRestoredData.recurringRules) ? rawRestoredData.recurringRules : [],
-      isLocked: !!rawRestoredData.pin,
+      transactions: Array.isArray(restoredFields.transactions) ? restoredFields.transactions : [],
+      trashTransactions: Array.isArray(restoredFields.trashTransactions) ? restoredFields.trashTransactions : [],
+      debts: Array.isArray(restoredFields.debts) ? restoredFields.debts : [],
+      budgets: Array.isArray(restoredFields.budgets) ? restoredFields.budgets : [],
+      goals: Array.isArray(restoredFields.goals) ? restoredFields.goals : [],
+      subscriptions: Array.isArray(restoredFields.subscriptions) ? restoredFields.subscriptions : [],
+      recurringRules: Array.isArray(restoredFields.recurringRules) ? restoredFields.recurringRules : [],
+      requireBiometricOnOpen: false,
+      isLocked: false,
     };
 
     setState(sanitizedState);
@@ -818,7 +820,9 @@ const App: React.FC = () => {
   };
 
   const handleApplyRepairedState = (repairedState: AppState) => {
-    setState(repairedState);
+    const normalizedState = normalizeStoredState(repairedState);
+    setState(normalizedState);
+    saveSecureStateSync(STORAGE_KEY, normalizedState);
   };
 
   const handleSubmitTransaction = (txData: any) => {
@@ -1184,9 +1188,8 @@ const App: React.FC = () => {
                   />
                 )}
                 
-                {activeTab === 'goals' && <GoalTracker goals={state.goals} wallets={state.wallets} transactions={state.transactions} onAddGoal={(g) => setState(p => ({ ...p, goals: [...p.goals, { ...g, id: 'g-'+Date.now() }] }))} onUpdateGoalAmount={(id, amt) => setState(p => ({ ...p, goals: p.goals.map(g => g.id === id ? { ...g, currentAmount: g.currentAmount + amt } : g) }))} currencySymbol={localizedCurrency.symbol} apiKey={state.apiKey} language={activeLanguage} />}
+                {activeTab === 'goals' && <GoalTracker goals={state.goals} wallets={state.wallets} onAddGoal={(g) => setState(p => ({ ...p, goals: [...p.goals, { ...g, id: 'g-'+Date.now() }] }))} onUpdateGoalAmount={(id, amt) => setState(p => ({ ...p, goals: p.goals.map(g => g.id === id ? { ...g, currentAmount: g.currentAmount + amt } : g) }))} currencySymbol={localizedCurrency.symbol} language={activeLanguage} />}
                 {activeTab === 'budgets' && <BudgetManager budgets={state.budgets} categories={state.categories} transactions={filteredTransactions} onSetBudget={(catId, amount) => setState(p => ({ ...p, budgets: [...p.budgets.filter(b => b.categoryId !== catId), { categoryId: catId, amount }] }))} currencySymbol={localizedCurrency.symbol} currencyCode={state.currency.code} language={activeLanguage} />}
-                {activeTab === 'chat' && <AIChat history={state.chatHistory} transactions={filteredTransactions} categories={state.categories} currency={localizedCurrency.symbol} onSendMessage={(msg) => setState(p => ({ ...p, chatHistory: [...p.chatHistory, msg].slice(-30) }))} apiKey={state.apiKey} language={activeLanguage} />}
                 {activeTab === 'debts' && <DebtManager debts={state.debts} wallets={state.wallets} onAddDebt={handleAddDebt} onUpdateDebt={handleUpdateDebt} onSettleDebt={handleSettleDebt} onPayDebt={handlePayDebt} onDeleteDebt={(id) => setState(p => ({ ...p, debts: p.debts.filter(d => d.id !== id) }))} currencySymbol={localizedCurrency.symbol} currencyCode={state.currency.code} language={activeLanguage} />}
                 {activeTab === 'subscriptions' && <SubscriptionManager subscriptions={state.subscriptions} categories={state.categories} onAdd={(sub) => setState(p => ({ ...p, subscriptions: [{...sub, id: 's-'+Date.now()}, ...p.subscriptions] }))} onRemove={(id) => setState(p => ({ ...p, subscriptions: p.subscriptions.filter(s => s.id !== id) }))} currencySymbol={localizedCurrency.symbol} currencyCode={state.currency.code} language={activeLanguage} />}
                 {activeTab === 'zakat' && (
@@ -1255,7 +1258,7 @@ const App: React.FC = () => {
                         onUpdateCategory={(id, updates) => setState(p => ({ ...p, categories: p.categories.map(c => c.id === id ? { ...c, ...updates } : c) }))}
                         onRemoveCategory={(id) => setState(p => ({ ...p, categories: p.categories.filter(c => c.id !== id) }))}
                         onRestore={handleRestoreState} 
-                        onClearData={() => setState(p => ({...p, transactions: [], debts: [], budgets: [], subscriptions: [], chatHistory: [], goals: []}))} 
+                        onClearData={() => setState(p => ({...p, transactions: [], debts: [], budgets: [], subscriptions: [], goals: []}))} 
                         onShowPrivacyPolicy={() => setShowPrivacyPolicy(true)} 
                         onPrint={handlePrint}
                         onShare={handleShare}
@@ -1326,7 +1329,6 @@ const App: React.FC = () => {
               onOpenRecurring={() => setShowRecurringModal(true)}
               onOpenTrash={() => setShowTrashModal(true)}
               onOpenDiagnostics={() => setShowDiagnosticsModal(true)}
-              onOpenAIAdvisor={() => setActiveTab('chat')}
               language={state.language || 'ar'}
             />
           )}

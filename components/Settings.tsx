@@ -142,7 +142,6 @@ interface SettingsProps {
   currencies: Currency[];
   wallets: Wallet[];
   categories: Category[];
-  apiKey?: string;
   exchangeRates?: Record<string, number>;
   appState: any; 
   onUpdateSettings: (updates: any) => void;
@@ -166,7 +165,7 @@ interface SettingsProps {
 }
 
 export default function Settings({ 
-  userName = '', pin = '', currency, currencies, wallets, categories, apiKey = '', exchangeRates = {}, appState = {}, onUpdateSettings, 
+  userName = '', pin = '', currency, currencies, wallets, categories, exchangeRates = {}, appState = {}, onUpdateSettings, 
   onAddCurrency, onRemoveCurrency, onAddWallet, onUpdateWallet, onRemoveWallet,
   onAddCategory, onUpdateCategory, onRemoveCategory,
   onRestore, onClearData, onShowPrivacyPolicy, onPrint, onShare, onExportExcel,
@@ -185,9 +184,7 @@ export default function Settings({
   const [localUserName, setLocalUserName] = useState(userName || '');
   const [localUserEmail, setLocalUserEmail] = useState(appState?.userEmail || '');
   const [localPin, setLocalPin] = useState(pin || '');
-  const [localApiKey, setLocalApiKey] = useState(apiKey || '');
   const [localAutoLockTime, setLocalAutoLockTime] = useState<'instant' | '1min' | '5min' | 'never'>(appState?.autoLockTime || 'instant');
-  const [localRequireBiometricOnOpen, setLocalRequireBiometricOnOpen] = useState<boolean>(appState?.requireBiometricOnOpen !== false);
   const [localAutoBackupFreq, setLocalAutoBackupFreq] = useState<'on_open' | 'daily' | 'weekly' | 'disabled'>(appState?.autoBackupFrequency || 'daily');
   const [localLanguage, setLocalLanguage] = useState<'ar' | 'en'>(appState?.language || 'ar');
   const [showAutoBackupHistoryModal, setShowAutoBackupHistoryModal] = useState(false);
@@ -311,7 +308,6 @@ export default function Settings({
     onUpdateSettings({ 
       userName: localUserName, 
       userEmail: localUserEmail,
-      apiKey: localApiKey,
       language: localLanguage 
     });
     showToast(t.saveProfileSuccess);
@@ -330,7 +326,7 @@ export default function Settings({
       isLocked: shouldLock,
       autoLockTime: localAutoLockTime,
       isBiometricEnabled: isBiometricEnabled,
-      requireBiometricOnOpen: localRequireBiometricOnOpen
+      requireBiometricOnOpen: false
     });
 
     if (shouldLock) {
@@ -830,18 +826,6 @@ export default function Settings({
                     </div>
                 </div>
 
-                <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2 block">{t.consultationKeyOptional}</label>
-                    <input 
-                      type="password" 
-                      value={localApiKey} 
-                      onChange={e => setLocalApiKey(e.target.value)} 
-                      onBlur={() => onUpdateSettings({ apiKey: localApiKey })}
-                      placeholder={t.apiKeyOptionalPlaceholder} 
-                      className="text-center w-full p-4 rounded-xl bg-[#0A0D10] text-[#F4F1EA] font-bold border border-white/10 outline-none focus:border-[#D9B978] shadow-inner text-sm" 
-                    />
-                </div>
-
                 <div className="pt-2">
                   <button
                     type="button"
@@ -900,10 +884,10 @@ export default function Settings({
                       <Clock size={14} className="text-[#D9B978]" /> {t.autoLockTimeout}
                     </label>
                     <div className="grid grid-cols-4 gap-1.5 bg-[#0A0D10] p-1.5 rounded-2xl border border-white/5">
-                      <button type="button" onClick={() => { setLocalAutoLockTime('instant'); onUpdateSettings({ autoLockTime: 'instant' }); }} className={`py-2 rounded-xl text-xs font-bold transition-all ${localAutoLockTime === 'instant' ? 'bg-[#D9B978] text-[#0A0D10] font-black shadow-md' : 'text-slate-400 hover:text-white'}`}>{t.instant}</button>
-                      <button type="button" onClick={() => { setLocalAutoLockTime('1min'); onUpdateSettings({ autoLockTime: '1min' }); }} className={`py-2 rounded-xl text-xs font-bold transition-all ${localAutoLockTime === '1min' ? 'bg-[#D9B978] text-[#0A0D10] font-black shadow-md' : 'text-slate-400 hover:text-white'}`}>{t.minute}</button>
-                      <button type="button" onClick={() => { setLocalAutoLockTime('5min'); onUpdateSettings({ autoLockTime: '5min' }); }} className={`py-2 rounded-xl text-xs font-bold transition-all ${localAutoLockTime === '5min' ? 'bg-[#D9B978] text-[#0A0D10] font-black shadow-md' : 'text-slate-400 hover:text-white'}`}>{t.fiveMinutes}</button>
-                      <button type="button" onClick={() => { setLocalAutoLockTime('never'); onUpdateSettings({ autoLockTime: 'never' }); }} className={`py-2 rounded-xl text-xs font-bold transition-all ${localAutoLockTime === 'never' ? 'bg-[#D9B978] text-[#0A0D10] font-black shadow-md' : 'text-slate-400 hover:text-white'}`}>{t.disabled}</button>
+                      <button type="button" onClick={() => { setLocalAutoLockTime('instant'); onUpdateSettings({ autoLockTime: 'instant', requireBiometricOnOpen: false, isLocked: false }); }} className={`py-2 rounded-xl text-xs font-bold transition-all ${localAutoLockTime === 'instant' ? 'bg-[#D9B978] text-[#0A0D10] font-black shadow-md' : 'text-slate-400 hover:text-white'}`}>{t.instant}</button>
+                      <button type="button" onClick={() => { setLocalAutoLockTime('1min'); onUpdateSettings({ autoLockTime: '1min', requireBiometricOnOpen: false, isLocked: false }); }} className={`py-2 rounded-xl text-xs font-bold transition-all ${localAutoLockTime === '1min' ? 'bg-[#D9B978] text-[#0A0D10] font-black shadow-md' : 'text-slate-400 hover:text-white'}`}>{t.minute}</button>
+                      <button type="button" onClick={() => { setLocalAutoLockTime('5min'); onUpdateSettings({ autoLockTime: '5min', requireBiometricOnOpen: false, isLocked: false }); }} className={`py-2 rounded-xl text-xs font-bold transition-all ${localAutoLockTime === '5min' ? 'bg-[#D9B978] text-[#0A0D10] font-black shadow-md' : 'text-slate-400 hover:text-white'}`}>{t.fiveMinutes}</button>
+                      <button type="button" onClick={() => { setLocalAutoLockTime('never'); onUpdateSettings({ autoLockTime: 'never', requireBiometricOnOpen: false, isLocked: false }); }} className={`py-2 rounded-xl text-xs font-bold transition-all ${localAutoLockTime === 'never' ? 'bg-[#D9B978] text-[#0A0D10] font-black shadow-md' : 'text-slate-400 hover:text-white'}`}>{t.disabled}</button>
                     </div>
                 </div>
 
