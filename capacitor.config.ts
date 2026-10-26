@@ -8,7 +8,6 @@ const config: CapacitorConfig = {
     androidScheme: 'https',
     cleartext: false,
     allowNavigation: [
-      'generativelanguage.googleapis.com',
       'fonts.googleapis.com',
       'fonts.gstatic.com'
     ]
