@@ -69,15 +69,15 @@ export const formatFinancialNumber = (num: number | string | undefined | null, u
 export const getGreeting = (lang: 'ar' | 'en' = 'ar'): { text: string; sub: string } => {
   const hour = new Date().getHours();
   if (lang === 'en') {
-    if (hour >= 5 && hour < 12) return { text: 'Good Morning', sub: 'Overview of your financial center & cashflow' };
-    if (hour >= 12 && hour < 17) return { text: 'Good Day', sub: 'Wallets performance & daily updates' };
-    if (hour >= 17 && hour < 22) return { text: 'Good Evening', sub: 'Financial activity summary & daily harvest' };
-    return { text: 'Good Night', sub: 'Assets and liabilities stability summary' };
+    if (hour >= 5 && hour < 12) return { text: 'Good morning', sub: 'A clear view of your money, one step at a time.' };
+    if (hour >= 12 && hour < 17) return { text: 'Hello', sub: 'Here is how your money is moving today.' };
+    if (hour >= 17 && hour < 22) return { text: 'Good evening', sub: 'Take a moment to check in on your finances.' };
+    return { text: 'Welcome back', sub: 'Your finances, gathered in one quiet place.' };
   } else {
-    if (hour >= 5 && hour < 12) return { text: 'صباح الخير', sub: 'نظرة عامة على مركزك المالي وسلامة تدفقاتك' };
-    if (hour >= 12 && hour < 17) return { text: 'طاب يومك', sub: 'نظرة عامة على أداء المحافظ ومستجدات اليوم' };
-    if (hour >= 17 && hour < 22) return { text: 'مساء الخير', sub: 'ملخص الحركة المالية وحصاد اليوم' };
-    return { text: 'مساء النور', sub: 'ملخص استقرار الأصول والالتزامات المالية' };
+    if (hour >= 5 && hour < 12) return { text: 'صباح الخير', sub: 'هذه لمحة بسيطة عن دخلك ومصروفاتك ومحافظك.' };
+    if (hour >= 12 && hour < 17) return { text: 'أهلًا بك', sub: 'تابع حركة أموالك اليوم بكل وضوح وراحة.' };
+    if (hour >= 17 && hour < 22) return { text: 'مساء الخير', sub: 'خذ دقيقة للاطمئنان على وضعك المالي.' };
+    return { text: 'حياك الله من جديد', sub: 'كل تفاصيل أموالك في مكان واحد، وبأسلوب أبسط.' };
   }
 };
 
@@ -111,6 +111,9 @@ export const ElegantDashboard: React.FC<ElegantDashboardProps> = ({
   const t = getTranslation(lang);
   const greeting = getGreeting(lang);
   const isEn = lang === 'en';
+  const displayName = userName?.trim() && userName.trim() !== 'مستخدم ثري'
+    ? userName.trim()
+    : (isEn ? 'there' : 'صديقي');
 
   const growthInfo = useMemo(() => {
     return calculateDateBasedGrowth(transactions, currency.code, exchangeRates);
@@ -183,23 +186,27 @@ export const ElegantDashboard: React.FC<ElegantDashboardProps> = ({
       .slice(0, 5);
   }, [transactions, selectedWalletId]);
 
+  const hasAnyTransactions = transactions.some(tx => !tx.isDeleted);
+
   return (
     <div className="w-full max-w-4xl mx-auto space-y-7 sm:space-y-9 pb-16 font-sans selection:bg-[#D9B978]/20">
       
       {/* ─────────────────────────────────────────────────────────────
           1. HEADER: QUIET GREETING & STATUS
       ───────────────────────────────────────────────────────────── */}
-      <section className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 pt-2 border-b border-white/[0.04] pb-5">
-        <div className="space-y-1">
-          <span className="text-xs font-medium tracking-wide text-[#D9B978] block">
-            {greeting.text}، {userName || (isEn ? 'Thari User' : 'مستخدم ثري')}
+      <section className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 pt-2 border-b border-white/[0.06] pb-5">
+        <div className="space-y-2 min-w-0">
+          <span className="text-sm font-semibold tracking-wide text-[#D9B978] block">
+            {isEn ? greeting.text + ', ' + displayName : greeting.text + '، ' + displayName}
           </span>
           <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-[#F4F1EA]">
             {t.comprehensiveFinancialCenter}
           </h1>
+          <p className="text-xs sm:text-sm text-slate-400 leading-relaxed max-w-xl">
+            {greeting.sub}
+          </p>
         </div>
-
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 sm:pb-1 shrink-0">
           <span className="text-xs text-slate-400 font-normal">
             {new Intl.DateTimeFormat(isEn ? 'en-US' : 'ar-SA', { weekday: 'long', day: 'numeric', month: 'short' }).format(new Date())}
           </span>
@@ -344,6 +351,12 @@ export const ElegantDashboard: React.FC<ElegantDashboardProps> = ({
           )}
         </div>
 
+        {walletRows.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.02] px-4 py-6 text-center">
+            <p className="text-sm font-medium text-slate-300">{t.noWalletsTitle}</p>
+            <p className="mt-1 text-xs leading-5 text-slate-500">{t.noWalletsDescription}</p>
+          </div>
+        ) : (
         <div className="divide-y divide-white/[0.04] border-y border-white/[0.05]">
           {walletRows.map(w => {
             const isSelected = selectedWalletId === w.id;
@@ -387,6 +400,7 @@ export const ElegantDashboard: React.FC<ElegantDashboardProps> = ({
             );
           })}
         </div>
+        )}
       </section>
 
       {/* ─────────────────────────────────────────────────────────────
@@ -394,8 +408,8 @@ export const ElegantDashboard: React.FC<ElegantDashboardProps> = ({
       ───────────────────────────────────────────────────────────── */}
       <section className="space-y-3">
         <div className="flex items-center justify-between px-1">
-          <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-            {t.monthlyIncome.replace('الدخل الشهري', 'هذا الشهر')}
+          <h2 className="text-sm font-semibold text-slate-300">
+            {t.thisMonthOverview}
           </h2>
           <span className="text-xs text-slate-400">
             {new Intl.DateTimeFormat(isEn ? 'en-US' : 'ar-SA', { month: 'long', year: 'numeric' }).format(new Date())}
@@ -449,14 +463,34 @@ export const ElegantDashboard: React.FC<ElegantDashboardProps> = ({
         </div>
 
         {recentTransactions.length === 0 ? (
-          <div className="py-10 text-center border border-dashed border-white/10 rounded-2xl">
-            <p className="text-xs text-slate-400">{t.noTransactionsYet}</p>
-            <button
-              onClick={() => onOpenNewTransaction('expense')}
-              className="mt-3 text-xs font-medium text-[#D9B978] hover:underline min-h-[44px] inline-flex items-center"
-            >
-              {isEn ? 'Record first financial movement' : 'تسجيل أول حركة مالية'}
-            </button>
+          <div className="rounded-3xl border border-dashed border-white/10 bg-[#11161C]/55 px-5 py-8 sm:py-10 text-center">
+            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-[#D9B978]/10 text-[#D9B978]">
+              <ArrowDownLeft size={22} />
+            </div>
+            <h3 className="text-sm font-semibold text-[#F4F1EA]">
+              {selectedWalletId && hasAnyTransactions ? t.noWalletActivityTitle : t.firstTransactionTitle}
+            </h3>
+            <p className="mx-auto mt-2 max-w-sm text-xs leading-6 text-slate-400">
+              {selectedWalletId && hasAnyTransactions ? t.noWalletActivityDescription : t.firstTransactionDescription}
+            </p>
+            {selectedWalletId && hasAnyTransactions ? (
+              <button
+                type="button"
+                onClick={() => onSelectWallet(null)}
+                className="mt-4 inline-flex min-h-11 items-center justify-center rounded-xl border border-white/10 px-4 text-xs font-semibold text-[#D9B978] transition hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D9B978]"
+              >
+                {t.showAllWallets}
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => onOpenNewTransaction('expense')}
+                className="mt-4 inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#D9B978] px-5 text-xs font-bold text-[#0A0D10] transition hover:bg-[#E8CA91] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#D9B978] focus-visible:ring-offset-[#11161C]"
+              >
+                <span>{t.addFirstTransaction}</span>
+                <ArrowDownLeft size={15} />
+              </button>
+            )}
           </div>
         ) : (
           <div className="divide-y divide-white/[0.04] border-y border-white/[0.05]">
