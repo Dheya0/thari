@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Plus, LayoutDashboard, History, Settings as SettingsIcon, Briefcase, HandCoins, Repeat, Coins, Sparkles, Scale, Wallet as WalletIcon, Check, Wifi, WifiOff, ChevronDown } from 'lucide-react';
+import { Plus, LayoutDashboard, History, Settings as SettingsIcon, HandCoins, Repeat, Coins, Sparkles, Scale, Wallet as WalletIcon, Check, Wifi, WifiOff, ChevronDown } from 'lucide-react';
 import { AppState, Transaction, Category, Debt, DebtPayment, Account, RecurringRule } from './types';
 import { INITIAL_CATEGORIES, DEFAULT_CURRENCIES, DEFAULT_EXCHANGE_RATES, convertCurrency } from './constants';
 import { buildExecutiveCSVContent, exportAndShareExecutiveCSV } from './utils/exportHelper';
@@ -23,7 +23,6 @@ import DebtManager from './components/DebtManager';
 import SubscriptionManager from './components/SubscriptionManager';
 import BudgetManager from './components/BudgetManager';
 import GoalTracker from './components/GoalTracker';
-import AIChat from './components/AIChat';
 import Settings from './components/Settings';
 import PrivacyPolicy from './components/PrivacyPolicy';
 import WelcomeScreen from './components/WelcomeScreen';
@@ -64,7 +63,6 @@ const INITIAL_STATE: AppState = {
   trashTransactions: [],
   recurringRules: [],
   subscriptions: [],
-  chatHistory: [],
   categories: INITIAL_CATEGORIES,
   wallets: [
     { id: 'w-yer-1', name: 'الراتب', currencyCode: 'YER_SANAA', color: '#f59e0b' },
@@ -85,7 +83,6 @@ const INITIAL_STATE: AppState = {
   isTravelMode: false,
   showSeparateCurrencies: false,
   hasAcceptedTerms: false,
-  apiKey: '', // Initialize empty
   autoLockTime: 'instant',
   autoBackupFrequency: 'daily',
   lastAutoBackupTime: '',
@@ -125,9 +122,6 @@ function normalizeStoredState(parsed: any): AppState {
     ? { ...DEFAULT_EXCHANGE_RATES, ...parsed.exchangeRates }
     : DEFAULT_EXCHANGE_RATES;
 
-  const isSecurityProtected = !!parsed.pin || parsed.isBiometricEnabled === true;
-  const shouldLockOnOpen = isSecurityProtected && parsed.requireBiometricOnOpen !== false && parsed.autoLockTime !== 'never';
-
   return {
     ...INITIAL_STATE,
     ...parsed,
@@ -148,7 +142,8 @@ function normalizeStoredState(parsed: any): AppState {
     exchangeRates,
     userEmail: parsed.userEmail || '',
     userName: parsed.userName || 'مستخدم ثري',
-    isLocked: shouldLockOnOpen,
+    requireBiometricOnOpen: false,
+    isLocked: false,
   };
 }
 
@@ -182,7 +177,7 @@ const App: React.FC = () => {
     };
   }, []);
 
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'transactions' | 'debts' | 'chat' | 'subscriptions' | 'settings' | 'budgets' | 'goals' | 'zakat'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'transactions' | 'debts' | 'subscriptions' | 'settings' | 'budgets' | 'goals' | 'zakat'>('dashboard');
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [showPrivacyPolicy, setShowPrivacyPolicy] = useState(false);
@@ -810,7 +805,8 @@ const App: React.FC = () => {
       goals: Array.isArray(rawRestoredData.goals) ? rawRestoredData.goals : [],
       subscriptions: Array.isArray(rawRestoredData.subscriptions) ? rawRestoredData.subscriptions : [],
       recurringRules: Array.isArray(rawRestoredData.recurringRules) ? rawRestoredData.recurringRules : [],
-      isLocked: !!rawRestoredData.pin,
+      requireBiometricOnOpen: false,
+      isLocked: false,
     };
 
     setState(sanitizedState);
@@ -1184,9 +1180,8 @@ const App: React.FC = () => {
                   />
                 )}
                 
-                {activeTab === 'goals' && <GoalTracker goals={state.goals} wallets={state.wallets} transactions={state.transactions} onAddGoal={(g) => setState(p => ({ ...p, goals: [...p.goals, { ...g, id: 'g-'+Date.now() }] }))} onUpdateGoalAmount={(id, amt) => setState(p => ({ ...p, goals: p.goals.map(g => g.id === id ? { ...g, currentAmount: g.currentAmount + amt } : g) }))} currencySymbol={localizedCurrency.symbol} apiKey={state.apiKey} language={activeLanguage} />}
+                {activeTab === 'goals' && <GoalTracker goals={state.goals} wallets={state.wallets} onAddGoal={(g) => setState(p => ({ ...p, goals: [...p.goals, { ...g, id: 'g-'+Date.now() }] }))} onUpdateGoalAmount={(id, amt) => setState(p => ({ ...p, goals: p.goals.map(g => g.id === id ? { ...g, currentAmount: g.currentAmount + amt } : g) }))} currencySymbol={localizedCurrency.symbol} language={activeLanguage} />}
                 {activeTab === 'budgets' && <BudgetManager budgets={state.budgets} categories={state.categories} transactions={filteredTransactions} onSetBudget={(catId, amount) => setState(p => ({ ...p, budgets: [...p.budgets.filter(b => b.categoryId !== catId), { categoryId: catId, amount }] }))} currencySymbol={localizedCurrency.symbol} currencyCode={state.currency.code} language={activeLanguage} />}
-                {activeTab === 'chat' && <AIChat history={state.chatHistory} transactions={filteredTransactions} categories={state.categories} currency={localizedCurrency.symbol} onSendMessage={(msg) => setState(p => ({ ...p, chatHistory: [...p.chatHistory, msg].slice(-30) }))} apiKey={state.apiKey} language={activeLanguage} />}
                 {activeTab === 'debts' && <DebtManager debts={state.debts} wallets={state.wallets} onAddDebt={handleAddDebt} onUpdateDebt={handleUpdateDebt} onSettleDebt={handleSettleDebt} onPayDebt={handlePayDebt} onDeleteDebt={(id) => setState(p => ({ ...p, debts: p.debts.filter(d => d.id !== id) }))} currencySymbol={localizedCurrency.symbol} currencyCode={state.currency.code} language={activeLanguage} />}
                 {activeTab === 'subscriptions' && <SubscriptionManager subscriptions={state.subscriptions} categories={state.categories} onAdd={(sub) => setState(p => ({ ...p, subscriptions: [{...sub, id: 's-'+Date.now()}, ...p.subscriptions] }))} onRemove={(id) => setState(p => ({ ...p, subscriptions: p.subscriptions.filter(s => s.id !== id) }))} currencySymbol={localizedCurrency.symbol} currencyCode={state.currency.code} language={activeLanguage} />}
                 {activeTab === 'zakat' && (
@@ -1255,7 +1250,7 @@ const App: React.FC = () => {
                         onUpdateCategory={(id, updates) => setState(p => ({ ...p, categories: p.categories.map(c => c.id === id ? { ...c, ...updates } : c) }))}
                         onRemoveCategory={(id) => setState(p => ({ ...p, categories: p.categories.filter(c => c.id !== id) }))}
                         onRestore={handleRestoreState} 
-                        onClearData={() => setState(p => ({...p, transactions: [], debts: [], budgets: [], subscriptions: [], chatHistory: [], goals: []}))} 
+                        onClearData={() => setState(p => ({...p, transactions: [], debts: [], budgets: [], subscriptions: [], goals: []}))} 
                         onShowPrivacyPolicy={() => setShowPrivacyPolicy(true)} 
                         onPrint={handlePrint}
                         onShare={handleShare}
@@ -1326,7 +1321,6 @@ const App: React.FC = () => {
               onOpenRecurring={() => setShowRecurringModal(true)}
               onOpenTrash={() => setShowTrashModal(true)}
               onOpenDiagnostics={() => setShowDiagnosticsModal(true)}
-              onOpenAIAdvisor={() => setActiveTab('chat')}
               language={state.language || 'ar'}
             />
           )}
