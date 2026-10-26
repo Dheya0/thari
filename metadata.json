@@ -2,10 +2,15 @@
   "name": "Thari",
   "description": "نظام مالي هادئ وأنيق لإدارة الثروة والمحافظ المتعددة، تتبع التدفقات النقدية، تسوية الديون، وحساب الزكاة بدقة واحترافية.",
   "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"],
+  "majorCapabilities": [
+    "OFFLINE_FINANCIAL_LEDGER",
+    "MULTI_CURRENCY_WALLETS",
+    "FINANCIAL_REPORTS",
+    "ZAKAT_CALCULATOR"
+  ],
   "ios": {
     "bundleId": "com.thari.finance.app",
-    "version": "1.2.0",
+    "version": "1.2.1",
     "displayName": "Thari"
   }
 }
