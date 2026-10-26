@@ -113,7 +113,8 @@ const TransactionList: React.FC<TransactionListProps> = ({
         <div className="bg-slate-900 w-16 h-16 sm:w-20 sm:h-20 rounded-[2rem] flex items-center justify-center mx-auto mb-4 shadow-inner border border-white/5">
           <WalletIcon className="text-slate-700" size={32} />
         </div>
-        <p className="text-slate-400 text-xs sm:text-sm font-bold">لا توجد أي معاملات مسجلة بعد</p>
+        <p className="text-base font-semibold text-slate-200">لسه ما سجّلت أي عملية</p>
+        <p className="mx-auto mt-2 max-w-xs text-xs leading-6 text-slate-400">بتظهر معاملاتك هنا بعد ما تضيف أول دخل أو مصروف.</p>
       </motion.div>
     );
   }
@@ -242,8 +243,24 @@ const TransactionList: React.FC<TransactionListProps> = ({
       <div className="space-y-2.5">
         <AnimatePresence mode="popLayout">
           {sortedTransactions.length === 0 ? (
-            <div className="text-center py-10 bg-slate-900/40 rounded-2xl border border-white/5">
-              <p className="text-xs text-slate-400 font-bold">لا توجد عمليات تطابق معايير التصفية المختارة.</p>
+            <div className="text-center px-5 py-9 sm:py-11 bg-slate-900/40 rounded-3xl border border-dashed border-white/10">
+              <div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-2xl bg-white/5 text-slate-400">
+                <Search size={20} />
+              </div>
+              <p className="text-sm font-semibold text-slate-200">ما لقينا عمليات تطابق بحثك</p>
+              <p className="mx-auto mt-2 max-w-sm text-xs leading-5 text-slate-400">جرّب كلمة ثانية أو غيّر نوع العملية أو المحفظة أو العملة.</p>
+              <button
+                type="button"
+                onClick={() => {
+                  setTypeFilter('all');
+                  setWalletFilter('all');
+                  setCurrencyFilter('all');
+                  setSearchQuery('');
+                }}
+                className="mt-4 inline-flex min-h-11 items-center justify-center rounded-xl bg-[#D9B978]/10 px-4 text-xs font-bold text-[#D9B978] transition hover:bg-[#D9B978]/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D9B978]"
+              >
+                إعادة ضبط البحث والفلاتر
+              </button>
             </div>
           ) : (
             sortedTransactions.map((tx, index) => {
