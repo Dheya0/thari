@@ -1070,7 +1070,7 @@ const App: React.FC = () => {
                 title="تطبيق ثري يعمل بالكامل محلياً دون الحاجة لأي إنترنت (0 نت)"
               >
                 <WifiOff size={11} />
-                <span>أوفلاين 100% (بدون نت)</span>
+                <span>{t.offline}</span>
               </div>
             </div>
 
@@ -1278,11 +1278,14 @@ const App: React.FC = () => {
                 <NavButton icon={<LayoutDashboard />} label={t.dashboard} active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} />
                 <NavButton icon={<Scale />} label={t.zakat} active={activeTab === 'zakat'} onClick={() => setActiveTab('zakat')} />
                 
-                <motion.button 
-                  whileHover={{ scale: 1.06 }}
-                  whileTap={{ scale: 0.94 }}
+                <motion.button
+                  type="button"
+                  aria-label={t.addTransaction}
+                  title={t.addTransaction}
+                  whileHover={{ scale: 1.04 }}
+                  whileTap={{ scale: 0.96 }}
                   onClick={() => { setEditingTransaction(null); setShowAddForm(true); }}
-                  className="w-14 h-14 bg-[#D9B978] hover:bg-[#D9B978]/90 text-slate-950 rounded-[1.5rem] shadow-[0_10px_25px_rgba(217,185,120,0.35)] flex items-center justify-center z-50 border-[4px] border-[#11161C] mx-1 shrink-0"
+                  className="w-14 h-14 min-w-14 min-h-14 bg-[#D9B978] hover:bg-[#E8CA91] text-slate-950 rounded-[1.5rem] shadow-[0_8px_20px_rgba(217,185,120,0.22)] flex items-center justify-center z-50 border-[4px] border-[#11161C] mx-1 shrink-0 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#D9B978] focus-visible:ring-offset-[#11161C]"
                 >
                   <Plus size={28} strokeWidth={3.5} />
                 </motion.button>
@@ -1437,10 +1440,13 @@ const App: React.FC = () => {
 };
 
 const NavButton = ({ icon, label, active, onClick }: { icon: any, label: string, active: boolean, onClick: () => void }) => (
-  <motion.button 
-    whileTap={{ scale: 0.92 }}
-    onClick={onClick} 
-    className={`flex flex-col items-center justify-center gap-1 transition-all flex-1 min-w-[60px] group ${active ? 'text-[#D9B978]' : 'text-slate-500'}`}
+  <motion.button
+    type="button"
+    aria-label={label}
+    aria-current={active ? 'page' : undefined}
+    whileTap={{ scale: 0.96 }}
+    onClick={onClick}
+    className={`flex flex-col items-center justify-center gap-1 transition-all flex-1 min-w-[60px] min-h-[58px] rounded-2xl group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D9B978]/80 ${active ? 'text-[#D9B978]' : 'text-slate-500'}`}
   >
     <div className={`p-2 rounded-xl transition-all duration-300 relative ${active ? 'bg-[#D9B978]/10 text-[#D9B978]' : 'group-hover:bg-white/5'}`}>
         {React.cloneElement(icon, { size: 24, strokeWidth: active ? 2.2 : 1.8 })}
@@ -1451,7 +1457,7 @@ const NavButton = ({ icon, label, active, onClick }: { icon: any, label: string,
           />
         )}
     </div>
-    <span className={`text-[10px] font-bold transition-all duration-300 ${active ? 'opacity-100' : 'opacity-70'}`}>{label}</span>
+    <span className={`text-[11px] font-semibold transition-all duration-300 ${active ? 'opacity-100' : 'opacity-75'}`}>{label}</span>
   </motion.button>
 );
 
