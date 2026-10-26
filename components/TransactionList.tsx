@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 import { Transaction, Category, TransactionType, Wallet, Currency } from '../types';
 import { getIcon, DEFAULT_CURRENCIES, convertCurrency } from '../constants';
-import { getLocalizedCurrency, LanguageKey } from '../utils/translations';
+import { getLocalizedCurrency, getTranslation, LanguageKey } from '../utils/translations';
 
 interface TransactionListProps {
   transactions: Transaction[];
@@ -48,6 +48,7 @@ const TransactionList: React.FC<TransactionListProps> = ({
   showFilters = false,
   language = 'ar'
 }) => {
+  const t = getTranslation(language);
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState<'all' | TransactionType>('all');
   const [walletFilter, setWalletFilter] = useState<string>('all');
@@ -113,8 +114,8 @@ const TransactionList: React.FC<TransactionListProps> = ({
         <div className="bg-slate-900 w-16 h-16 sm:w-20 sm:h-20 rounded-[2rem] flex items-center justify-center mx-auto mb-4 shadow-inner border border-white/5">
           <WalletIcon className="text-slate-700" size={32} />
         </div>
-        <p className="text-base font-semibold text-slate-200">لسه ما سجّلت أي عملية</p>
-        <p className="mx-auto mt-2 max-w-xs text-xs leading-6 text-slate-400">بتظهر معاملاتك هنا بعد ما تضيف أول دخل أو مصروف.</p>
+        <p className="text-base font-semibold text-slate-200">{t.firstTransactionTitle}</p>
+        <p className="mx-auto mt-2 max-w-xs text-xs leading-6 text-slate-400">{t.firstTransactionDescription}</p>
       </motion.div>
     );
   }
@@ -247,8 +248,8 @@ const TransactionList: React.FC<TransactionListProps> = ({
               <div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-2xl bg-white/5 text-slate-400">
                 <Search size={20} />
               </div>
-              <p className="text-sm font-semibold text-slate-200">ما لقينا عمليات تطابق بحثك</p>
-              <p className="mx-auto mt-2 max-w-sm text-xs leading-5 text-slate-400">جرّب كلمة ثانية أو غيّر نوع العملية أو المحفظة أو العملة.</p>
+              <p className="text-sm font-semibold text-slate-200">{t.noTransactionsMatchTitle}</p>
+              <p className="mx-auto mt-2 max-w-sm text-xs leading-5 text-slate-400">{t.noTransactionsMatchDescription}</p>
               <button
                 type="button"
                 onClick={() => {
@@ -259,7 +260,7 @@ const TransactionList: React.FC<TransactionListProps> = ({
                 }}
                 className="mt-4 inline-flex min-h-11 items-center justify-center rounded-xl bg-[#D9B978]/10 px-4 text-xs font-bold text-[#D9B978] transition hover:bg-[#D9B978]/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D9B978]"
               >
-                إعادة ضبط البحث والفلاتر
+                {t.resetSearchFilters}
               </button>
             </div>
           ) : (
