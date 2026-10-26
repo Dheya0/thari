@@ -129,7 +129,7 @@ function normalizeStoredState(parsed: any): AppState {
     ...INITIAL_STATE,
     ...storedData,
     accounts,
-    activeAccountId: parsed.activeAccountId || accounts[0]?.id || 'acc-main',
+    activeAccountId: storedData.activeAccountId || accounts[0]?.id || 'acc-main',
     currency: activeCurrency,
     currencies,
     categories,
@@ -820,7 +820,9 @@ const App: React.FC = () => {
   };
 
   const handleApplyRepairedState = (repairedState: AppState) => {
-    setState(repairedState);
+    const normalizedState = normalizeStoredState(repairedState);
+    setState(normalizedState);
+    saveSecureStateSync(STORAGE_KEY, normalizedState);
   };
 
   const handleSubmitTransaction = (txData: any) => {
